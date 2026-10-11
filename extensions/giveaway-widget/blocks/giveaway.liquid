@@ -1,0 +1,48 @@
+{% comment %}
+  Poke-Collect Giveaways entry widget. Talks to the app through the app proxy at /apps/giveaways.
+{% endcomment %}
+<div
+  class="pcg"
+  data-pcg
+  data-slug="{{ block.settings.slug | escape }}"
+  data-proxy="/apps/giveaways"
+  style="--pcg-accent: {{ block.settings.accent }}; --pcg-radius: {{ block.settings.radius }}px;"
+  {{ block.shopify_attributes }}
+>
+  <div class="pcg__loading" aria-live="polite">Loading giveaway…</div>
+</div>
+
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<script src="{{ 'giveaway.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Giveaway",
+  "target": "section",
+  "stylesheet": "giveaway.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "slug",
+      "label": "Giveaway link name",
+      "info": "Shown on the giveaway's page in the app, under On your store."
+    },
+    {
+      "type": "color",
+      "id": "accent",
+      "label": "Accent color",
+      "default": "#E3350D"
+    },
+    {
+      "type": "range",
+      "id": "radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 24,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    }
+  ]
+}
+{% endschema %}

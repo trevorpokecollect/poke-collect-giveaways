@@ -1,0 +1,276 @@
+// Poke-Collect Giveaways data model.
+// Entry totals are always derived from the append-only EntryEvent ledger, so
+// rollbacks (order edits, cancellations, bot clawbacks) are just negative events.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  ENDED
+  ARCHIVED
+}
+
+model Campaign {
+  id            String         @id @default(cuid())
+  shop          String
+  slug          String
+  title         String
+  description   String?
+  prize         String?
+  imageUrl      String?
+  status        CampaignStatus @default(DRAFT)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  timezone      String         @default("America/New_York")
+  // Purchase rules (base points, product/bundle rules, boosters). Validated by
+  // app/lib/entries/rules.ts before it is saved.
+  purchaseRules Json?
+  // Bot policy thresholds; see app/lib/bot/policy.ts for the default.
+  riskPolicy    Json?
+  // Branding for the storefront widget (colors, copy).
+  theme         Json?
+  rulesText     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  actions  EntryAction[]
+  entrants Entrant[]
+  events   EntryEvent[]
+  orders   OrderLog[]
+  draws    Draw[]
+
+  @@unique([shop, slug])
+  @@index([shop, status])
+}
+
+enum ActionType {
+  SIGNUP
+  REFERRAL
+  SOCIAL_FOLLOW
+  VISIT_URL
+  DAILY_CHECKIN
+  SECRET_CODE
+  ALTERNATE_ENTRY
+  CUSTOM
+}
+
+model EntryAction {
+  id         String     @id @default(cuid())
+  campaignId String
+  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type       ActionType
+  label      String
+  entries    Int        @default(1)
+  // Type-specific settings, e.g. { url } for VISIT_URL or { code } for SECRET_CODE.
+  config     Json?
+  mandatory  Boolean    @default(false)
+  repeatable Boolean    @default(false)
+  sortOrder  Int        @default(0)
+  createdAt  DateTime   @default(now())
+
+  events EntryEvent[]
+}
+
+enum EntrantStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  HELD
+  DISQUALIFIED
+}
+
+model Entrant {
+  id                String        @id @default(cuid())
+  campaignId        String
+  campaign          Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email             String
+  // Canonical form (lowercased, gmail dots/+tags stripped) used for de-duplication.
+  emailNormalized   String
+  name              String?
+  shopifyCustomerId String?
+  status            EntrantStatus @default(PENDING_VERIFICATION)
+  verifiedAt        DateTime?
+  referralCode      String        @unique
+  referredById      String?
+  referredBy        Entrant?      @relation("Referrals", fields: [referredById], references: [id])
+  referrals         Entrant[]     @relation("Referrals")
+  riskScore         Int           @default(0)
+  // Hashed (HMAC) network/device identifiers; raw IPs are never stored.
+  ipHash            String?
+  subnetHash        String?
+  deviceHash        String?
+  userAgent         String?
+  utm               Json?
+  marketingConsent  Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  events      EntryEvent[]
+  riskSignals RiskSignal[]
+  otps        EmailOtp[]
+  wins        Winner[]
+
+  @@unique([campaignId, emailNormalized])
+  @@index([campaignId, status])
+  @@index([campaignId, ipHash])
+  @@index([campaignId, subnetHash])
+  @@index([campaignId, deviceHash])
+}
+
+enum EntrySource {
+  ACTION
+  PURCHASE
+  REFERRAL
+  ADJUSTMENT
+  ROLLBACK
+  IMPORT
+}
+
+model EntryEvent {
+  id         String       @id @default(cuid())
+  campaignId String
+  campaign   Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  entrantId  String
+  entrant    Entrant      @relation(fields: [entrantId], references: [id], onDelete: Cascade)
+  source     EntrySource
+  actionId   String?
+  action     EntryAction? @relation(fields: [actionId], references: [id], onDelete: SetNull)
+  orderLogId String?
+  orderLog   OrderLog?    @relation(fields: [orderLogId], references: [id], onDelete: SetNull)
+  // Positive to award, negative to roll back.
+  entries    Int
+  note       String?
+  // Prevents double-awarding (e.g. "action:<id>:<day>" or "order:<id>").
+  dedupeKey  String?
+  createdAt  DateTime     @default(now())
+
+  @@unique([campaignId, dedupeKey])
+  @@index([entrantId])
+}
+
+enum OrderLogStatus {
+  ENTRIES
+  NO_ENTRIES
+  NO_USER
+  ROLLED_BACK_EDIT
+  ROLLED_BACK_CANCELLED
+}
+
+model OrderLog {
+  id             String         @id @default(cuid())
+  campaignId     String
+  campaign       Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  shopifyOrderId String
+  orderName      String?
+  email          String?
+  status         OrderLogStatus
+  entries        Int            @default(0)
+  // Per-rule breakdown from the scoring engine, shown in the admin order log.
+  breakdown      Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  events EntryEvent[]
+
+  @@unique([campaignId, shopifyOrderId])
+}
+
+model RiskSignal {
+  id        String   @id @default(cuid())
+  entrantId String
+  entrant   Entrant  @relation(fields: [entrantId], references: [id], onDelete: Cascade)
+  code      String
+  weight    Int
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([entrantId])
+}
+
+model EmailOtp {
+  id        String    @id @default(cuid())
+  entrantId String
+  entrant   Entrant   @relation(fields: [entrantId], references: [id], onDelete: Cascade)
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([entrantId])
+}
+
+// Sliding-window counters for rate limiting (key = scope:hash).
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
+model Draw {
+  id            String   @id @default(cuid())
+  campaignId    String
+  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // Hex seed and a hash of the eligible-entrant snapshot, so a draw can be re-verified.
+  seed          String
+  snapshotHash  String
+  totalEntries  Int
+  eligibleCount Int
+  createdBy     String?
+  createdAt     DateTime @default(now())
+
+  winners Winner[]
+}
+
+model Winner {
+  id         String    @id @default(cuid())
+  drawId     String
+  draw       Draw      @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  entrantId  String
+  entrant    Entrant   @relation(fields: [entrantId], references: [id], onDelete: Cascade)
+  position   Int
+  notifiedAt DateTime?
+  forfeited  Boolean   @default(false)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  shop      String
+  actor     String?
+  action    String
+  target    String?
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([shop, createdAt])
+}

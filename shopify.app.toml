@@ -1,0 +1,36 @@
+# Shopify app configuration. Fill client_id by running `npm run config:link`.
+client_id = ""
+name = "Poke-Collect Giveaways"
+embedded = true
+
+[access_scopes]
+# read_orders: purchase entries. read_customers: link entrants to customer accounts.
+# read_products: pick products for entry rules.
+scopes = "read_orders,read_customers,read_products"
+
+[app_proxy]
+# Storefront requests to https://<store>/apps/giveaways/* are signed by Shopify and forwarded here.
+url = "/proxy"
+prefix = "apps"
+subpath = "giveaways"
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  # Handled by: /app/routes/webhooks.orders.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders"
+  topics = ["orders/create", "orders/updated", "orders/cancelled"]
+
+  # Handled by: /app/routes/webhooks.compliance.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/compliance"
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
