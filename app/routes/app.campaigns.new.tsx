@@ -11,6 +11,10 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { purchaseRulesSchema } from "../lib/entries/rules";
 import { DEFAULT_RISK_POLICY } from "../lib/bot/risk";
+import { slugify } from "../lib/slug";
+import { parseLocalDateTime } from "../lib/time";
+
+const TIMEZONE = "America/New_York";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -19,13 +23,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 48);
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -61,6 +58,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       },
     });
     imageUrl = `${process.env.SHOPIFY_APP_URL}/images/${image.id}`;
+  }
+
+  const startsAt = parseLocalDateTime(get("startsAt"), TIMEZONE);
+  const endsAt = parseLocalDateTime(get("endsAt"), TIMEZONE);
+  if (startsAt === null || endsAt === null) {
+    return { error: "Pick the start and end dates with the date pickers." };
+  }
+  if (startsAt && endsAt && endsAt <= startsAt) {
+    return { error: "The end date must be after the start date." };
   }
 
   const perDollar = Number(get("entriesPerDollar") || 0);
@@ -118,8 +124,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       prize: get("prize") || null,
       description: get("description") || null,
       imageUrl,
-      startsAt: get("startsAt") ? new Date(get("startsAt")) : null,
-      endsAt: get("endsAt") ? new Date(get("endsAt")) : null,
+      startsAt: startsAt ?? null,
+      endsAt: endsAt ?? null,
+      timezone: TIMEZONE,
       purchaseRules:
         perDollar > 0
           ? purchaseRulesSchema.parse({
@@ -198,17 +205,18 @@ export default function NewCampaign() {
                 details="Used in the giveaway URL. Leave blank to use the title."
               />
               <s-grid gridTemplateColumns="1fr 1fr" gap="base">
-                <s-text-field
-                  name="startsAt"
-                  label="Starts"
-                  placeholder="2026-11-01T09:00"
-                />
-                <s-text-field
-                  name="endsAt"
-                  label="Ends"
-                  placeholder="2026-11-30T23:59"
-                />
+                <label className="pcg-field">
+                  <s-text>Starts (Eastern time)</s-text>
+                  <input type="datetime-local" name="startsAt" />
+                </label>
+                <label className="pcg-field">
+                  <s-text>Ends (Eastern time)</s-text>
+                  <input type="datetime-local" name="endsAt" />
+                </label>
               </s-grid>
+              <s-text color="subdued">
+                Leave Starts blank to open as soon as you click Go live.
+              </s-text>
             </s-stack>
           </s-section>
 

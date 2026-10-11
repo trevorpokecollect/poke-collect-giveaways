@@ -20,6 +20,7 @@ import { verifyTurnstile } from "../bot/turnstile.server";
 import { issueOtp } from "../otp.server";
 import { issueEntrantToken } from "../token.server";
 import { award, entrantTotal } from "./ledger.server";
+import { slugify } from "../slug";
 
 export interface SignupInput {
   shop: string;
@@ -58,16 +59,46 @@ const LIMITS = {
   deviceEntrants: 2,
 };
 
+/**
+ * Finds the open giveaway for a storefront request. Accepts the link name in
+ * any form a merchant might type it ("Delta Reign", "delta-reign"), or the
+ * giveaway title; "latest" picks the newest open giveaway.
+ */
 export async function findLiveCampaign(shop: string, slug: string) {
   const now = new Date();
-  const campaign = await db.campaign.findUnique({
-    where: { shop_slug: { shop, slug } },
-    include: { actions: { orderBy: { sortOrder: "asc" } } },
+  const include = { actions: { orderBy: { sortOrder: "asc" as const } } };
+  const isOpen = (c: Campaign | null) =>
+    !!c &&
+    c.status === "ACTIVE" &&
+    (!c.startsAt || c.startsAt <= now) &&
+    (!c.endsAt || c.endsAt >= now);
+  const wanted = slugify(slug);
+
+  if (wanted && wanted !== "latest") {
+    const bySlug = await db.campaign.findUnique({
+      where: { shop_slug: { shop, slug: wanted } },
+      include,
+    });
+    if (bySlug) return isOpen(bySlug) ? bySlug : null;
+    const byTitle = await db.campaign.findFirst({
+      where: { shop, title: { equals: slug.trim(), mode: "insensitive" } },
+      orderBy: { createdAt: "desc" },
+      include,
+    });
+    return isOpen(byTitle) ? byTitle : null;
+  }
+
+  const latest = await db.campaign.findFirst({
+    where: {
+      shop,
+      status: "ACTIVE",
+      OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+      AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
+    },
+    orderBy: { createdAt: "desc" },
+    include,
   });
-  if (!campaign || campaign.status !== "ACTIVE") return null;
-  if (campaign.startsAt && campaign.startsAt > now) return null;
-  if (campaign.endsAt && campaign.endsAt < now) return null;
-  return campaign;
+  return latest;
 }
 
 export async function signup(input: SignupInput): Promise<SignupResult> {
