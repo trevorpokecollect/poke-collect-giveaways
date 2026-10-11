@@ -2,6 +2,10 @@
 client_id = ""
 name = "Poke-Collect Giveaways"
 embedded = true
+application_url = "https://app-production-2322.up.railway.app"
+
+[auth]
+redirect_urls = ["https://app-production-2322.up.railway.app/auth/callback"]
 
 [access_scopes]
 # read_orders: purchase entries. read_customers: link entrants to customer accounts.
