@@ -1,5 +1,5 @@
-# Shopify app configuration. Fill client_id by running `npm run config:link`.
-client_id = ""
+# Shopify app configuration.
+client_id = "0e0ba5328cb24247e2b03e9468d5e102"
 name = "Poke-Collect Giveaways"
 embedded = true
 application_url = "https://app-production-2322.up.railway.app"
