@@ -3,6 +3,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
+import { useState } from "react";
 import { Form, redirect, useActionData, useNavigation } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { ActionType } from "@prisma/client";
@@ -15,6 +16,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
   return null;
 };
+
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const slugify = (s: string) =>
   s
@@ -37,6 +41,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     })
   ) {
     return { error: `A giveaway with the link "${slug}" already exists.` };
+  }
+
+  // Prize image: stored in the app database and served from /images/<id>.
+  const file = form.get("image");
+  let imageUrl: string | null = null;
+  if (file instanceof File && file.size > 0) {
+    if (!IMAGE_TYPES.includes(file.type)) {
+      return { error: "The prize image must be a PNG, JPG, WebP or GIF." };
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      return { error: "The prize image must be 5 MB or smaller." };
+    }
+    const image = await db.campaignImage.create({
+      data: {
+        shop: session.shop,
+        contentType: file.type,
+        data: Buffer.from(await file.arrayBuffer()),
+      },
+    });
+    imageUrl = `${process.env.SHOPIFY_APP_URL}/images/${image.id}`;
   }
 
   const perDollar = Number(get("entriesPerDollar") || 0);
@@ -93,7 +117,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       title,
       prize: get("prize") || null,
       description: get("description") || null,
-      imageUrl: get("imageUrl") || null,
+      imageUrl,
       startsAt: get("startsAt") ? new Date(get("startsAt")) : null,
       endsAt: get("endsAt") ? new Date(get("endsAt")) : null,
       purchaseRules:
@@ -124,10 +148,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function NewCampaign() {
   const result = useActionData<typeof action>();
   const saving = useNavigation().state === "submitting";
+  const [preview, setPreview] = useState<string | null>(null);
 
   return (
     <s-page heading="New giveaway">
-      <Form method="post">
+      <Form method="post" encType="multipart/form-data">
         <s-stack gap="base">
           {result?.error && <s-banner tone="critical">{result.error}</s-banner>}
 
@@ -145,7 +170,28 @@ export default function NewCampaign() {
                 placeholder="1x sealed booster box"
               />
               <s-text-area name="description" label="Description" rows={3} />
-              <s-url-field name="imageUrl" label="Prize image URL" />
+              <s-stack gap="small-200">
+                <s-text>Prize image</s-text>
+                <input
+                  type="file"
+                  name="image"
+                  accept={IMAGE_TYPES.join(",")}
+                  onChange={(e) => {
+                    const f = e.currentTarget.files?.[0];
+                    setPreview(f ? URL.createObjectURL(f) : null);
+                  }}
+                />
+                {preview && (
+                  <img
+                    src={preview}
+                    alt="Prize preview"
+                    style={{ maxWidth: 240, borderRadius: 8 }}
+                  />
+                )}
+                <s-text color="subdued">
+                  PNG, JPG, WebP or GIF, up to 5 MB.
+                </s-text>
+              </s-stack>
               <s-text-field
                 name="slug"
                 label="Link name"

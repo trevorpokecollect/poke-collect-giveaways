@@ -263,6 +263,15 @@ model Winner {
   forfeited  Boolean   @default(false)
 }
 
+// Prize images uploaded from the admin, served publicly at /images/<id>.
+model CampaignImage {
+  id          String   @id @default(cuid())
+  shop        String
+  contentType String
+  data        Bytes
+  createdAt   DateTime @default(now())
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   shop      String
