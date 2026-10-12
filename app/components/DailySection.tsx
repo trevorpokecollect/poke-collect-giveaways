@@ -103,7 +103,7 @@ export function DailySection({ daily }: { daily: DailyData }) {
                     {STATUS[current.status].label}
                   </s-badge>
                   {current.fromSafetyStock && (
-                    <s-badge>From safety stock</s-badge>
+                    <s-badge>From Safety Stock</s-badge>
                   )}
                   {current.winner && <s-text>Winner: {current.winner}</s-text>}
                 </s-stack>

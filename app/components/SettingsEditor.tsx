@@ -131,7 +131,7 @@ export function SettingsEditor(props: {
                 />
               </s-grid>
               <Check
-                label="Also use safety stock"
+                label="Also Use Safety Stock"
                 details="Automatic picks can use a product whose only stock is safety stock. Products you line up or choose yourself can always use it."
                 checked={s.daily.useSafetyStock}
                 onChange={(useSafetyStock) => daily({ useSafetyStock })}
