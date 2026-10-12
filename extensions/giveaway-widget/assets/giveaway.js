@@ -4,6 +4,10 @@
 
   var TOKEN_KEY = "pcg:token:";
   var DEVICE_KEY = "pcg:device";
+  var VIDEO_KEY = "pcg:video:";
+  var AMOE_KEY = "pcg:amoe:";
+  // Completed from elsewhere in the widget, never from the action list.
+  var NOT_LISTED = { REFERRAL: 1, ALTERNATE_ENTRY: 1, SIGNUP: 1 };
 
   function store(k, v) {
     try {
@@ -43,35 +47,64 @@
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     Object.keys(attrs || {}).forEach(function (k) {
-      if (k === "text") node.textContent = attrs[k];
-      else if (k.indexOf("on") === 0) node.addEventListener(k.slice(2), attrs[k]);
-      else node.setAttribute(k, attrs[k]);
+      var v = attrs[k];
+      if (v === undefined || v === null || v === false) return;
+      if (k === "text") node.textContent = v;
+      else if (k.indexOf("on") === 0) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? "" : v);
     });
-    (children || []).forEach(function (c) { if (c) node.appendChild(c); });
+    (children || []).forEach(function (c) {
+      if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
     return node;
   }
 
+  function plural(n, one, many) { return n === 1 ? one : many; }
+
+  var uid = 0;
+  function nextId(prefix) { uid += 1; return "pcg-" + prefix + "-" + uid; }
+
+  function copyText(text, input) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    if (input) { input.select(); try { document.execCommand("copy"); return Promise.resolve(); } catch (e) { /* fall through */ } }
+    return Promise.reject(new Error("copy"));
+  }
+
+  // Share targets for referral links and SOCIAL_SHARE actions.
+  var NETWORKS = [
+    { id: "x", label: "X", url: function (link, text) { return "https://x.com/intent/post?text=" + encodeURIComponent(text) + "&url=" + encodeURIComponent(link); } },
+    { id: "facebook", label: "Facebook", url: function (link) { return "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(link); } },
+    { id: "whatsapp", label: "WhatsApp", url: function (link, text) { return "https://wa.me/?text=" + encodeURIComponent(text + " " + link); } },
+    { id: "copy", label: "Copy link" },
+  ];
+
   function Widget(root) {
     this.root = root;
-    this.slug = root.getAttribute("data-slug");
-    this.base = root.getAttribute("data-proxy") + "/" + encodeURIComponent(this.slug);
+    // A blank link name means the newest open giveaway.
+    this.slug = (root.getAttribute("data-slug") || "").trim() || "latest";
+    this.base = (root.getAttribute("data-proxy") || "/apps/giveaways") + "/" + encodeURIComponent(this.slug);
     this.tokenKey = TOKEN_KEY + this.slug;
     this.ref = new URLSearchParams(window.location.search).get("ref") || "";
     this.renderedAt = Date.now();
   }
 
   Widget.prototype.request = function (method, body) {
-    var headers = { "Content-Type": "application/json" };
+    // format=json (and the Accept header) tell the server this isn't a page view.
+    var headers = { "Content-Type": "application/json", Accept: "application/json" };
     var token = store(this.tokenKey);
     if (token) headers["x-entrant-token"] = token;
-    return fetch(this.base, {
+    return fetch(this.base + "?format=json", {
       method: method,
       headers: headers,
       credentials: "same-origin",
       body: body ? JSON.stringify(body) : undefined,
     }).then(function (res) {
-      return res.json().then(function (data) {
-        if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) {
+          var err = new Error(data.error || "Something went wrong. Please try again.");
+          err.data = data;
+          throw err;
+        }
         return data;
       });
     });
@@ -79,19 +112,44 @@
 
   Widget.prototype.load = function () {
     var self = this;
-    if (!this.slug) return this.message("Set the giveaway link name in the theme editor.");
-    this.request("GET")
+    return this.request("GET")
       .then(function (data) {
         self.data = data;
-        if (data.entrant && data.entrant.state === "active") self.renderEntrant(data.entrant);
-        else if (data.entrant && data.entrant.state === "held") self.renderHeld();
+        var entrant = data.entrant;
+        if (entrant && entrant.state === "active") {
+          self.renderEntrant(entrant);
+          self.flushAlternateEntry().catch(function () { /* stays saved; retried on the next load */ });
+        } else if (entrant && entrant.state === "held") self.renderHeld();
         else self.renderSignup();
       })
-      .catch(function (err) { self.message(err.message); });
+      .catch(function (err) {
+        // An ended giveaway answers "not open" along with its public winners.
+        var d = err.data || {};
+        if (d.winners && d.winners.length) return self.renderClosed(d, err.message);
+        self.message(err.message);
+      });
+  };
+
+  Widget.prototype.renderClosed = function (data, text) {
+    this.data = { campaign: data.campaign || null, winners: data.winners };
+    var c = data.campaign;
+    this.show([
+      c && c.title ? el("div", { class: "pcg__hero" }, [
+        el("span", { class: "pcg__badge pcg__badge--ended", text: "Ended" }),
+        el("h2", { class: "pcg__title", text: c.title }),
+        c.prize ? el("p", { class: "pcg__prize", text: c.prize }) : null,
+      ]) : el("div", { class: "pcg__hero" }, [el("span", { class: "pcg__badge pcg__badge--ended", text: "Ended" })]),
+      el("p", { class: "pcg__note", text: text || "This giveaway has ended." }),
+      this.winners(),
+    ]);
   };
 
   Widget.prototype.message = function (text) {
-    this.root.replaceChildren(el("p", { class: "pcg__note", text: text }));
+    this.root.replaceChildren(el("p", { class: "pcg__note pcg__note--solo", text: text }));
+  };
+
+  Widget.prototype.show = function (nodes) {
+    this.root.replaceChildren.apply(this.root, nodes.filter(Boolean));
   };
 
   Widget.prototype.header = function () {
@@ -113,9 +171,9 @@
     var units = [["d", 86400], ["h", 3600], ["m", 60], ["s", 1]];
     var labels = { d: "Days", h: "Hours", m: "Mins", s: "Secs" };
     var cells = {};
-    var box = el("div", { class: "pcg__timer", "aria-label": "Ends " + endsAt.toLocaleString() }, units.map(function (u) {
-      cells[u[0]] = el("b", { text: "0" });
-      return el("div", {}, [cells[u[0]], el("span", { text: labels[u[0]] })]);
+    var box = el("div", { class: "pcg__timer", role: "timer", "aria-label": "Ends " + endsAt.toLocaleString() }, units.map(function (u) {
+      cells[u[0]] = el("b", { text: "0", "aria-hidden": "true" });
+      return el("div", {}, [cells[u[0]], el("span", { text: labels[u[0]], "aria-hidden": "true" })]);
     }));
     function tick() {
       var left = Math.max(0, Math.floor((endsAt.getTime() - Date.now()) / 1000));
@@ -131,15 +189,98 @@
     return box;
   };
 
+  // Sections every view shows: leaderboard, winners, rules and the free-entry link.
+  Widget.prototype.extras = function () {
+    return [this.winners(), this.leaderboard(), this.footer()];
+  };
+
+  Widget.prototype.leaderboard = function () {
+    var rows = this.data.leaderboard;
+    if (!rows || !rows.length) return null;
+    var headingId = nextId("lb");
+    return el("section", { class: "pcg__board", "aria-labelledby": headingId }, [
+      el("h3", { class: "pcg__subheading", id: headingId, text: "Leaderboard" }),
+      el("ol", { class: "pcg__board-list" }, rows.map(function (r) {
+        return el("li", { class: "pcg__board-row" + (r.you ? " pcg__board-row--you" : "") }, [
+          el("span", { class: "pcg__board-rank", text: String(r.rank) }),
+          el("span", { class: "pcg__board-name", text: r.name + (r.you ? " (you)" : "") }),
+          el("b", { class: "pcg__board-entries", text: String(r.entries) }),
+          el("span", { class: "pcg__sr", text: plural(r.entries, " entry", " entries") }),
+        ]);
+      })),
+    ]);
+  };
+
+  // Rendered whenever the server includes `winners`: [{ position, name }] after a draw, if the
+  // merchant shows them. Ended giveaways send them with the "not open" error (see renderClosed).
+  Widget.prototype.winners = function () {
+    var list = this.data.winners;
+    if (!list || !list.length) return null;
+    var headingId = nextId("win");
+    return el("section", { class: "pcg__winners", "aria-labelledby": headingId }, [
+      el("h3", { class: "pcg__subheading", id: headingId, text: list.length === 1 ? "Winner" : "Winners" }),
+      el("ol", { class: "pcg__winners-list" }, list.slice().sort(function (a, b) { return (a.position || 0) - (b.position || 0); }).map(function (w) {
+        var name = typeof w === "string" ? w : w.name || "Winner";
+        var prize = typeof w === "object" && w ? w.prize : null;
+        return el("li", {}, [
+          w.position ? el("span", { class: "pcg__winner-pos", text: "#" + w.position }) : null,
+          el("span", { class: "pcg__winner-name", text: name }),
+          prize ? el("span", { class: "pcg__winner-prize", text: prize }) : null,
+        ]);
+      })),
+    ]);
+  };
+
   Widget.prototype.footer = function () {
+    var self = this;
     var c = this.data.campaign;
-    return c.rulesText ? el("details", { class: "pcg__rules" }, [el("summary", { text: "Official rules" }), el("p", { text: c.rulesText })]) : null;
+    var free = el("p", { class: "pcg__free" }, [
+      "No purchase necessary. ",
+      el("button", { class: "pcg__link", type: "button", text: "Free alternate entry", onclick: function () { self.openAlternateEntry(); } }),
+    ]);
+    var rules = c.rulesText ? el("details", { class: "pcg__rules" }, [el("summary", { text: "Official rules" }), el("p", { text: c.rulesText })]) : null;
+    return el("div", { class: "pcg__footer" }, [free, rules]);
+  };
+
+  Widget.prototype.mountTurnstile = function (box, onToken) {
+    var siteKey = this.data.turnstileSiteKey;
+    if (!siteKey) return;
+    var tries = 0;
+    var mount = function () {
+      if (!window.turnstile) { tries += 1; if (tries < 50) window.setTimeout(mount, 200); return; }
+      box.__tsId = window.turnstile.render(box, {
+        sitekey: siteKey,
+        appearance: "interaction-only",
+        callback: function (t) { onToken(t); },
+        "expired-callback": function () { onToken(""); },
+      });
+    };
+    mount();
+  };
+
+  Widget.prototype.signup = function (fields) {
+    var self = this;
+    this.email = fields.email;
+    return this.request("POST", {
+      intent: "signup",
+      email: fields.email,
+      name: fields.name,
+      website: fields.website,
+      consent: fields.consent,
+      ref: this.ref,
+      turnstileToken: fields.turnstileToken,
+      elapsedMs: Date.now() - this.renderedAt,
+      deviceId: deviceId(),
+      utm: utm(),
+    }).then(function (res) { self.handleResult(res); });
   };
 
   Widget.prototype.renderSignup = function (error) {
     var self = this;
-    var email = el("input", { class: "pcg__input", type: "email", name: "email", required: "", autocomplete: "email", placeholder: "Email address" });
-    var name = el("input", { class: "pcg__input", type: "text", name: "name", autocomplete: "name", placeholder: "Name (optional)" });
+    var emailId = nextId("email");
+    var nameId = nextId("name");
+    var email = el("input", { class: "pcg__input", id: emailId, type: "email", name: "email", required: true, autocomplete: "email", placeholder: "you@example.com" });
+    var name = el("input", { class: "pcg__input", id: nameId, type: "text", name: "name", autocomplete: "name", placeholder: "Ash Ketchum" });
     var honeypot = el("input", { type: "text", name: "website", tabindex: "-1", autocomplete: "off" });
     var consent = el("input", { type: "checkbox", name: "consent" });
     var turnstileBox = el("div");
@@ -149,33 +290,22 @@
 
     var form = el("form", {
       class: "pcg__form",
-      novalidate: "",
+      novalidate: true,
       onsubmit: function (e) {
         e.preventDefault();
-        if (!email.value) { err.textContent = "Please enter your email."; return; }
+        if (!email.value) { err.textContent = "Please enter your email."; email.focus(); return; }
         button.disabled = true;
-        self.email = email.value;
-        self.request("POST", {
-          intent: "signup",
-          email: email.value,
-          name: name.value,
-          website: honeypot.value,
-          consent: consent.checked,
-          ref: self.ref,
-          turnstileToken: turnstileToken,
-          elapsedMs: Date.now() - self.renderedAt,
-          deviceId: deviceId(),
-          utm: utm(),
-        })
-          .then(function (res) { self.handleResult(res); })
+        self.signup({ email: email.value, name: name.value, website: honeypot.value, consent: consent.checked, turnstileToken: turnstileToken })
           .catch(function (e2) {
             err.textContent = e2.message;
             button.disabled = false;
-            if (window.turnstile && self.turnstileId !== undefined) window.turnstile.reset(self.turnstileId);
+            if (window.turnstile && turnstileBox.__tsId !== undefined) window.turnstile.reset(turnstileBox.__tsId);
           });
       },
     }, [
+      el("label", { class: "pcg__label", for: emailId, text: "Email" }),
       email,
+      el("label", { class: "pcg__label", for: nameId, text: "Name (optional)" }),
       name,
       el("div", { class: "pcg__hp", "aria-hidden": "true" }, [el("label", { text: "Website" }), honeypot]),
       el("label", { class: "pcg__check" }, [consent, el("span", { text: "Send me news and drops by email." })]),
@@ -184,21 +314,8 @@
       button,
     ]);
 
-    this.root.replaceChildren.apply(this.root, this.header().concat([form, this.footer()]).filter(Boolean));
-
-    var siteKey = this.data.turnstileSiteKey;
-    if (siteKey) {
-      var mount = function () {
-        if (!window.turnstile) return window.setTimeout(mount, 200);
-        self.turnstileId = window.turnstile.render(turnstileBox, {
-          sitekey: siteKey,
-          appearance: "interaction-only",
-          callback: function (t) { turnstileToken = t; },
-          "expired-callback": function () { turnstileToken = ""; },
-        });
-      };
-      mount();
-    }
+    this.show(this.header().concat([form], this.extras()));
+    this.mountTurnstile(turnstileBox, function (t) { turnstileToken = t; });
   };
 
   Widget.prototype.handleResult = function (res) {
@@ -210,7 +327,8 @@
 
   Widget.prototype.renderVerify = function (error) {
     var self = this;
-    var code = el("input", { class: "pcg__input", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6", placeholder: "6-digit code" });
+    var codeId = nextId("code");
+    var code = el("input", { class: "pcg__input", id: codeId, inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6", placeholder: "6-digit code" });
     var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
     var button = el("button", { class: "pcg__btn", type: "submit", text: "Confirm entry" });
     var form = el("form", {
@@ -223,79 +341,419 @@
           .catch(function (e2) { err.textContent = e2.message; button.disabled = false; });
       },
     }, [
-      el("p", { class: "pcg__note", text: "We sent a code to " + (self.email || "your email") + ". Enter it to confirm your entry." }),
+      el("label", { class: "pcg__note", for: codeId, text: "We sent a code to " + (self.email || "your email") + ". Enter it to confirm your entry." }),
       code,
       err,
       button,
       el("button", { class: "pcg__btn pcg__btn--ghost", type: "button", text: "Use a different email", onclick: function () { self.renderSignup(); } }),
     ]);
-    this.root.replaceChildren.apply(this.root, this.header().concat([form]));
+    this.show(this.header().concat([form]));
     code.focus();
   };
 
   Widget.prototype.renderHeld = function () {
-    this.root.replaceChildren.apply(this.root, this.header().concat([
-      el("p", { class: "pcg__note", text: "Thanks! Your entry is being reviewed and will count once it's approved." }),
-    ]));
+    this.show(this.header().concat([
+      el("p", { class: "pcg__note", role: "status", text: "Thanks! Your entry is being reviewed and will count once it's approved." }),
+    ], this.extras()));
+  };
+
+  Widget.prototype.referralLink = function () {
+    var code = this.data.entrant && this.data.entrant.referralCode;
+    var url = new URL(window.location.href);
+    url.hash = "";
+    ["ref", "format"].forEach(function (k) { url.searchParams.delete(k); });
+    if (code) url.searchParams.set("ref", code);
+    return url.toString();
+  };
+
+  Widget.prototype.shareText = function () {
+    var c = this.data.campaign;
+    return "Enter " + c.title + (c.prize ? " for a chance to win " + c.prize : "") + "!";
+  };
+
+  // Share buttons. onShare(networkId) runs after the share window opens (or the link is copied).
+  Widget.prototype.shareButtons = function (only, onShare) {
+    var link = this.referralLink();
+    var text = this.shareText();
+    var networks = NETWORKS.filter(function (n) { return !only || only === "any" || n.id === only; });
+    return el("div", { class: "pcg__share", role: "group", "aria-label": "Share" }, networks.map(function (n) {
+      var btn = el("button", {
+        class: "pcg__share-btn pcg__share-btn--" + n.id,
+        type: "button",
+        text: n.label,
+        onclick: function () {
+          if (n.id === "copy") {
+            copyText(link).then(
+              function () { btn.textContent = "Copied"; if (onShare) onShare(n.id); },
+              function () { window.prompt("Copy your link", link); if (onShare) onShare(n.id); }
+            );
+            return;
+          }
+          window.open(n.url(link, text), "_blank", "noopener,width=600,height=540");
+          if (onShare) onShare(n.id);
+        },
+      });
+      return btn;
+    }));
   };
 
   Widget.prototype.renderEntrant = function (entrant) {
     var self = this;
     var done = {};
     (entrant.completedActionIds || []).forEach(function (id) { done[id] = true; });
-
-    var list = el("ul", { class: "pcg__actions" });
-    this.data.campaign.actions.forEach(function (a) {
-      if (a.type === "REFERRAL" || a.type === "ALTERNATE_ENTRY") return;
-      var isDone = done[a.id] && a.type !== "DAILY_CHECKIN";
-      var pill = el("span", { class: "pcg__pill", text: "+" + a.entries });
-      var input = a.type === "SECRET_CODE" && !isDone ? el("input", { class: "pcg__input", placeholder: "Code" }) : null;
-      var btn = isDone ? null : el("button", {
-        class: "pcg__btn",
-        type: "button",
-        text: a.type === "DAILY_CHECKIN" ? "Check in" : a.url ? "Go" : "Submit",
-        onclick: function () {
-          if (a.url) window.open(a.url, "_blank", "noopener");
-          btn.disabled = true;
-          self.request("POST", { intent: "action", actionId: a.id, code: input ? input.value : undefined })
-            .then(function () { self.load(); })
-            .catch(function (e2) { btn.disabled = false; window.alert(e2.message); });
-        },
-      });
-      if (btn) btn.className = "pcg__btn pcg__btn--small";
-      list.appendChild(el("li", { class: "pcg__action" + (isDone ? " pcg__action--done" : "") }, [
-        el("span", { class: "pcg__action-label", text: a.label }), input, pill, btn,
-      ]));
-    });
+    var actions = this.data.campaign.actions.filter(function (a) { return !NOT_LISTED[a.type]; });
+    var requiredLeft = actions.filter(function (a) { return a.mandatory && !done[a.id]; });
 
     var nodes = this.header().concat([
-      el("div", { class: "pcg__count" }, [
-        el("span", { text: entrant.entries === 1 ? "Your entry" : "Your entries" }),
+      el("div", { class: "pcg__count", role: "status", "aria-live": "polite" }, [
+        el("span", { text: plural(entrant.entries, "Your entry", "Your entries") }),
         el("b", { text: String(entrant.entries) }),
       ]),
+      this.breakdown(entrant),
     ]);
-    if (list.children.length) nodes.push(el("h3", { class: "pcg__subheading", text: "Earn more entries" }), list);
+
+    if (actions.length) {
+      nodes.push(el("h3", { class: "pcg__subheading", text: "Earn more entries" }));
+      if (requiredLeft.length) {
+        nodes.push(el("p", { class: "pcg__note", text: "Complete the required " + plural(requiredLeft.length, "action", "actions") + " first to unlock the rest." }));
+      }
+      nodes.push(el("ul", { class: "pcg__actions" }, actions.map(function (a) {
+        return self.actionItem(a, entrant, !!done[a.id], !a.mandatory && requiredLeft.length > 0);
+      })));
+    }
 
     var referral = this.data.campaign.actions.filter(function (a) { return a.type === "REFERRAL"; })[0];
-    if (referral && entrant.referralCode) {
-      var link = window.location.origin + window.location.pathname + "?ref=" + encodeURIComponent(entrant.referralCode);
-      var input = el("input", { class: "pcg__input", readonly: "", value: link });
-      nodes.push(el("div", { class: "pcg__ref" }, [
-        el("p", { class: "pcg__note", text: "Get +" + referral.entries + " entries for every friend who enters with your link." }),
-        el("div", { class: "pcg__ref-row" }, [input, el("button", {
-          class: "pcg__btn pcg__btn--small", type: "button", text: "Copy",
-          onclick: function (e) {
-            var b = e.currentTarget;
-            (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
-              function () { b.textContent = "Copied"; },
-              function () { input.select(); }
-            );
+    if (referral && entrant.referralCode) nodes.push(this.referralBox(referral));
+
+    this.show(nodes.concat(this.extras()));
+  };
+
+  // "My entries": where the total came from.
+  Widget.prototype.breakdown = function (entrant) {
+    var b = entrant.breakdown;
+    if (!b) return null;
+    var rows = [["Signing up", b.signup], ["Actions", b.actions], ["Purchases", b.purchases], ["Referrals", b.referrals], ["Adjustments", b.other]]
+      .filter(function (r) { return r[1]; });
+    if (!rows.length) return null;
+    return el("details", { class: "pcg__mine" }, [
+      el("summary", { text: "My entries" }),
+      el("dl", { class: "pcg__mine-list" }, rows.reduce(function (out, r) {
+        return out.concat([el("dt", { text: r[0] }), el("dd", { text: (r[1] > 0 ? "+" : "") + r[1] })]);
+      }, [])),
+    ]);
+  };
+
+  // Runs an action request with shared busy / error / success handling.
+  Widget.prototype.submitAction = function (a, extra, ctx) {
+    var self = this;
+    var body = { intent: "action", actionId: a.id };
+    Object.keys(extra || {}).forEach(function (k) { body[k] = extra[k]; });
+    if (ctx.button) ctx.button.disabled = true;
+    ctx.error.textContent = "";
+    return this.request("POST", body)
+      .then(function (res) {
+        if (res.awarded === false && (a.type === "DAILY_CHECKIN" || a.repeatable)) {
+          ctx.error.textContent = "Already counted today. Come back tomorrow.";
+          if (ctx.button) ctx.button.disabled = false;
+          return res;
+        }
+        if (body.step !== "start") self.load();
+        return res;
+      })
+      .catch(function (e2) {
+        ctx.error.textContent = e2.message;
+        if (ctx.button) ctx.button.disabled = false;
+        throw e2;
+      });
+  };
+
+  Widget.prototype.actionItem = function (a, entrant, isDone, locked) {
+    var self = this;
+    var cfg = a.config || {};
+    var repeats = a.type === "DAILY_CHECKIN" || a.repeatable;
+    var finished = isDone && !repeats;
+    var error = el("p", { class: "pcg__error", role: "alert" });
+    var labelId = nextId("act");
+    var head = el("div", { class: "pcg__action-head" }, [
+      el("span", { class: "pcg__action-label", id: labelId }, [
+        a.label,
+        a.mandatory ? el("span", { class: "pcg__req", text: "Required" }) : null,
+      ]),
+      el("span", { class: "pcg__pill", text: finished ? "Done +" + a.entries : "+" + a.entries }),
+    ]);
+    var body = finished ? this.doneBody(a, entrant) : locked ? null : this.actionBody(a, entrant, cfg, error);
+    var cls = "pcg__action" + (finished ? " pcg__action--done" : "") + (locked && !finished ? " pcg__action--locked" : "") + (a.mandatory ? " pcg__action--required" : "");
+    return el("li", { class: cls, "aria-labelledby": labelId }, [head, body, locked && !finished ? el("p", { class: "pcg__lock", text: "Locked" }) : null, error]);
+  };
+
+  // What a completed action still shows: poll results or the entrant's answer.
+  Widget.prototype.doneBody = function (a, entrant) {
+    var answer = entrant.answers && entrant.answers[a.id];
+    if (a.type === "POLL") return this.pollResults(a, entrant);
+    if (a.type === "QUESTION" && answer) return el("p", { class: "pcg__answered", text: "Your answer: " + answer });
+    return null;
+  };
+
+  Widget.prototype.pollResults = function (a, entrant) {
+    var counts = (entrant.pollResults && entrant.pollResults[a.id]) || {};
+    var mine = entrant.answers && entrant.answers[a.id];
+    var total = Object.keys(counts).reduce(function (s, k) { return s + counts[k]; }, 0) || 1;
+    return el("div", { class: "pcg__poll" }, [
+      a.config.question ? el("p", { class: "pcg__question", text: a.config.question }) : null,
+      el("ul", { class: "pcg__results" }, (a.config.options || []).map(function (o) {
+        var pct = Math.round(((counts[o] || 0) / total) * 100);
+        return el("li", { class: "pcg__result" + (o === mine ? " pcg__result--mine" : "") }, [
+          el("span", { class: "pcg__result-bar", style: "width:" + pct + "%", "aria-hidden": "true" }),
+          el("span", { class: "pcg__result-label", text: o + (o === mine ? " (your vote)" : "") }),
+          el("b", { text: pct + "%" }),
+        ]);
+      })),
+    ]);
+  };
+
+  Widget.prototype.actionBody = function (a, entrant, cfg, error) {
+    var self = this;
+    var ctx = { error: error };
+    var btn = function (text, onclick, extraClass) {
+      var b = el("button", { class: "pcg__btn pcg__btn--small" + (extraClass || ""), type: "button", text: text, onclick: onclick });
+      return b;
+    };
+
+    switch (a.type) {
+      case "POLL": {
+        var question = cfg.question ? el("p", { class: "pcg__question", text: cfg.question }) : null;
+        var group = el("div", { class: "pcg__options", role: "group", "aria-label": cfg.question || a.label });
+        (cfg.options || []).forEach(function (o) {
+          var b = btn(o, function () {
+            Array.prototype.forEach.call(group.children, function (c) { c.disabled = true; });
+            ctx.button = null;
+            self.submitAction(a, { answer: o }, ctx).catch(function () {
+              Array.prototype.forEach.call(group.children, function (c) { c.disabled = false; });
+            });
+          }, " pcg__btn--option");
+          group.appendChild(b);
+        });
+        return el("div", { class: "pcg__action-body" }, [question, group]);
+      }
+
+      case "QUESTION": {
+        var inputId = nextId("q");
+        var left = entrant.quizAttemptsLeft ? entrant.quizAttemptsLeft[a.id] : undefined;
+        var input = el("input", { class: "pcg__input", id: inputId, type: "text", maxlength: "500", autocomplete: "off", placeholder: "Your answer" });
+        var submit = el("button", { class: "pcg__btn pcg__btn--small", type: "submit", text: "Submit" });
+        var hint = cfg.quiz ? el("p", { class: "pcg__hint", text: left === 0 ? "No tries left today." : (left === undefined ? 3 : left) + plural(left === undefined ? 3 : left, " try", " tries") + " left today." }) : null;
+        if (left === 0) { input.disabled = true; submit.disabled = true; }
+        ctx.button = submit;
+        var form = el("form", {
+          class: "pcg__inline-form",
+          onsubmit: function (e) {
+            e.preventDefault();
+            if (!input.value.trim()) { error.textContent = "Please type an answer."; input.focus(); return; }
+            self.submitAction(a, { answer: input.value }, ctx).catch(function (e2) {
+              var d = e2.data || {};
+              if (hint && typeof d.attemptsLeft === "number") hint.textContent = d.attemptsLeft + plural(d.attemptsLeft, " try", " tries") + " left today.";
+              if (d.attemptsLeft === 0) { input.disabled = true; submit.disabled = true; }
+            });
           },
-        })]),
-      ]));
+        }, [el("label", { class: "pcg__question", for: inputId, text: cfg.question || a.label }), el("div", { class: "pcg__row" }, [input, submit])]);
+        return el("div", { class: "pcg__action-body" }, [form, hint]);
+      }
+
+      case "SECRET_CODE": {
+        var codeId = nextId("sc");
+        var code = el("input", { class: "pcg__input", id: codeId, type: "text", autocomplete: "off", placeholder: "Code" });
+        var go = el("button", { class: "pcg__btn pcg__btn--small", type: "submit", text: "Submit" });
+        ctx.button = go;
+        return el("form", {
+          class: "pcg__inline-form pcg__action-body",
+          onsubmit: function (e) { e.preventDefault(); self.submitAction(a, { code: code.value }, ctx).catch(function () {}); },
+        }, [el("label", { class: "pcg__sr", for: codeId, text: "Secret code" }), el("div", { class: "pcg__row" }, [code, go])]);
+      }
+
+      case "WATCH_VIDEO":
+        return this.videoBody(a, cfg, ctx);
+
+      case "SOCIAL_SHARE":
+        return el("div", { class: "pcg__action-body" }, [
+          el("p", { class: "pcg__hint", text: "Share your entry link" + (cfg.network === "x" ? " on X" : cfg.network === "facebook" ? " on Facebook" : "") + "." }),
+          this.shareButtons(cfg.network || "any", function (network) {
+            if (ctx.sent) return;
+            ctx.sent = true;
+            self.submitAction(a, { network: network }, ctx).catch(function () { ctx.sent = false; });
+          }),
+        ]);
+
+      default: {
+        // VISIT_URL, SOCIAL_FOLLOW, DAILY_CHECKIN, CUSTOM.
+        var url = cfg.url || a.url;
+        var b = btn(a.type === "DAILY_CHECKIN" ? "Check in" : a.type === "SOCIAL_FOLLOW" ? "Follow" : url ? "Visit" : "Done", function () {
+          if (url) window.open(url, "_blank", "noopener");
+          self.submitAction(a, {}, ctx).catch(function () {});
+        });
+        ctx.button = b;
+        return el("div", { class: "pcg__action-body pcg__action-body--end" }, [b]);
+      }
     }
-    nodes.push(this.footer());
-    this.root.replaceChildren.apply(this.root, nodes.filter(Boolean));
+  };
+
+  // Video: opening it asks the server for a signed start time; the claim button unlocks after
+  // config.seconds and the server checks the elapsed time again.
+  Widget.prototype.videoBody = function (a, cfg, ctx) {
+    var self = this;
+    var key = VIDEO_KEY + a.id;
+    var seconds = cfg.seconds || 0;
+    var saved = null;
+    try { saved = JSON.parse(store(key) || "null"); } catch (e) { saved = null; }
+    var status = el("p", { class: "pcg__hint", "aria-live": "polite" });
+    var claim = el("button", { class: "pcg__btn pcg__btn--small", type: "button", text: "Claim entries", disabled: true });
+    var watch = el("a", { class: "pcg__btn pcg__btn--small pcg__btn--ghost", href: cfg.url || "#", target: "_blank", rel: "noopener", text: saved ? "Watch again" : "Watch video" });
+    var tick;
+    ctx.button = claim;
+
+    function run(started) {
+      window.clearInterval(tick);
+      var update = function () {
+        var left = Math.max(0, Math.ceil((started.at + seconds * 1000 - Date.now()) / 1000));
+        if (left > 0) {
+          status.textContent = "Keep the video open: " + left + "s to go.";
+          claim.disabled = true;
+        } else {
+          window.clearInterval(tick);
+          status.textContent = "Thanks for watching!";
+          claim.disabled = false;
+        }
+      };
+      update();
+      tick = window.setInterval(update, 1000);
+    }
+
+    watch.addEventListener("click", function () {
+      self.submitAction(a, { step: "start" }, { error: ctx.error }).then(function (res) {
+        var started = { token: res.started, at: Date.now() };
+        store(key, JSON.stringify(started));
+        saved = started;
+        run(started);
+      }).catch(function () {});
+    });
+    claim.addEventListener("click", function () {
+      if (!saved) return;
+      self.submitAction(a, { started: saved.token }, ctx).then(function () { store(key, null); }).catch(function () {});
+    });
+    if (saved) run(saved);
+    else status.textContent = seconds ? "Watch for " + seconds + " seconds to earn " + plural(a.entries, "this entry.", "these entries.") : "Open the video to earn " + plural(a.entries, "this entry.", "these entries.");
+    return el("div", { class: "pcg__action-body" }, [status, el("div", { class: "pcg__row" }, [watch, claim])]);
+  };
+
+  Widget.prototype.referralBox = function (referral) {
+    var link = this.referralLink();
+    var inputId = nextId("ref");
+    var input = el("input", { class: "pcg__input", id: inputId, readonly: true, value: link });
+    var copy = el("button", {
+      class: "pcg__btn pcg__btn--small", type: "button", text: "Copy",
+      onclick: function () {
+        copyText(link, input).then(function () { copy.textContent = "Copied"; }, function () { input.select(); });
+      },
+    });
+    return el("div", { class: "pcg__ref" }, [
+      el("label", { class: "pcg__note", for: inputId, text: "Get +" + referral.entries + plural(referral.entries, " entry", " entries") + " for every friend who enters with your link." }),
+      el("div", { class: "pcg__row" }, [input, copy]),
+      this.shareButtons("any", null),
+    ]);
+  };
+
+  // ---- Alternate entry (no purchase necessary) ----
+
+  Widget.prototype.alternateAction = function () {
+    return this.data.campaign.actions.filter(function (a) { return a.type === "ALTERNATE_ENTRY"; })[0] || null;
+  };
+
+  Widget.prototype.openAlternateEntry = function () {
+    var self = this;
+    var amoe = this.alternateAction();
+    var entrant = this.data.entrant && this.data.entrant.state === "active" ? this.data.entrant : null;
+    var already = amoe && entrant && (entrant.completedActionIds || []).indexOf(amoe.id) !== -1;
+    var titleId = nextId("amoe");
+    var err = el("p", { class: "pcg__error", role: "alert" });
+    var fields = [];
+    var email, name, address;
+    var turnstileToken = "";
+    var turnstileBox = el("div");
+
+    if (!entrant) {
+      var emailId = nextId("ae");
+      var nameId = nextId("an");
+      email = el("input", { class: "pcg__input", id: emailId, type: "email", required: true, autocomplete: "email" });
+      name = el("input", { class: "pcg__input", id: nameId, type: "text", required: true, autocomplete: "name" });
+      fields.push(el("label", { class: "pcg__label", for: nameId, text: "Full name" }), name, el("label", { class: "pcg__label", for: emailId, text: "Email" }), email);
+    }
+    if (amoe && !already) {
+      var addrId = nextId("aa");
+      address = el("textarea", { class: "pcg__input", id: addrId, rows: "3", required: true, autocomplete: "street-address" });
+      fields.push(el("label", { class: "pcg__label", for: addrId, text: "Mailing address" }), address);
+    }
+
+    var intro = already
+      ? "You've already used your free alternate entry. Thanks!"
+      : "You don't need to buy anything to enter or win. Making a purchase doesn't improve your chances beyond the entries listed in the official rules." +
+        (amoe ? " Send this form to get " + amoe.entries + plural(amoe.entries, " free entry", " free entries") + "." : entrant ? " You're already entered." : " Fill this in to enter free.");
+
+    var submit = el("button", { class: "pcg__btn", type: "submit", text: "Send free entry" });
+    var close = el("button", { class: "pcg__dialog-close", type: "button", "aria-label": "Close", text: "×" });
+    var form = el("form", { class: "pcg__form", novalidate: true }, fields.concat([turnstileBox, err, fields.length ? submit : null]));
+    var dialog = el("dialog", { class: "pcg__dialog", "aria-labelledby": titleId }, [
+      close,
+      el("h3", { class: "pcg__subheading", id: titleId, text: "Free alternate entry" }),
+      el("p", { class: "pcg__note", text: intro }),
+      amoe && amoe.config && amoe.config.instructions ? el("p", { class: "pcg__note", text: amoe.config.instructions }) : null,
+      form,
+    ]);
+
+    function done(text) {
+      form.replaceChildren(el("p", { class: "pcg__note", role: "status", text: text }));
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (email && !email.value) { err.textContent = "Please enter your email."; email.focus(); return; }
+      if (address && address.value.trim().length < 5) { err.textContent = "Please enter your mailing address."; address.focus(); return; }
+      submit.disabled = true;
+      err.textContent = "";
+      if (address) store(AMOE_KEY + self.slug, address.value.trim());
+      var p = entrant
+        ? self.flushAlternateEntry()
+        : self.signup({ email: email.value, name: name.value, turnstileToken: turnstileToken });
+      p.then(function () {
+        done(entrant || store(self.tokenKey) ? "Thanks! Your free entry has been received." : "Check your email for a code to confirm your entry.");
+      }).catch(function (e2) { err.textContent = e2.message; submit.disabled = false; });
+    });
+    close.addEventListener("click", function () { dialog.close(); });
+    dialog.addEventListener("close", function () { dialog.remove(); });
+    // Clicking the backdrop closes it too.
+    dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
+
+    this.root.appendChild(dialog);
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    if (!entrant) this.mountTurnstile(turnstileBox, function (t) { turnstileToken = t; });
+    var first = form.querySelector("input, textarea");
+    if (first) first.focus();
+  };
+
+  // Completes a pending alternate entry once the entrant is active (right away, or after verifying).
+  Widget.prototype.flushAlternateEntry = function () {
+    var self = this;
+    var key = AMOE_KEY + this.slug;
+    var address = store(key);
+    var amoe = this.alternateAction();
+    if (!address || !amoe) { store(key, null); return Promise.resolve(); }
+    return this.request("POST", { intent: "action", actionId: amoe.id, answer: address }).then(function () {
+      store(key, null);
+      return self.load();
+    }, function (err) {
+      // The server said no (rather than the network failing), so don't retry it on every load.
+      if (err.data) store(key, null);
+      throw err;
+    });
   };
 
   function boot() {
