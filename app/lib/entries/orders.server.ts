@@ -4,6 +4,7 @@ import db from "../../db.server";
 import { normalizeEmail } from "../bot/email";
 import { award } from "./ledger.server";
 import { emitWebhook } from "../webhook-out.server";
+import { parseSettings } from "../settings";
 import { purchaseRulesSchema, scoreOrder, type ScorableOrder } from "./rules";
 
 /** Subset of the Shopify `orders/*` webhook payload that we use. */
@@ -68,6 +69,14 @@ export function toScorableOrder(p: OrderWebhookPayload): ScorableOrder {
   };
 }
 
+/**
+ * When orders start counting: the start date, or for a giveaway opened with "Go live" and no
+ * start date, when it was created (Go live now records a start date). Updates Shopify sends
+ * for older orders (fulfilment, tags, edits) never earn entries.
+ */
+export const ordersCountFrom = (c: Pick<Campaign, "startsAt" | "createdAt">) =>
+  c.startsAt ?? c.createdAt;
+
 async function liveCampaigns(shop: string, at: Date) {
   const campaigns = await db.campaign.findMany({
     where: { shop, status: "ACTIVE" },
@@ -75,7 +84,7 @@ async function liveCampaigns(shop: string, at: Date) {
   return campaigns.filter(
     (c) =>
       c.purchaseRules &&
-      (!c.startsAt || c.startsAt <= at) &&
+      ordersCountFrom(c) <= at &&
       (!c.endsAt || c.endsAt >= at),
   );
 }
@@ -195,6 +204,10 @@ export async function processOrder(
         entries: delta,
         source: delta > 0 && current === 0 ? "PURCHASE" : "ROLLBACK",
         orderLogId: orderLog.id,
+        // Daily draws count an order on the day it was placed, not when Shopify sent the update.
+        createdAt: parseSettings(campaign.settings).daily.enabled
+          ? order.createdAt
+          : undefined,
         note: cancelled
           ? "order cancelled"
           : current === 0
@@ -227,4 +240,83 @@ export async function processOrder(
       },
     });
   }
+}
+
+const ORDER_DATES = `#graphql
+  query OrderDates($ids: [ID!]!) {
+    nodes(ids: $ids) { ... on Order { id createdAt } }
+  }`;
+
+interface GraphqlClient {
+  graphql: (
+    query: string,
+    opts?: { variables?: Record<string, unknown> },
+  ) => Promise<Response>;
+}
+
+/**
+ * Takes back entries from orders placed before the giveaway started (they came in through
+ * Shopify updates to older orders). Each removal is a rollback with a note, and the order log
+ * shows it. Safe to run again.
+ */
+export async function removePreStartOrderEntries(
+  campaign: Campaign,
+  admin: GraphqlClient,
+) {
+  const cutoff = ordersCountFrom(campaign);
+  const logs = await db.orderLog.findMany({
+    where: { campaignId: campaign.id, entries: { not: 0 } },
+    include: {
+      events: { select: { entrantId: true, entries: true, createdAt: true } },
+    },
+  });
+  let orders = 0;
+  let entries = 0;
+  for (let i = 0; i < logs.length; i += 100) {
+    const batch = logs.slice(i, i + 100);
+    const res = await admin.graphql(ORDER_DATES, {
+      variables: {
+        ids: batch.map((l) => `gid://shopify/Order/${l.shopifyOrderId}`),
+      },
+    });
+    const body = (await res.json()) as {
+      data?: { nodes: ({ id: string; createdAt: string } | null)[] };
+    };
+    const placed = new Map(
+      (body.data?.nodes ?? []).flatMap((n) =>
+        n ? [[n.id.split("/").pop()!, new Date(n.createdAt)] as const] : [],
+      ),
+    );
+    for (const log of batch) {
+      const at = placed.get(log.shopifyOrderId);
+      if (!at || at >= cutoff) continue;
+      const net = log.events.reduce((s, e) => s + e.entries, 0);
+      const entrantId = log.events[0]?.entrantId;
+      if (net > 0 && entrantId) {
+        await award({
+          campaignId: campaign.id,
+          entrantId,
+          entries: -net,
+          source: "ROLLBACK",
+          orderLogId: log.id,
+          note: "order placed before the giveaway started",
+          // Same draw day as the entries it takes back, so a daily draw nets to zero there.
+          createdAt: new Date(
+            Math.max(...log.events.map((e) => e.createdAt.getTime())) + 1,
+          ),
+        });
+        entries += net;
+      }
+      await db.orderLog.update({
+        where: { id: log.id },
+        data: {
+          entries: 0,
+          status: "NO_ENTRIES",
+          breakdown: { reason: "placed before the giveaway started" },
+        },
+      });
+      orders++;
+    }
+  }
+  return { orders, entries };
 }

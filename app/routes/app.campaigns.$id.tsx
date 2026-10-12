@@ -31,6 +31,10 @@ import {
   choosePrize,
 } from "../lib/daily.server";
 import { publicName } from "../lib/winners";
+import {
+  ordersCountFrom,
+  removePreStartOrderEntries,
+} from "../lib/entries/orders.server";
 import { periodFor } from "../lib/daily";
 import { entriesByMethod } from "../lib/entries/methods.server";
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
@@ -163,6 +167,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     filter,
     q,
     storefrontPath: `/apps/giveaways/${campaign.slug}`,
+    startsLabel: new Intl.DateTimeFormat("en-US", {
+      timeZone: campaign.timezone,
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(ordersCountFrom(campaign)),
     campaign: {
       id: campaign.id,
       title: campaign.title,
@@ -321,12 +330,25 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   switch (intent) {
     case "status": {
       const status = String(form.get("status")) as CampaignStatus;
+      // Going live with no start date records one, so only orders placed from now earn entries.
+      const startsAt =
+        status === "ACTIVE" && !campaign.startsAt ? new Date() : undefined;
       await db.campaign.update({
         where: { id: campaign.id },
-        data: { status },
+        data: { status, startsAt },
       });
-      await audit("campaign.status", { status });
+      await audit("campaign.status", { status, startsAt });
       break;
+    }
+    case "removePreStart": {
+      const r = await removePreStartOrderEntries(campaign, admin);
+      await audit("orders.removePreStart", r);
+      return {
+        ok: true,
+        message: r.orders
+          ? `Removed ${r.entries.toLocaleString()} entries from ${r.orders} orders placed before the giveaway started.`
+          : "No entries from orders placed before the giveaway started.",
+      };
     }
     case "approve": {
       for (const id of entrantIds) {
@@ -375,6 +397,7 @@ export default function CampaignPage() {
     q,
     storefrontPath,
     methods,
+    startsLabel,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const submit = (data: Record<string, string>) =>
@@ -596,33 +619,54 @@ export default function CampaignPage() {
       <DrawsSection draws={draws} extras={drawExtras} />
 
       <s-section heading="Recent orders">
-        {orders.length === 0 ? (
-          <s-paragraph>
-            Orders placed while this giveaway is live will show here with the
-            entries they earned.
-          </s-paragraph>
-        ) : (
-          <s-table>
-            <s-table-header-row>
-              <s-table-header listSlot="primary">Order</s-table-header>
-              <s-table-header>Customer</s-table-header>
-              <s-table-header listSlot="inline">Result</s-table-header>
-              <s-table-header format="numeric">Entries</s-table-header>
-            </s-table-header-row>
-            <s-table-body>
-              {orders.map((o) => (
-                <s-table-row key={o.id}>
-                  <s-table-cell>{o.name}</s-table-cell>
-                  <s-table-cell>{o.email ?? "—"}</s-table-cell>
-                  <s-table-cell>
-                    {o.status.toLowerCase().replaceAll("_", " ")}
-                  </s-table-cell>
-                  <s-table-cell>{o.entries}</s-table-cell>
-                </s-table-row>
-              ))}
-            </s-table-body>
-          </s-table>
-        )}
+        <s-stack gap="base">
+          <s-stack direction="inline" gap="base" alignItems="center">
+            <s-button
+              onClick={() => submit({ intent: "removePreStart" })}
+              loading={
+                fetcher.state !== "idle" &&
+                fetcher.formData?.get("intent") === "removePreStart"
+              }
+            >
+              Remove entries from orders placed before the start
+            </s-button>
+            <s-text color="subdued">
+              Orders placed before {startsLabel} don&apos;t earn entries.
+            </s-text>
+          </s-stack>
+          {fetcher.data &&
+            "message" in fetcher.data &&
+            fetcher.formData === undefined && (
+              <s-banner tone="success">{String(fetcher.data.message)}</s-banner>
+            )}
+          {orders.length === 0 ? (
+            <s-paragraph>
+              Orders placed while this giveaway is live will show here with the
+              entries they earned.
+            </s-paragraph>
+          ) : (
+            <s-table>
+              <s-table-header-row>
+                <s-table-header listSlot="primary">Order</s-table-header>
+                <s-table-header>Customer</s-table-header>
+                <s-table-header listSlot="inline">Result</s-table-header>
+                <s-table-header format="numeric">Entries</s-table-header>
+              </s-table-header-row>
+              <s-table-body>
+                {orders.map((o) => (
+                  <s-table-row key={o.id}>
+                    <s-table-cell>{o.name}</s-table-cell>
+                    <s-table-cell>{o.email ?? "—"}</s-table-cell>
+                    <s-table-cell>
+                      {o.status.toLowerCase().replaceAll("_", " ")}
+                    </s-table-cell>
+                    <s-table-cell>{o.entries}</s-table-cell>
+                  </s-table-row>
+                ))}
+              </s-table-body>
+            </s-table>
+          )}
+        </s-stack>
       </s-section>
 
       <s-section slot="aside" heading="On your store">

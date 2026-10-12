@@ -14,6 +14,8 @@ export interface AwardInput {
   orderLogId?: string;
   note?: string;
   dedupeKey?: string;
+  /** Backdates the event, e.g. to when an order was placed, so it counts in that day's draw. */
+  createdAt?: Date;
 }
 
 /** Append an event to the ledger. Returns false if the dedupe key was already used. */
