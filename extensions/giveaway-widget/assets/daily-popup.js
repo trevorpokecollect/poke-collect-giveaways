@@ -114,6 +114,9 @@
     // The widget may have loaded before this script ran.
     if (widget.__pcg && widget.__pcg.data && widget.__pcg.data.campaign) onLoaded(widget.__pcg.data);
 
+    // A small digital rain behind the button, like the popup's prize backdrop.
+    var rain = launcher.querySelector(".pcg-pop__rain");
+    if (rain && window.pcgMatrixRain) window.pcgMatrixRain(rain, launcher, { size: 9 });
     launcher.addEventListener("click", open);
     if (tab) tab.addEventListener("click", open);
     pop.querySelector(".pcg-pop__close").addEventListener("click", close);

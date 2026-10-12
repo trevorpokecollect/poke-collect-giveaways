@@ -32,6 +32,10 @@
     radial-gradient(55% 60% at 100% 0%, rgba(226, 47, 57, 0.32), transparent 60%),
     radial-gradient(45% 50% at 0% 100%, rgba(110, 216, 255, 0.16), transparent 60%);
 }
+/* The store theme also styles a "pcg" class (its header logo glow) as inline-block with no line
+   height, which with size containment collapses the widget to zero width. The attribute makes these
+   win over the theme's .pcg whatever order the stylesheets load in. */
+.pcg[data-pcg] { display: block; position: relative; isolation: isolate; line-height: 1.45; }
 .pcg *, .pcg *::before, .pcg *::after { box-sizing: border-box; }
 .pcg--wide { max-width: 1120px; }
 .pcg--three { max-width: none; }
@@ -376,23 +380,37 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .pcg__badge::before { animation: none; }
+  .pcg-pop__launcher, .pcg-pop__thumb:not([hidden]) { animation: none; }
   .pcg__stage-img { animation: none; }
   .pcg__btn, .pcg__soc { transition: none; }
 }
 
 /* Daily giveaway popup (app embed) */
 .pcg-pop__launcher {
-  position: fixed; bottom: 18px; z-index: 999;
+  position: fixed; bottom: var(--pcg-pop-bottom, 96px); z-index: 999; overflow: hidden; isolation: isolate;
   display: flex; align-items: center; gap: 10px;
-  max-width: calc(100vw - 36px); padding: 7px 18px 7px 7px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px;
-  background: #111114; color: #fff; font: inherit; text-align: left; cursor: pointer;
-  box-shadow: 0 10px 30px rgba(17, 17, 20, 0.4); transition: transform 0.15s, box-shadow 0.2s;
+  max-width: calc(100vw - 36px); padding: 7px 18px 7px 7px; border: 1px solid rgba(226, 47, 57, 0.5); border-radius: 999px;
+  background: #050306; color: #fff; font: inherit; text-align: left; cursor: pointer;
+  box-shadow: 0 10px 30px rgba(5, 3, 6, 0.45), 0 0 0 rgba(226, 47, 57, 0);
+  transition: transform 0.15s; animation: pcg-pop-pulse 3.2s ease-in-out infinite;
+}
+/* A small version of the popup's digital rain behind the button's contents. */
+.pcg-pop__rain { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; opacity: 0.4; pointer-events: none; }
+.pcg-pop__launcher > :not(.pcg-pop__rain) { position: relative; }
+@keyframes pcg-pop-pulse {
+  0%, 100% { box-shadow: 0 10px 30px rgba(5, 3, 6, 0.45), 0 0 8px rgba(226, 47, 57, 0.25); }
+  50% { box-shadow: 0 10px 30px rgba(5, 3, 6, 0.45), 0 0 20px rgba(226, 47, 57, 0.6); }
+}
+@keyframes pcg-thumb-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-2px) rotate(3deg); }
 }
 .pcg-pop__launcher[hidden] { display: none; }
-.pcg-pop__launcher:hover, .pcg-pop__launcher:focus-visible { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(17, 17, 20, 0.5); }
+.pcg-pop__launcher:hover, .pcg-pop__launcher:focus-visible { transform: translateY(-2px); }
 .pcg-pop--right .pcg-pop__launcher { right: 18px; }
 .pcg-pop--left .pcg-pop__launcher { left: 18px; }
-.pcg-pop__thumb { width: 46px; height: 46px; border-radius: 50%; object-fit: contain; padding: 3px; background: #fff; box-shadow: 0 0 0 2px #e22f39; }
+.pcg-pop__thumb { width: 46px; height: 46px; border-radius: 50%; object-fit: contain; padding: 4px; background: radial-gradient(circle, rgba(226, 47, 57, 0.35), rgba(5, 3, 6, 0.9) 70%); box-shadow: 0 0 0 2px #e22f39, 0 0 12px rgba(226, 47, 57, 0.6); }
+.pcg-pop__thumb:not([hidden]) { filter: drop-shadow(0 0 4px rgba(226, 47, 57, 0.8)); animation: pcg-thumb-float 4s ease-in-out infinite; }
 .pcg-pop__thumb[hidden] { display: none; }
 .pcg-pop__launcher:not(:has(.pcg-pop__thumb:not([hidden])))::before {
   content: "🎁"; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%;
@@ -427,7 +445,7 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 }
 .pcg-pop__monthly:hover { background: #facc15; }
 @media (max-width: 480px) {
-  .pcg-pop__launcher { bottom: 12px; }
+  .pcg-pop__launcher { bottom: min(var(--pcg-pop-bottom, 96px), 84px); }
   .pcg-pop--left .pcg-pop__launcher { left: 12px; }
   .pcg-pop--right .pcg-pop__launcher { right: 12px; }
 }

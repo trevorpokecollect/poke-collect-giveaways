@@ -245,11 +245,11 @@
   }
 
   var GLYPHS = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン0123456789POKECOLLECT";
-  function matrixRain(canvas, stage) {
+  function matrixRain(canvas, stage, opts) {
     var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var ctx = canvas.getContext && canvas.getContext("2d");
     if (!ctx || typeof ResizeObserver === "undefined") return;
-    var size = 14, drops = [], w = 0, h = 0, visible = false, frame = 0, last = 0;
+    var size = (opts && opts.size) || 14, drops = [], w = 0, h = 0, visible = false, frame = 0, last = 0;
     function glyph() { return GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length)); }
     function resize() {
       var r = stage.getBoundingClientRect();
@@ -304,6 +304,9 @@
     if (io) io.observe(stage); else { visible = true; run(); }
     document.addEventListener("visibilitychange", run);
   }
+
+  // Shared with the daily popup's launcher button (daily-popup.js).
+  window.pcgMatrixRain = matrixRain;
 
   Widget.prototype.header = function () {
     var c = this.data.campaign;

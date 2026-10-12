@@ -9,9 +9,10 @@
   data-pcg-pop
   data-auto="{{ block.settings.auto_open }}"
   data-delay="{{ block.settings.delay }}"
-  style="--pcg-accent: {{ block.settings.accent }};"
+  style="--pcg-accent: {{ block.settings.accent }}; --pcg-pop-bottom: {{ block.settings.bottom | default: 96 }}px;"
 >
   <button class="pcg-pop__launcher" type="button" aria-haspopup="dialog" hidden>
+    <canvas class="pcg-pop__rain" aria-hidden="true"></canvas>
     <img class="pcg-pop__thumb" alt="" hidden>
     <span class="pcg-pop__text">
       <b>{{ block.settings.button_text | escape }}</b>
@@ -87,6 +88,17 @@
         { "value": "left", "label": "Bottom left" }
       ],
       "default": "left"
+    },
+    {
+      "type": "range",
+      "id": "bottom",
+      "label": "Distance from bottom",
+      "min": 12,
+      "max": 200,
+      "step": 4,
+      "unit": "px",
+      "default": 96,
+      "info": "Raise the button above other corner buttons, like a chat bubble. Phones use up to 84px."
     },
     {
       "type": "select",
