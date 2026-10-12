@@ -23,6 +23,7 @@ const card = (over: Partial<Candidate>): Candidate => ({
   inventoryItemId: "i",
   locationId: "l",
   available: 2,
+  source: "available",
   ...over,
 });
 

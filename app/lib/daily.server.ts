@@ -10,6 +10,7 @@ import {
   sourceTypes,
   type Candidate,
   type DailySettings,
+  type StockSource,
 } from "./daily";
 import { queueFor, upcomingPlan } from "./daily-queue.server";
 import { drawWinners, newSeed, snapshotHash } from "./draw";
@@ -76,7 +77,7 @@ interface VariantPage {
         inventoryLevels: {
           nodes: {
             location: { id: string };
-            quantities: { quantity: number }[];
+            quantities: { name: string; quantity: number }[];
           }[];
         };
       } | null;
@@ -91,7 +92,7 @@ const quote = (s: string) =>
 export async function fetchCandidates(
   admin: Admin,
   cfg: DailySettings,
-  opts: { productId?: string } = {},
+  opts: { productId?: string; safetyStock?: boolean } = {},
 ): Promise<Candidate[]> {
   const types = sourceTypes(cfg);
   if (!types.length && !opts.productId) return [];
@@ -100,7 +101,8 @@ export async function fetchCandidates(
       ? `product_id:${opts.productId.split("/").pop()}`
       : `(${types.map((t) => `product_type:${quote(t)}`).join(" OR ")})`,
     "product_status:active",
-    "inventory_quantity:>0",
+    // Safety stock isn't in the searchable quantity, so those are checked per variant.
+    ...(opts.safetyStock ? [] : ["inventory_quantity:>0"]),
   ].join(" AND ");
 
   const out: Candidate[] = [];
@@ -126,7 +128,7 @@ export async function fetchCandidates(
                 id
                 tracked
                 inventoryLevels(first: 5) {
-                  nodes { location { id } quantities(names: ["available"]) { quantity } }
+                  nodes { location { id } quantities(names: ["available", "safety_stock"]) { name quantity } }
                 }
               }
             }
@@ -136,13 +138,13 @@ export async function fetchCandidates(
     );
     for (const v of data.productVariants.nodes) {
       if (v.product.status !== "ACTIVE" || !v.inventoryItem?.tracked) continue;
-      // Reserve from the location holding the most copies.
-      let best: { locationId: string; available: number } | null = null;
-      for (const level of v.inventoryItem.inventoryLevels.nodes) {
-        const available = level.quantities[0]?.quantity ?? 0;
-        if (available > 0 && (!best || available > best.available))
-          best = { locationId: level.location.id, available };
-      }
+      // Reserve from the location holding the most available copies, else (when allowed)
+      // the most safety stock.
+      const best =
+        mostStock(v.inventoryItem.inventoryLevels.nodes, "available") ??
+        (opts.safetyStock
+          ? mostStock(v.inventoryItem.inventoryLevels.nodes, "safety_stock")
+          : null);
       if (!best) continue;
       out.push({
         variantId: v.id,
@@ -157,6 +159,7 @@ export async function fetchCandidates(
         inventoryItemId: v.inventoryItem.id,
         locationId: best.locationId,
         available: best.available,
+        source: best.source,
       });
     }
     if (!data.productVariants.pageInfo.hasNextPage) break;
@@ -165,22 +168,47 @@ export async function fetchCandidates(
   return out;
 }
 
+function mostStock(
+  levels: {
+    location: { id: string };
+    quantities: { name: string; quantity: number }[];
+  }[],
+  source: StockSource,
+) {
+  let best: {
+    locationId: string;
+    available: number;
+    source: StockSource;
+  } | null = null;
+  for (const level of levels) {
+    const n = level.quantities.find((q) => q.name === source)?.quantity ?? 0;
+    if (n > 0 && (!best || n > best.available))
+      best = { locationId: level.location.id, available: n, source };
+  }
+  return best;
+}
+
+/** Variants with available stock first, then the most copies. */
+const byStock = (a: Candidate, b: Candidate) =>
+  Number(b.source === "available") - Number(a.source === "available") ||
+  b.available - a.available;
+
 const ledgerFor = (prize: { campaignId: string; id: string }) =>
   `poke-collect-giveaways://daily/${prize.campaignId}/${prize.id}`;
 
-/** Moves one unit between available and reserved. */
+/** Moves one unit between reserved and where it came from (available or safety stock). */
 async function moveOne(
   admin: Admin,
   prize: Pick<
     DailyPrize,
-    "id" | "campaignId" | "inventoryItemId" | "locationId"
+    "id" | "campaignId" | "inventoryItemId" | "locationId" | "reservedFrom"
   >,
   direction: "reserve" | "release",
 ) {
   const [from, to] =
     direction === "reserve"
-      ? ["available", "reserved"]
-      : ["reserved", "available"];
+      ? [prize.reservedFrom, "reserved"]
+      : ["reserved", prize.reservedFrom];
   const ledger = ledgerFor(prize);
   await gql(
     admin,
@@ -237,7 +265,7 @@ async function removeOne(admin: Admin, prize: DailyPrize) {
     {
       key: `daily-sent-${prize.id}`,
       input: {
-        name: "available",
+        name: prize.reservedFrom,
         reason: "promotion",
         referenceDocumentUri: ledgerFor(prize),
         changes: [
@@ -317,8 +345,9 @@ export async function ensurePrize(
     for (const item of await queueFor(campaign.id, period)) {
       const variants = await fetchCandidates(admin, cfg, {
         productId: item.productId,
+        safetyStock: true,
       });
-      pick = variants.sort((a, b) => b.available - a.available)[0] ?? null;
+      pick = variants.sort(byStock)[0] ?? null;
       if (pick) {
         queued = item.id;
         break;
@@ -333,21 +362,22 @@ export async function ensurePrize(
     // From the queue.
   } else if (opts.productId) {
     // Chosen by the merchant: any in-stock variant of that product, ignoring the price range
-    // and product types. The variant with the most stock is reserved.
+    // and product types, from safety stock too. The variant with the most stock is reserved.
     const variants = await fetchCandidates(admin, cfg, {
       productId: opts.productId,
+      safetyStock: true,
     });
-    pick = variants.sort((a, b) => b.available - a.available)[0] ?? null;
+    pick = variants.sort(byStock)[0] ?? null;
     if (!pick)
       throw new Error(
-        "That product has no in-stock, inventory-tracked variant to reserve.",
+        "That product has no inventory-tracked variant in stock or in safety stock to reserve.",
       );
   } else {
     const recent = await recentProducts(campaign.id, cfg.noRepeatDays);
     if (opts.exclude) recent.add(opts.exclude);
-    const candidates = (await fetchCandidates(admin, cfg)).filter(
-      (c) => c.productId !== opts.exclude,
-    );
+    const candidates = (
+      await fetchCandidates(admin, cfg, { safetyStock: cfg.useSafetyStock })
+    ).filter((c) => c.productId !== opts.exclude);
     pick = pickPrize(
       candidates,
       cfg,
@@ -376,6 +406,7 @@ export async function ensurePrize(
       value: pick.value,
       inventoryItemId: pick.inventoryItemId,
       locationId: pick.locationId,
+      reservedFrom: pick.source,
     },
   });
   try {

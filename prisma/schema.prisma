@@ -355,6 +355,8 @@ model DailyPrize {
   value           Float
   inventoryItemId String
   locationId      String
+  // Where the reserved unit came from: "available" or "safety_stock". Released units go back there.
+  reservedFrom    String           @default("available")
   status          DailyPrizeStatus @default(RESERVED)
   drawId          String?          @unique
   draw            Draw?            @relation(fields: [drawId], references: [id], onDelete: SetNull)

@@ -14,6 +14,7 @@ export interface DailyPrizeRow {
   drawAt: string;
   winner: string | null;
   note: string | null;
+  fromSafetyStock: boolean;
 }
 
 export interface QueueRow {
@@ -101,6 +102,9 @@ export function DailySection({ daily }: { daily: DailyData }) {
                   <s-badge tone={STATUS[current.status].tone}>
                     {STATUS[current.status].label}
                   </s-badge>
+                  {current.fromSafetyStock && (
+                    <s-badge>From safety stock</s-badge>
+                  )}
                   {current.winner && <s-text>Winner: {current.winner}</s-text>}
                 </s-stack>
               </s-stack>

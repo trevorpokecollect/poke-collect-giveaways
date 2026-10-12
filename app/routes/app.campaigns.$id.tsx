@@ -189,6 +189,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             ? `${publicName(w.entrant.name, w.entrant.email)} (${w.entrant.email})`
             : null,
           note: p.note,
+          fromSafetyStock: p.reservedFrom === "safety_stock",
         };
       }),
     };

@@ -58,6 +58,9 @@ export const campaignSettingsSchema = z.object({
       noRepeatDays: z.number().int().nonnegative().default(30),
       // A daily winner can't win another daily prize within this many days.
       winCooldownDays: z.number().int().nonnegative().default(30),
+      // Let the automatic pick use products whose only stock is safety stock. Products the
+      // merchant picks (the upcoming list, Choose product) can always use it.
+      useSafetyStock: z.boolean().default(false),
     })
     .prefault({}),
   // "Shop & earn" under the bonus entries: the purchase-entry rate, a Shop now link and a few

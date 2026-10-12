@@ -57,8 +57,13 @@ export interface Candidate {
   value: number;
   inventoryItemId: string;
   locationId: string;
+  /** Copies in `source` at that location. */
   available: number;
+  /** Where the reserved unit comes from (and goes back to if released). */
+  source: StockSource;
 }
+
+export type StockSource = "available" | "safety_stock";
 
 const languageTags = (languages: string) =>
   languages
