@@ -231,6 +231,80 @@
   var head = mark("head");
   var tasks = mark("tasks");
 
+  // Today's prize on a red "digital rain" backdrop (the Mystery Packs opener's effect), floating
+  // with a soft glow. Only once a prize is picked; the rain pauses while off-screen or hidden.
+  function prizeStage(p) {
+    var canvas = el("canvas", { class: "pcg__matrix", "aria-hidden": "true" });
+    var stage = el("div", { class: "pcg__image pcg__stage" }, [
+      canvas,
+      el("span", { class: "pcg__spot", "aria-hidden": "true" }),
+      el("img", { class: "pcg__stage-img", src: p.imageUrl, alt: p.title, loading: "lazy" }),
+    ]);
+    matrixRain(canvas, stage);
+    return stage;
+  }
+
+  var GLYPHS = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン0123456789POKECOLLECT";
+  function matrixRain(canvas, stage) {
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var ctx = canvas.getContext && canvas.getContext("2d");
+    if (!ctx || typeof ResizeObserver === "undefined") return;
+    var size = 14, drops = [], w = 0, h = 0, visible = false, frame = 0, last = 0;
+    function glyph() { return GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length)); }
+    function resize() {
+      var r = stage.getBoundingClientRect();
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = Math.max(1, Math.round(r.width)); h = Math.max(1, Math.round(r.height));
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = "#050306"; ctx.fillRect(0, 0, w, h);
+      var cols = Math.ceil(w / size);
+      drops = [];
+      for (var i = 0; i < cols; i++) drops.push(Math.random() * h / size);
+      if (reduce) still();
+    }
+    // Reduced motion: one quiet frame of glyphs, no movement.
+    function still() {
+      ctx.font = "700 " + size + "px monospace";
+      for (var i = 0; i < drops.length; i++)
+        for (var y = 0; y < h; y += size * 2) if (Math.random() < 0.35) {
+          ctx.fillStyle = "rgba(226, 47, 57, " + (0.25 + Math.random() * 0.4) + ")";
+          ctx.fillText(glyph(), i * size, y);
+        }
+    }
+    function step(t) {
+      if (!canvas.isConnected) { stop(); return; }
+      if (!visible || document.hidden) { frame = 0; return; }
+      frame = window.requestAnimationFrame(step);
+      if (t - last < 55) return;
+      last = t;
+      ctx.fillStyle = "rgba(5, 3, 6, 0.16)"; ctx.fillRect(0, 0, w, h);
+      ctx.font = "700 " + size + "px monospace";
+      for (var i = 0; i < drops.length; i++) {
+        var y = drops[i] * size;
+        ctx.fillStyle = "#ff8a90"; ctx.fillText(glyph(), i * size, y);
+        ctx.fillStyle = "#e22f39"; ctx.fillText(glyph(), i * size, y - size);
+        if (y > h && Math.random() > 0.975) drops[i] = 0;
+        drops[i] += 1;
+      }
+    }
+    function stop() {
+      ro.disconnect(); if (io) io.disconnect();
+      document.removeEventListener("visibilitychange", run);
+    }
+    function run() {
+      if (!canvas.isConnected) { stop(); return; }
+      if (!reduce && visible && !frame && !document.hidden) frame = window.requestAnimationFrame(step);
+    }
+    var ro = new ResizeObserver(resize);
+    ro.observe(stage);
+    var io = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(function (e) {
+      visible = e[0].isIntersecting; run();
+    }) : null;
+    if (io) io.observe(stage); else { visible = true; run(); }
+    document.addEventListener("visibilitychange", run);
+  }
+
   Widget.prototype.header = function () {
     var c = this.data.campaign;
     var daily = this.data.daily;
@@ -238,7 +312,7 @@
     if (daily) {
       // Daily draw: today's product is the prize, and the clock runs to tonight's draw.
       var p = daily.prize;
-      if (p && p.imageUrl) nodes.push(el("img", { class: "pcg__image", src: p.imageUrl, alt: p.title, loading: "lazy" }));
+      if (p && p.imageUrl) nodes.push(prizeStage(p));
       nodes.push(el("div", { class: "pcg__hero" }, [
         el("span", { class: "pcg__badge", text: "Daily Giveaway" }),
         el("h2", { class: "pcg__title", text: p ? p.title : c.title }),
