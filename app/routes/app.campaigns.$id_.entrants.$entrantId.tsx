@@ -162,70 +162,76 @@ export default function EntrantEntries() {
   const [reason, setReason] = useState("");
   const disqualified = entrant.status === "DISQUALIFIED";
   return (
-    <s-page heading={entrant.name || entrant.email}>
+    <s-page heading={entrant.name || entrant.email} inlineSize="large">
       <s-link slot="breadcrumb-actions" href={`/app/campaigns/${campaign.id}`}>
         {campaign.title}
       </s-link>
       {fetcher.data && "error" in fetcher.data && (
         <s-banner tone="critical">{fetcher.data.error}</s-banner>
       )}
-      <s-section>
-        <s-stack gap="small-200">
-          <s-stack direction="inline" gap="small-200">
-            <s-badge tone={statusTone(entrant.status)}>
-              {entrant.status === "PENDING_VERIFICATION"
-                ? "unverified"
-                : entrant.status.toLowerCase()}
-            </s-badge>
-            <s-badge tone={riskTone(entrant.riskScore)}>
-              Risk {entrant.riskScore}
-            </s-badge>
+      <s-section padding="base">
+        <s-grid
+          gridTemplateColumns="repeat(auto-fit, minmax(220px, 1fr))"
+          gap="base"
+          alignItems="start"
+        >
+          <s-stack gap="small-200">
+            <s-stack direction="inline" gap="small-200">
+              <s-badge tone={statusTone(entrant.status)}>
+                {entrant.status === "PENDING_VERIFICATION"
+                  ? "unverified"
+                  : entrant.status === "HELD"
+                    ? "needs review"
+                    : entrant.status.toLowerCase()}
+              </s-badge>
+              <s-badge tone={riskTone(entrant.riskScore)}>
+                Risk {entrant.riskScore}
+              </s-badge>
+            </s-stack>
+            <s-text>{entrant.email}</s-text>
+            {entrant.phone && <s-text>{entrant.phone}</s-text>}
+            <s-text color="subdued">Entered {entrant.createdAt}</s-text>
           </s-stack>
-          <s-text>{entrant.email}</s-text>
-          {entrant.phone && <s-text>{entrant.phone}</s-text>}
-          <s-text color="subdued">Entered {entrant.createdAt}</s-text>
-          <s-heading>{total.toLocaleString()} entries</s-heading>
-          {disqualified && (
-            <s-banner tone="critical">
-              Disqualified
-              {entrant.disqualifiedReason
-                ? `: ${entrant.disqualifiedReason}`
-                : ""}
-              . None of their entries count in any draw.
-            </s-banner>
-          )}
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Disqualify Entrant">
-        {disqualified ? (
-          <s-button
-            disabled={flag(busy)}
-            onClick={() => submit({ intent: "reinstate" })}
-          >
-            Reinstate entrant
-          </s-button>
-        ) : (
-          <s-stack gap="base">
-            <TextInput
-              label="Reason (optional)"
-              placeholder="e.g. duplicate account"
-              value={reason}
-              onChange={setReason}
-            />
-            <s-button
-              tone="critical"
-              disabled={flag(busy)}
-              onClick={() => submit({ intent: "disqualify", reason })}
-            >
-              Disqualify entrant
-            </s-button>
-            <s-text color="subdued">
-              Removes them from every draw for this giveaway. To take back just
-              one entry, use Disqualify entry below.
-            </s-text>
+          <s-stack gap="small-200">
+            <s-text color="subdued">Total Entries</s-text>
+            <s-heading>{total.toLocaleString()}</s-heading>
+            {disqualified && (
+              <s-text tone="critical">
+                Disqualified
+                {entrant.disqualifiedReason
+                  ? `: ${entrant.disqualifiedReason}`
+                  : ""}
+                . No entries count.
+              </s-text>
+            )}
           </s-stack>
-        )}
+          <s-stack gap="small-200">
+            {disqualified ? (
+              <s-button
+                disabled={flag(busy)}
+                onClick={() => submit({ intent: "reinstate" })}
+              >
+                Reinstate Entrant
+              </s-button>
+            ) : (
+              <>
+                <TextInput
+                  label="Reason (optional)"
+                  placeholder="e.g. duplicate account"
+                  value={reason}
+                  onChange={setReason}
+                />
+                <s-button
+                  tone="critical"
+                  disabled={flag(busy)}
+                  onClick={() => submit({ intent: "disqualify", reason })}
+                >
+                  Disqualify Entrant
+                </s-button>
+              </>
+            )}
+          </s-stack>
+        </s-grid>
       </s-section>
 
       <s-section heading="Entries By Method">

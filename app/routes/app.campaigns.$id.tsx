@@ -40,7 +40,7 @@ import { periodFor } from "../lib/daily";
 import { entriesByMethod } from "../lib/entries/methods.server";
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
 import { EntryActivityTable } from "../components/EntryActivity";
-import { Select } from "../components/fields";
+import { flag, Select } from "../components/fields";
 import {
   activityFeed,
   restoreEvent,
@@ -425,6 +425,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   return { ok: true };
 };
 
+const TABS = [
+  ["overview", "Overview"],
+  ["entrants", "Entrants"],
+  ["activity", "Activity"],
+  ["orders", "Orders"],
+  ["draws", "Draws"],
+] as const;
+type Tab = (typeof TABS)[number][0];
+
 export default function CampaignPage() {
   const {
     campaign,
@@ -445,11 +454,44 @@ export default function CampaignPage() {
   const fetcher = useFetcher<typeof action>();
   const submit = (data: Record<string, string>) =>
     fetcher.submit(data, { method: "post" });
-  const [, setSearch] = useSearchParams();
+  const [search, setSearch] = useSearchParams();
+  const tab = (TABS.find(([t]) => t === search.get("tab"))?.[0] ??
+    "overview") as Tab;
+  // Changes some query params and keeps the rest (tab, filters, searches).
+  const setParams = (changes: Record<string, string | null>) =>
+    setSearch((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [k, v] of Object.entries(changes))
+        if (v) next.set(k, v);
+        else next.delete(k);
+      return next;
+    });
   const total = Object.values(counts).reduce((s, n) => s + n, 0);
+  const busy = fetcher.state !== "idle";
+  const base = `/app/campaigns/${campaign.id}`;
+
+  const methodSwitch = daily && (
+    <s-button-group>
+      {(
+        [
+          ["today", "Current Draw"],
+          ["all", "All Time"],
+        ] as const
+      ).map(([value, label]) => (
+        <s-button
+          key={value}
+          slot="secondary-actions"
+          variant={methods.period === value ? "primary" : "secondary"}
+          onClick={() => setParams({ methods: value === "all" ? "all" : null })}
+        >
+          {label}
+        </s-button>
+      ))}
+    </s-button-group>
+  );
 
   return (
-    <s-page heading={campaign.title}>
+    <s-page heading={campaign.title} inlineSize="large">
       <s-badge slot="title-metadata" tone={statusTone(campaign.status)}>
         {campaign.status.toLowerCase()}
       </s-badge>
@@ -458,7 +500,7 @@ export default function CampaignPage() {
           slot="primary-action"
           onClick={() => submit({ intent: "status", status: "ENDED" })}
         >
-          End giveaway
+          End Giveaway
         </s-button>
       ) : (
         <s-button
@@ -466,313 +508,341 @@ export default function CampaignPage() {
           variant="primary"
           onClick={() => submit({ intent: "status", status: "ACTIVE" })}
         >
-          Go live
+          Go Live
         </s-button>
       )}
+      <s-button slot="secondary-actions" href={`${base}/edit`}>
+        Edit
+      </s-button>
+      <s-button slot="secondary-actions" href={`${base}/analytics`}>
+        Analytics
+      </s-button>
       <s-button
         slot="secondary-actions"
-        href={`/app/campaigns/${campaign.id}/edit`}
+        onClick={() =>
+          downloadFile(
+            `${base}/export${filter === "ALL" ? "" : `?status=${filter}`}`,
+            "entrants.csv",
+          )
+        }
       >
-        Edit
+        Export CSV
+      </s-button>
+      <s-button slot="secondary-actions" href={`${base}/import`}>
+        Import
       </s-button>
       <s-button
         slot="secondary-actions"
         onClick={() =>
           fetcher.submit(
             { intent: "duplicate" },
-            { method: "post", action: `/app/campaigns/${campaign.id}/edit` },
+            { method: "post", action: `${base}/edit` },
           )
         }
       >
         Duplicate
       </s-button>
 
-      <s-section>
-        <s-grid gridTemplateColumns="repeat(4, 1fr)" gap="base">
-          <Stat label="Entrants" value={total} />
-          <Stat label="Total entries" value={totalEntries} />
-          <Stat label="Needs review" value={counts.HELD ?? 0} />
-          <Stat
-            label="Blocked or disqualified"
-            value={counts.DISQUALIFIED ?? 0}
-          />
-        </s-grid>
-      </s-section>
-
-      <s-section heading="Entries By Method">
+      <s-section padding="base">
         <s-stack gap="base">
-          {daily && (
-            <s-button-group>
-              {(
-                [
-                  ["today", "Current draw"],
-                  ["all", "All time"],
-                ] as const
-              ).map(([value, label]) => (
-                <s-button
-                  key={value}
-                  slot="secondary-actions"
-                  variant={methods.period === value ? "primary" : "secondary"}
-                  onClick={() =>
-                    setSearch((prev) => {
-                      const next = new URLSearchParams(prev);
-                      if (value === "all") next.set("methods", "all");
-                      else next.delete("methods");
-                      return next;
-                    })
-                  }
-                >
-                  {label}
-                </s-button>
-              ))}
-            </s-button-group>
-          )}
-          <EntriesByMethodTable rows={methods.rows} />
-          <s-text color="subdued">
-            People counts each entrant once per method. Click an entrant below
-            to see how they earned their entries.
-          </s-text>
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Entry Activity">
-        <s-stack gap="base">
-          <s-stack direction="inline" gap="base" alignItems="end">
-            <Select
-              label="Method"
-              value={activity.method}
-              options={[
-                { value: "", label: "All methods" },
-                ...methods.rows.map((r) => ({ value: r.key, label: r.label })),
-              ]}
-              onChange={(v) =>
-                setSearch((prev) => {
-                  const next = new URLSearchParams(prev);
-                  if (v) next.set("activity", v);
-                  else next.delete("activity");
-                  return next;
-                })
-              }
-            />
-            <Form method="get">
-              {activity.method && (
-                <input type="hidden" name="activity" value={activity.method} />
-              )}
-              <s-search-field
-                name="aq"
-                label="Search entries"
-                labelAccessibilityVisibility="exclusive"
-                placeholder="Search by email or name"
-                defaultValue={activity.q}
-              />
-            </Form>
-          </s-stack>
-          <EntryActivityTable
-            items={activity.items}
-            campaignId={campaign.id}
-            submit={submit}
-            busy={fetcher.state !== "idle"}
-          />
-          <s-text color="subdued">
-            The newest 100 entries. Disqualifying an entry takes back just those
-            entries; Restore gives them back.
-          </s-text>
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Entrants">
-        <s-stack gap="base">
-          <s-stack direction="inline" gap="base" alignItems="end">
-            <Form method="get">
-              {filter !== "ALL" && (
-                <input type="hidden" name="status" value={filter} />
-              )}
-              <s-search-field
-                name="q"
-                label="Search entrants"
-                labelAccessibilityVisibility="exclusive"
-                placeholder="Search by email or name"
-                defaultValue={q}
-              />
-            </Form>
-            <s-button href={`/app/campaigns/${campaign.id}/analytics`}>
-              Analytics
-            </s-button>
-            <s-button
-              onClick={() =>
-                downloadFile(
-                  `/app/campaigns/${campaign.id}/export${filter === "ALL" ? "" : `?status=${filter}`}`,
-                  "entrants.csv",
-                )
-              }
-            >
-              Export CSV
-            </s-button>
-            <s-button href={`/app/campaigns/${campaign.id}/import`}>
-              Import and backfill
-            </s-button>
-          </s-stack>
+          <s-grid
+            gridTemplateColumns="repeat(auto-fit, minmax(150px, 1fr))"
+            gap="base"
+          >
+            <Stat label="Entrants" value={total} />
+            <Stat label="Entries" value={totalEntries} />
+            <Stat label="Needs Review" value={counts.HELD ?? 0} />
+            <Stat label="Disqualified" value={counts.DISQUALIFIED ?? 0} />
+          </s-grid>
           <s-button-group>
-            {FILTERS.map((f) => (
+            {TABS.map(([t, label]) => (
               <s-button
-                key={f}
+                key={t}
                 slot="secondary-actions"
-                variant={f === filter ? "primary" : "secondary"}
-                onClick={() => setSearch(f === "ALL" ? {} : { status: f })}
+                variant={t === tab ? "primary" : "secondary"}
+                onClick={() => setParams({ tab: t === "overview" ? null : t })}
               >
-                {f === "PENDING_VERIFICATION"
-                  ? "Unverified"
-                  : f === "HELD"
-                    ? "Needs review"
-                    : f[0] + f.slice(1).toLowerCase()}
+                {label}
               </s-button>
             ))}
           </s-button-group>
-          {fetcher.data && "error" in fetcher.data && (
-            <s-banner tone="critical">{fetcher.data.error}</s-banner>
-          )}
-          <s-table>
-            <s-table-header-row>
-              <s-table-header listSlot="primary">Entrant</s-table-header>
-              <s-table-header listSlot="inline">Status</s-table-header>
-              <s-table-header format="numeric">Entries</s-table-header>
-              <s-table-header format="numeric">Risk</s-table-header>
-              <s-table-header>Signals</s-table-header>
-              <s-table-header>Actions</s-table-header>
-            </s-table-header-row>
-            <s-table-body>
-              {entrants.map((e) => (
-                <s-table-row key={e.id}>
-                  <s-table-cell>
-                    <s-stack gap="none">
-                      <s-link
-                        href={`/app/campaigns/${campaign.id}/entrants/${e.id}`}
-                      >
-                        {e.email}
-                      </s-link>
-                      {e.name && <s-text color="subdued">{e.name}</s-text>}
-                    </s-stack>
-                  </s-table-cell>
-                  <s-table-cell>
-                    <s-badge tone={statusTone(e.status)}>
-                      {e.status === "PENDING_VERIFICATION"
-                        ? "unverified"
-                        : e.status.toLowerCase()}
-                    </s-badge>
-                  </s-table-cell>
-                  <s-table-cell>{e.entries}</s-table-cell>
-                  <s-table-cell>
-                    <s-badge tone={riskTone(e.riskScore)}>
-                      {e.riskScore}
-                    </s-badge>
-                  </s-table-cell>
-                  <s-table-cell>
-                    {e.signals.join(", ").replaceAll("_", " ") || "—"}
-                  </s-table-cell>
-                  <s-table-cell>
-                    <s-button-group>
-                      {e.status !== "ACTIVE" && e.status !== "DISQUALIFIED" && (
-                        <s-button
-                          onClick={() =>
-                            submit({ intent: "approve", entrantId: e.id })
-                          }
-                        >
-                          Approve
-                        </s-button>
-                      )}
-                      {e.status !== "DISQUALIFIED" && (
-                        <s-button
-                          tone="critical"
-                          onClick={() =>
-                            submit({ intent: "disqualify", entrantId: e.id })
-                          }
-                        >
-                          Disqualify
-                        </s-button>
-                      )}
-                    </s-button-group>
-                  </s-table-cell>
-                </s-table-row>
-              ))}
-            </s-table-body>
-          </s-table>
-          {entrants.length === 0 && (
-            <s-paragraph>No entrants here yet.</s-paragraph>
-          )}
         </s-stack>
       </s-section>
 
-      {daily && <DailySection daily={daily} />}
+      {fetcher.data && "error" in fetcher.data && (
+        <s-banner tone="critical">{String(fetcher.data.error)}</s-banner>
+      )}
+      {fetcher.data &&
+        "message" in fetcher.data &&
+        fetcher.state === "idle" && (
+          <s-banner tone="success">{String(fetcher.data.message)}</s-banner>
+        )}
 
-      <DrawsSection draws={draws} extras={drawExtras} />
+      {tab === "overview" && (
+        <>
+          {daily && <DailySection daily={daily} />}
+          <s-section heading="Entries By Method">
+            <s-stack gap="base">
+              {methodSwitch}
+              <EntriesByMethodTable rows={methods.rows} />
+            </s-stack>
+          </s-section>
+          <s-section heading="Latest Entries">
+            <s-stack gap="base">
+              <EntryActivityTable
+                items={activity.items.slice(0, 8)}
+                campaignId={campaign.id}
+                submit={submit}
+                busy={busy}
+                compact
+              />
+              <s-button
+                variant="tertiary"
+                onClick={() => setParams({ tab: "activity" })}
+              >
+                See All Activity
+              </s-button>
+            </s-stack>
+          </s-section>
+        </>
+      )}
 
-      <s-section heading="Recent orders">
-        <s-stack gap="base">
-          <s-stack direction="inline" gap="base" alignItems="center">
-            <s-button
-              onClick={() => submit({ intent: "removePreStart" })}
-              loading={
-                fetcher.state !== "idle" &&
-                fetcher.formData?.get("intent") === "removePreStart"
-              }
+      {tab === "activity" && (
+        <s-section heading="Activity">
+          <s-stack gap="base">
+            <s-grid
+              gridTemplateColumns="minmax(180px, 260px) minmax(200px, 1fr)"
+              gap="base"
+              alignItems="end"
             >
-              Remove entries from orders placed before the start
-            </s-button>
+              <Select
+                label="Method"
+                value={activity.method}
+                options={[
+                  { value: "", label: "All methods" },
+                  ...methods.rows.map((r) => ({
+                    value: r.key,
+                    label: r.label,
+                  })),
+                ]}
+                onChange={(v) => setParams({ activity: v || null })}
+              />
+              <Form method="get">
+                <input type="hidden" name="tab" value="activity" />
+                {activity.method && (
+                  <input
+                    type="hidden"
+                    name="activity"
+                    value={activity.method}
+                  />
+                )}
+                <s-search-field
+                  name="aq"
+                  label="Search"
+                  labelAccessibilityVisibility="exclusive"
+                  placeholder="Search by email or name"
+                  defaultValue={activity.q}
+                />
+              </Form>
+            </s-grid>
+            <EntryActivityTable
+              items={activity.items}
+              campaignId={campaign.id}
+              submit={submit}
+              busy={busy}
+            />
             <s-text color="subdued">
-              Orders placed before {startsLabel} don&apos;t earn entries.
+              Newest 100 entries. Disqualify takes back just that entry; Restore
+              gives it back.
             </s-text>
           </s-stack>
-          {fetcher.data &&
-            "message" in fetcher.data &&
-            fetcher.formData === undefined && (
-              <s-banner tone="success">{String(fetcher.data.message)}</s-banner>
-            )}
-          {orders.length === 0 ? (
-            <s-paragraph>
-              Orders placed while this giveaway is live will show here with the
-              entries they earned.
-            </s-paragraph>
-          ) : (
-            <s-table>
-              <s-table-header-row>
-                <s-table-header listSlot="primary">Order</s-table-header>
-                <s-table-header>Placed</s-table-header>
-                <s-table-header>Customer</s-table-header>
-                <s-table-header listSlot="inline">Result</s-table-header>
-                <s-table-header format="numeric">Entries</s-table-header>
-              </s-table-header-row>
-              <s-table-body>
-                {orders.map((o) => (
-                  <s-table-row key={o.id}>
-                    <s-table-cell>{o.name}</s-table-cell>
-                    <s-table-cell>{o.email ?? "—"}</s-table-cell>
-                    <s-table-cell>{o.status}</s-table-cell>
-                    <s-table-cell>{o.entries}</s-table-cell>
-                  </s-table-row>
+        </s-section>
+      )}
+
+      {tab === "entrants" && (
+        <s-section heading="Entrants">
+          <s-stack gap="base">
+            <s-stack direction="inline" gap="base" alignItems="center">
+              <Form method="get">
+                <input type="hidden" name="tab" value="entrants" />
+                {filter !== "ALL" && (
+                  <input type="hidden" name="status" value={filter} />
+                )}
+                <s-search-field
+                  name="q"
+                  label="Search entrants"
+                  labelAccessibilityVisibility="exclusive"
+                  placeholder="Search by email or name"
+                  defaultValue={q}
+                />
+              </Form>
+              <s-button-group>
+                {FILTERS.map((f) => (
+                  <s-button
+                    key={f}
+                    slot="secondary-actions"
+                    variant={f === filter ? "primary" : "secondary"}
+                    onClick={() =>
+                      setParams({ status: f === "ALL" ? null : f })
+                    }
+                  >
+                    {f === "PENDING_VERIFICATION"
+                      ? "Unverified"
+                      : f === "HELD"
+                        ? "Needs Review"
+                        : f[0] + f.slice(1).toLowerCase()}
+                  </s-button>
                 ))}
-              </s-table-body>
-            </s-table>
-          )}
+              </s-button-group>
+            </s-stack>
+            {entrants.length === 0 ? (
+              <s-paragraph>No entrants here yet.</s-paragraph>
+            ) : (
+              <s-table>
+                <s-table-header-row>
+                  <s-table-header listSlot="primary">Entrant</s-table-header>
+                  <s-table-header listSlot="inline">Status</s-table-header>
+                  <s-table-header format="numeric">Entries</s-table-header>
+                  <s-table-header format="numeric">Risk</s-table-header>
+                  <s-table-header />
+                </s-table-header-row>
+                <s-table-body>
+                  {entrants.map((e) => (
+                    <s-table-row key={e.id}>
+                      <s-table-cell>
+                        <s-stack gap="none">
+                          <s-link href={`${base}/entrants/${e.id}`}>
+                            {e.name || e.email}
+                          </s-link>
+                          {e.name && <s-text color="subdued">{e.email}</s-text>}
+                        </s-stack>
+                      </s-table-cell>
+                      <s-table-cell>
+                        <s-badge tone={statusTone(e.status)}>
+                          {e.status === "PENDING_VERIFICATION"
+                            ? "unverified"
+                            : e.status === "HELD"
+                              ? "needs review"
+                              : e.status.toLowerCase()}
+                        </s-badge>
+                      </s-table-cell>
+                      <s-table-cell>{e.entries.toLocaleString()}</s-table-cell>
+                      <s-table-cell>
+                        <s-badge tone={riskTone(e.riskScore)}>
+                          {e.riskScore}
+                          {e.signals.length
+                            ? ` · ${e.signals.join(", ").replaceAll("_", " ").toLowerCase()}`
+                            : ""}
+                        </s-badge>
+                      </s-table-cell>
+                      <s-table-cell>
+                        <s-button-group>
+                          {e.status !== "ACTIVE" &&
+                            e.status !== "DISQUALIFIED" && (
+                              <s-button
+                                onClick={() =>
+                                  submit({ intent: "approve", entrantId: e.id })
+                                }
+                              >
+                                Approve
+                              </s-button>
+                            )}
+                          {e.status !== "DISQUALIFIED" && (
+                            <s-button
+                              tone="critical"
+                              onClick={() =>
+                                submit({
+                                  intent: "disqualify",
+                                  entrantId: e.id,
+                                })
+                              }
+                            >
+                              Disqualify
+                            </s-button>
+                          )}
+                        </s-button-group>
+                      </s-table-cell>
+                    </s-table-row>
+                  ))}
+                </s-table-body>
+              </s-table>
+            )}
+          </s-stack>
+        </s-section>
+      )}
+
+      {tab === "orders" && (
+        <s-section heading="Orders">
+          <s-stack gap="base">
+            <s-stack direction="inline" gap="base" alignItems="center">
+              <s-text color="subdued">
+                Only orders placed after {startsLabel} earn entries.
+              </s-text>
+              <s-button
+                variant="tertiary"
+                onClick={() => submit({ intent: "removePreStart" })}
+                loading={flag(
+                  busy && fetcher.formData?.get("intent") === "removePreStart",
+                )}
+              >
+                Remove Entries From Older Orders
+              </s-button>
+            </s-stack>
+            {orders.length === 0 ? (
+              <s-paragraph>
+                Orders placed while this giveaway is live show here with the
+                entries they earned.
+              </s-paragraph>
+            ) : (
+              <s-table>
+                <s-table-header-row>
+                  <s-table-header listSlot="primary">Order</s-table-header>
+                  <s-table-header>Placed</s-table-header>
+                  <s-table-header>Customer</s-table-header>
+                  <s-table-header listSlot="inline">Result</s-table-header>
+                  <s-table-header format="numeric">Entries</s-table-header>
+                </s-table-header-row>
+                <s-table-body>
+                  {orders.map((o) => (
+                    <s-table-row key={o.id}>
+                      <s-table-cell>{o.name}</s-table-cell>
+                      <s-table-cell>{o.placed ?? "—"}</s-table-cell>
+                      <s-table-cell>{o.email ?? "—"}</s-table-cell>
+                      <s-table-cell>{o.status}</s-table-cell>
+                      <s-table-cell>{o.entries.toLocaleString()}</s-table-cell>
+                    </s-table-row>
+                  ))}
+                </s-table-body>
+              </s-table>
+            )}
+          </s-stack>
+        </s-section>
+      )}
+
+      {tab === "draws" && <DrawsSection draws={draws} extras={drawExtras} />}
+
+      <s-section slot="aside" heading="On Your Store">
+        <s-stack gap="small-200">
+          <s-text>
+            Link name: <s-text type="strong">{campaign.slug}</s-text>
+          </s-text>
+          <s-text color="subdued">{storefrontPath}</s-text>
         </s-stack>
       </s-section>
-
-      <s-section slot="aside" heading="On your store">
-        <s-paragraph>
-          Add the Giveaway block in your theme editor and set its giveaway link
-          to <s-text type="strong">{campaign.slug}</s-text>.
-        </s-paragraph>
-        <s-paragraph>
-          Direct link: <s-text type="strong">{storefrontPath}</s-text>
-        </s-paragraph>
-      </s-section>
-      <s-section slot="aside" heading="Ways to enter">
-        <s-unordered-list>
+      <s-section slot="aside" heading="Ways To Enter">
+        <s-stack gap="small-200">
           {campaign.actions.map((a) => (
-            <s-list-item key={a.id}>
-              {a.label}: {a.entries} {a.entries === 1 ? "entry" : "entries"}
-            </s-list-item>
+            <s-stack
+              key={a.id}
+              direction="inline"
+              justifyContent="space-between"
+              gap="base"
+            >
+              <s-text>{a.label}</s-text>
+              <s-text color="subdued">+{a.entries}</s-text>
+            </s-stack>
           ))}
-        </s-unordered-list>
+        </s-stack>
       </s-section>
     </s-page>
   );
