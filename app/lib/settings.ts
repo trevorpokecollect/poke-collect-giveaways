@@ -32,6 +32,12 @@ export const campaignSettingsSchema = z.object({
   webhookUrl: z.string().url().or(z.literal("")).default(""),
   showLeaderboard: z.boolean().default(false),
   showWinners: z.boolean().default(true),
+  // Who may enter, used by the official rules generator in the editor.
+  eligibility: z
+    .string()
+    .default(
+      "legal residents of the 50 United States and the District of Columbia who are 18 years of age or older",
+    ),
 });
 
 export type CampaignSettings = z.infer<typeof campaignSettingsSchema>;
@@ -47,7 +53,13 @@ export const parseSettings = (raw: unknown): CampaignSettings =>
  * SECRET_CODE: { code }
  * POLL: { question, options: string[] }
  * QUESTION: { question, answer? }  (answer set = quiz, must match case-insensitively)
+ * ALTERNATE_ENTRY: { instructions? }  (free method of entry, quoted in the official rules)
  * DAILY_CHECKIN, SIGNUP, REFERRAL: none
+ *
+ * Any type may also carry `archived: true`. The editor sets it (with entries 0)
+ * instead of deleting an action that already has EntryEvents, so the ledger
+ * keeps its actionId. Archived actions must not be shown on the storefront or
+ * awarded again; use isArchivedAction().
  */
 export const actionConfigSchema = {
   SOCIAL_FOLLOW: z.object({ url: z.string().url() }),
@@ -68,4 +80,10 @@ export const actionConfigSchema = {
     question: z.string().min(1),
     answer: z.string().optional(),
   }),
+  ALTERNATE_ENTRY: z.object({ instructions: z.string().optional() }),
 } as const;
+
+export const isArchivedAction = (config: unknown) =>
+  !!config &&
+  typeof config === "object" &&
+  (config as { archived?: unknown }).archived === true;
