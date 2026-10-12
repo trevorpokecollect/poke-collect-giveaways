@@ -183,7 +183,11 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
   const turnstile = await verifyTurnstile(input.turnstileToken, input.ip);
   if (!turnstile.success)
     signals.push({
-      code: "turnstile_failed",
+      code: turnstile.errorCodes.every((c) =>
+        ["missing-input-response", "timeout-or-duplicate"].includes(c),
+      )
+        ? "turnstile_missing"
+        : "turnstile_failed",
       detail: turnstile.errorCodes.join(","),
     });
   if (input.honeypot) signals.push({ code: "honeypot" });
@@ -243,6 +247,12 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
     decision = "allow";
 
   if (decision === "block") {
+    // Blocked sign-ups aren't saved, so log why (no personal data) for tuning.
+    console.warn("signup blocked", {
+      campaign: campaign.slug,
+      score,
+      signals: scored.map((s) => `${s.code}${s.detail ? `(${s.detail})` : ""}`),
+    });
     return { ok: false, error: "We couldn't accept this entry.", status: 403 };
   }
 

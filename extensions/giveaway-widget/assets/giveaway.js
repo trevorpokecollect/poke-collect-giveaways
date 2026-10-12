@@ -538,7 +538,9 @@
     var email = el("input", { class: "pcg__input", id: emailId, type: "email", name: "email", required: true, autocomplete: "email", placeholder: "you@example.com" });
     var nameRequired = this.data.campaign.requireName !== false;
     var name = el("input", { class: "pcg__input", id: nameId, type: "text", name: "name", autocomplete: "name", placeholder: "Ash Ketchum", required: nameRequired, maxlength: "80" });
-    var honeypot = el("input", { type: "text", name: "website", tabindex: "-1", autocomplete: "off" });
+    // A field only bots fill. Its name matches no autofill category, so browsers and password
+    // managers leave it empty.
+    var honeypot = el("input", { type: "text", name: "pcg_hp_" + uid, tabindex: "-1", autocomplete: "off", "data-1p-ignore": "true", "data-lpignore": "true", "aria-hidden": "true" });
     var emailRequired = !!this.data.campaign.requireEmailConsent;
     var consent = el("input", { type: "checkbox", name: "consent", required: emailRequired });
     var turnstileBox = el("div");
@@ -591,6 +593,25 @@
         if (emailRequired && !consent.checked) { err.textContent = "Tick the email box to enter."; consent.focus(); return; }
         if (phone && phone.value.trim() && !smsConsent.checked) { err.textContent = "Check the box to agree to texts, or leave the number blank."; smsConsent.focus(); return; }
         button.disabled = true;
+        // The bot check runs in the background; wait for it (up to 8s) rather than sending the
+        // entry without its token, which would be refused.
+        if (self.data.turnstileSiteKey && window.turnstile && !turnstileToken && !e.__waited) {
+          var waited = 0, label = button.textContent;
+          button.textContent = "One Moment…";
+          var again = function () {
+            if (turnstileToken || waited >= 8000) {
+              button.textContent = label;
+              var ev = new Event("submit", { cancelable: true });
+              ev.__waited = true;
+              form.dispatchEvent(ev);
+              return;
+            }
+            waited += 250;
+            window.setTimeout(again, 250);
+          };
+          again();
+          return;
+        }
         self.signup({
           email: email.value, name: name.value, website: honeypot.value, consent: consent.checked, turnstileToken: turnstileToken,
           phone: phone && smsConsent.checked ? phone.value : undefined, smsConsent: !!(smsConsent && smsConsent.checked && phone.value.trim()),

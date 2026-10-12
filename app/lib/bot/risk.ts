@@ -3,6 +3,7 @@
 
 export type SignalCode =
   | "turnstile_failed"
+  | "turnstile_missing"
   | "disposable_email"
   | "generated_email"
   | "duplicate_email_alias"
@@ -22,6 +23,9 @@ export interface Signal {
 
 export const SIGNAL_WEIGHTS: Record<SignalCode, number> = {
   turnstile_failed: 100,
+  // No token, or one already used: a real person who submitted before the check finished, or
+  // retried after an error. Enough to ask for an email code, not to refuse the entry.
+  turnstile_missing: 20,
   honeypot: 100,
   disposable_email: 60,
   self_referral: 60,
