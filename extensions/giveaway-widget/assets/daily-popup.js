@@ -119,7 +119,7 @@
     if (rain && window.pcgMatrixRain) window.pcgMatrixRain(rain, launcher, { size: 9 });
     launcher.addEventListener("click", open);
     if (tab) tab.addEventListener("click", open);
-    pop.querySelector(".pcg-pop__close").addEventListener("click", close);
+    pop.querySelectorAll(".pcg-pop__close, .pcg-pop__done").forEach(function (b) { b.addEventListener("click", close); });
     // A click on the backdrop (outside the dialog box) closes it.
     dialog.addEventListener("click", function (e) {
       if (e.target === dialog) close();
