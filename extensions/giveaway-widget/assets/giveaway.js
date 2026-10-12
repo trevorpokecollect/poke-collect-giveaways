@@ -684,7 +684,16 @@
 
   Widget.prototype.referralLink = function () {
     var code = this.data.entrant && this.data.entrant.referralCode;
-    var url = new URL(window.location.href);
+    // In the popup the page underneath is wherever the shopper happened to be (a product, a
+    // collection), so friends get the giveaway's own page instead.
+    var inPopup = !!(this.root.closest && this.root.closest(".pcg-pop"));
+    var url;
+    try {
+      url = new URL(inPopup ? this.base : window.location.href, window.location.href);
+    } catch (e) {
+      // No usable page address (e.g. the admin's sandboxed preview).
+      url = new URL("https://example.com" + this.base);
+    }
     url.hash = "";
     ["ref", "format"].forEach(function (k) { url.searchParams.delete(k); });
     if (code) url.searchParams.set("ref", code);
@@ -700,7 +709,8 @@
   Widget.prototype.shareButtons = function (only, onShare) {
     var link = this.referralLink();
     var text = this.shareText();
-    var networks = NETWORKS.filter(function (n) { return !only || only === "any" || n.id === only; });
+    // "share": every network but Copy Link (for boxes that already have their own Copy button).
+    var networks = NETWORKS.filter(function (n) { return !only || only === "any" || (only === "share" ? n.id !== "copy" : n.id === only); });
     return el("div", { class: "pcg__share", role: "group", "aria-label": "Share" }, networks.map(function (n) {
       var btn = el("button", {
         class: "pcg__share-btn pcg__share-btn--" + n.id,
@@ -743,9 +753,9 @@
       this.linkedNote(),
     ]);
 
-    // The referral box stays with the entry count; the tasks get their own column when wide.
+    // The referral box goes last, after the tasks and Shop & Earn (last in the tasks column when wide).
     var referral = this.data.campaign.actions.filter(function (a) { return a.type === "REFERRAL"; })[0];
-    if (referral && entrant.referralCode) nodes.push(this.referralBox(referral));
+    var refBox = referral && entrant.referralCode ? this.referralBox(referral) : null;
 
     var shop = this.shopBox();
     if (all.length || shop) {
@@ -759,8 +769,9 @@
           return self.actionItem(a, entrant, !!done[a.id], !a.mandatory && requiredLeft.length > 0);
         })) : null,
         shop,
+        refBox,
       ]));
-    }
+    } else if (refBox) nodes.push(refBox);
 
     this.show(nodes.concat(this.extras()));
   };
@@ -1060,9 +1071,9 @@
       },
     });
     return el("div", { class: "pcg__ref" }, [
-      el("label", { class: "pcg__note", for: inputId, text: "Get +" + referral.entries + plural(referral.entries, " entry", " entries") + " for every friend who enters with your link." }),
+      el("label", { class: "pcg__note", for: inputId, text: "Get +" + referral.entries + plural(referral.entries, " Entry", " Entries") + " For Every Friend Who Enters With Your Link" }),
       el("div", { class: "pcg__row" }, [input, copy]),
-      this.shareButtons("any", null),
+      this.shareButtons("share", null),
     ]);
   };
 
