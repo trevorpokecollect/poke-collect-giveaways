@@ -31,6 +31,9 @@ import {
   choosePrize,
 } from "../lib/daily.server";
 import { publicName } from "../lib/winners";
+import { periodFor } from "../lib/daily";
+import { entriesByMethod } from "../lib/entries/methods.server";
+import { EntriesByMethodTable } from "../components/EntriesByMethod";
 
 const FILTERS = [
   "ALL",
@@ -99,6 +102,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }),
   ]);
   const dailyCfg = dailySettings(campaign);
+  // Daily giveaways can show just the current draw period ("Today").
+  const methodPeriod =
+    dailyCfg.enabled && url.searchParams.get("methods") !== "all"
+      ? "today"
+      : "all";
+  const methods = await entriesByMethod(campaign.id, {
+    since:
+      methodPeriod === "today"
+        ? periodFor(new Date(), campaign.timezone, dailyCfg.drawTime).opensAt
+        : undefined,
+  });
   let daily: DailyData | null = null;
   if (dailyCfg.enabled) {
     const [current, prizes] = await Promise.all([
@@ -206,6 +220,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     })),
     drawExtras: await drawsSectionExtras(campaign),
     daily,
+    methods: { period: methodPeriod, rows: methods.rows },
   };
 };
 
@@ -359,6 +374,7 @@ export default function CampaignPage() {
     filter,
     q,
     storefrontPath,
+    methods,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const submit = (data: Record<string, string>) =>
@@ -415,6 +431,42 @@ export default function CampaignPage() {
             value={counts.DISQUALIFIED ?? 0}
           />
         </s-grid>
+      </s-section>
+
+      <s-section heading="Entries By Method">
+        <s-stack gap="base">
+          {daily && (
+            <s-button-group>
+              {(
+                [
+                  ["today", "Current draw"],
+                  ["all", "All time"],
+                ] as const
+              ).map(([value, label]) => (
+                <s-button
+                  key={value}
+                  slot="secondary-actions"
+                  variant={methods.period === value ? "primary" : "secondary"}
+                  onClick={() =>
+                    setSearch((prev) => {
+                      const next = new URLSearchParams(prev);
+                      if (value === "all") next.set("methods", "all");
+                      else next.delete("methods");
+                      return next;
+                    })
+                  }
+                >
+                  {label}
+                </s-button>
+              ))}
+            </s-button-group>
+          )}
+          <EntriesByMethodTable rows={methods.rows} />
+          <s-text color="subdued">
+            People counts each entrant once per method. Click an entrant below
+            to see how they earned their entries.
+          </s-text>
+        </s-stack>
       </s-section>
 
       <s-section heading="Entrants">
@@ -482,7 +534,11 @@ export default function CampaignPage() {
                 <s-table-row key={e.id}>
                   <s-table-cell>
                     <s-stack gap="none">
-                      <s-text>{e.email}</s-text>
+                      <s-link
+                        href={`/app/campaigns/${campaign.id}/entrants/${e.id}`}
+                      >
+                        {e.email}
+                      </s-link>
                       {e.name && <s-text color="subdued">{e.name}</s-text>}
                     </s-stack>
                   </s-table-cell>

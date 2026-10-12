@@ -1,4 +1,5 @@
 import type { Campaign } from "@prisma/client";
+import { entriesByMethod } from "./entries/methods.server";
 import db from "../db.server";
 import { normalizeEmail } from "./bot/email";
 
@@ -116,7 +117,6 @@ export async function campaignAnalytics(campaign: Campaign) {
   const [
     entrantDays,
     entryDays,
-    bySource,
     statusCounts,
     verified,
     entrants,
@@ -134,12 +134,6 @@ export async function campaignAnalytics(campaign: Campaign) {
              coalesce(sum(entries), 0) AS n
       FROM "EntryEvent" WHERE "campaignId" = ${campaignId} AND entries > 0
       GROUP BY 1`,
-    db.entryEvent.groupBy({
-      by: ["source", "actionId"],
-      where: { campaignId },
-      _sum: { entries: true },
-      _count: true,
-    }),
     db.entrant.groupBy({
       by: ["status"],
       where: { campaignId },
@@ -162,27 +156,6 @@ export async function campaignAnalytics(campaign: Campaign) {
       select: { status: true, email: true, breakdown: true },
     }),
   ]);
-
-  const actions = await db.entryAction.findMany({
-    where: { campaignId },
-    select: { id: true, type: true, label: true },
-  });
-  const actionById = new Map(actions.map((a) => [a.id, a]));
-  const sources = new Map<
-    string,
-    { label: string; entries: number; events: number }
-  >();
-  for (const row of bySource) {
-    const action = row.actionId ? actionById.get(row.actionId) : undefined;
-    const label =
-      row.source === "ACTION"
-        ? `Action: ${action ? action.type.toLowerCase().replaceAll("_", " ") : "removed action"}`
-        : row.source.toLowerCase();
-    const s = sources.get(label) ?? { label, entries: 0, events: 0 };
-    s.entries += row._sum.entries ?? 0;
-    s.events += row._count;
-    sources.set(label, s);
-  }
 
   const referrerIds = topReferrers.map((r) => r.referredById!);
   const referrerRows = referrerIds.length
@@ -208,7 +181,7 @@ export async function campaignAnalytics(campaign: Campaign) {
       ...entrantDays.map((r) => ({ day: r.day, entrants: Number(r.n) })),
       ...entryDays.map((r) => ({ day: r.day, entries: Number(r.n) })),
     ]),
-    sources: [...sources.values()].sort((a, b) => b.entries - a.entries),
+    methods: (await entriesByMethod(campaignId)).rows,
     topReferrers: topReferrers.map((r) => ({
       id: r.referredById!,
       email: referrerById.get(r.referredById!)?.email ?? "(deleted)",

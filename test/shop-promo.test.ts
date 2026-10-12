@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { purchaseRulesSchema } from "../app/lib/entries/rules";
-import { purchaseRateText } from "../app/lib/shop-promo";
+import { feedCollection, purchaseRateText } from "../app/lib/shop-promo";
 
 const rules = (r: object) => purchaseRulesSchema.parse(r);
 
@@ -22,5 +22,16 @@ describe("purchaseRateText", () => {
   it("hides the box when purchases earn nothing", () => {
     expect(purchaseRateText(rules({ enabled: false }))).toBeNull();
     expect(purchaseRateText(rules({ base: { mode: "none" } }))).toBeNull();
+  });
+});
+
+describe("feedCollection", () => {
+  it("uses the Shop now collection, or Popular Picks for /collections/all and other pages", () => {
+    expect(feedCollection("/collections/booster-boxes")).toBe("booster-boxes");
+    expect(feedCollection("https://poke-collect.com/collections/popular-picks?sort=x")).toBe(
+      "popular-picks",
+    );
+    expect(feedCollection("/collections/all")).toBe("popular-picks");
+    expect(feedCollection("/pages/shop")).toBe("popular-picks");
   });
 });

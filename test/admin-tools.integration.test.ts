@@ -144,10 +144,21 @@ describe.skipIf(!enabled)("admin data tools", async () => {
     const a = await campaignAnalytics(campaign);
     expect(a.totals).toMatchObject({ entrants: 2, verified: 2, held: 0 });
     expect(a.revenue).toEqual({ orders: 1, revenue: 40, missing: 0 });
-    expect(a.sources).toEqual(
+    expect(a.methods).toEqual(
       expect.arrayContaining([
-        { label: "import", entries: 32, events: 2 },
-        { label: "purchase", entries: 40, events: 1 },
+        expect.objectContaining({
+          label: "Imported (GiveawayNinja)",
+          entries: 32,
+          times: 2,
+          people: 2,
+        }),
+        expect.objectContaining({
+          label: "Purchases",
+          entries: 40,
+          times: 1,
+          people: 1,
+          share: 40 / 72,
+        }),
       ]),
     );
     expect(a.days.at(-1)).toMatchObject({ entrants: 2, entries: 72 });

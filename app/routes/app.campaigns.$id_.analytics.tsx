@@ -6,6 +6,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { campaignAnalytics, type DayPoint } from "../lib/analytics.server";
 import { downloadFile } from "../lib/download";
+import { EntriesByMethodTable } from "../components/EntriesByMethod";
 
 // Named with "$id_" so it renders as its own page instead of nesting inside
 // the campaign page (which has no <Outlet />). URL: /app/campaigns/:id/analytics.
@@ -106,27 +107,8 @@ export default function CampaignAnalytics() {
         <BarChart days={stats.days} field="entries" />
       </s-section>
 
-      <s-section heading="Entries by source">
-        {stats.sources.length === 0 ? (
-          <s-paragraph>No entries yet.</s-paragraph>
-        ) : (
-          <s-table>
-            <s-table-header-row>
-              <s-table-header listSlot="primary">Source</s-table-header>
-              <s-table-header format="numeric">Events</s-table-header>
-              <s-table-header format="numeric">Entries</s-table-header>
-            </s-table-header-row>
-            <s-table-body>
-              {stats.sources.map((s) => (
-                <s-table-row key={s.label}>
-                  <s-table-cell>{s.label}</s-table-cell>
-                  <s-table-cell>{s.events.toLocaleString()}</s-table-cell>
-                  <s-table-cell>{s.entries.toLocaleString()}</s-table-cell>
-                </s-table-row>
-              ))}
-            </s-table-body>
-          </s-table>
-        )}
+      <s-section heading="Entries By Method">
+        <EntriesByMethodTable rows={stats.methods} />
       </s-section>
 
       <s-section heading="Top referrers">

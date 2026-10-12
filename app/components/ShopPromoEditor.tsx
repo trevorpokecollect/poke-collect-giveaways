@@ -53,8 +53,9 @@ export function ShopPromoEditor(props: {
               <s-text>Example products</s-text>
               <s-text color="subdued">
                 Up to six products, each shown with its price and the entries
-                it earns. A few popular items from different collections work
-                well.
+                it earns. With none picked, the store shows the first six from
+                the Shop now collection (Popular Picks when the link is
+                /collections/all).
               </s-text>
               {s.products.length > 0 && (
                 <s-stack gap="small-200">
