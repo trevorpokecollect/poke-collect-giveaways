@@ -200,6 +200,15 @@ export async function processOrder(
         },
       }));
 
+    // An order disqualified by hand in the admin stays at zero, whatever Shopify sends later.
+    if (
+      log &&
+      (await db.entryEvent.count({
+        where: { orderLogId: log.id, dedupeKey: { startsWith: "void:" } },
+      }))
+    )
+      continue;
+
     // Bring the ledger for this order to exactly `target` entries.
     const current = await netOrderEntries(orderLog.id);
     const delta = target - current;

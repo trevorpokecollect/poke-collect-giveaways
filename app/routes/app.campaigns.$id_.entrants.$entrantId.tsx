@@ -1,31 +1,46 @@
-import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import type {
+  ActionFunctionArgs,
+  HeadersFunction,
+  LoaderFunctionArgs,
+} from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
+import { useState } from "react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { entriesByMethod } from "../lib/entries/methods.server";
-import { methodLabel } from "../lib/entries/methods";
 import { orderPlacedAt } from "../lib/entries/orders.server";
+import {
+  describeEvent,
+  restoreEvent,
+  voidEvent,
+  voidedEvents,
+} from "../lib/entries/void.server";
+import { activate, clawBackReferrals } from "../lib/entries/signup.server";
 import { riskTone, statusTone } from "../lib/ui";
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
+import { EntryActivityTable } from "../components/EntryActivity";
+import { flag, TextInput } from "../components/fields";
 
-// One entrant's entries: totals per method and every entry event, newest first.
-// Named with "$id_" so it renders as its own page. URL: /app/campaigns/:id/entrants/:entrantId.
+// One entrant: entries per method, every entry with Disqualify / Restore, and disqualifying
+// or reinstating the whole entrant. Named with "$id_" so it renders as its own page.
+// URL: /app/campaigns/:id/entrants/:entrantId.
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+async function findEntrant(request: Request, campaignId?: string, id?: string) {
   const { session } = await authenticate.admin(request);
   const entrant = await db.entrant.findFirst({
-    where: {
-      id: params.entrantId,
-      campaignId: params.id,
-      campaign: { shop: session.shop },
-    },
+    where: { id, campaignId, campaign: { shop: session.shop } },
     include: {
       campaign: { select: { id: true, title: true, timezone: true } },
     },
   });
   if (!entrant) throw new Response("Not found", { status: 404 });
-  const [methods, events] = await Promise.all([
+  return { entrant, shop: session.shop };
+}
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const { entrant } = await findEntrant(request, params.id, params.entrantId);
+  const [methods, events, lastDisqualify] = await Promise.all([
     entriesByMethod(entrant.campaignId, { entrantId: entrant.id }),
     db.entryEvent.findMany({
       where: { entrantId: entrant.id },
@@ -33,7 +48,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       take: 500,
       include: { orderLog: { select: { orderName: true, breakdown: true } } },
     }),
+    db.auditLog.findFirst({
+      where: {
+        action: "entrant.disqualify",
+        target: entrant.campaignId,
+        data: { path: ["entrantId"], equals: entrant.id },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
+  const voided = await voidedEvents(
+    entrant.campaignId,
+    events.map((e) => e.id),
+  );
   const when = new Intl.DateTimeFormat("en-US", {
     timeZone: entrant.campaign.timezone,
     dateStyle: "medium",
@@ -48,39 +75,100 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       status: entrant.status,
       riskScore: entrant.riskScore,
       createdAt: when.format(entrant.createdAt),
+      disqualifiedReason:
+        entrant.status === "DISQUALIFIED"
+          ? ((lastDisqualify?.data as { reason?: string } | null)?.reason ??
+            null)
+          : null,
     },
     total: Math.max(
       0,
       methods.rows.reduce((s, r) => s + r.entries, 0),
     ),
     rows: methods.rows.filter((r) => r.times > 0 || r.entries !== 0),
-    events: events.map((e) => ({
-      id: e.id,
-      at: when.format(e.createdAt),
-      method: methodLabel(e.source, e.actionId, methods.actions),
-      entries: e.entries,
-      order: e.orderLog
-        ? [
-            e.orderLog.orderName,
-            orderPlacedAt(e.orderLog.breakdown) &&
-              `placed ${when.format(orderPlacedAt(e.orderLog.breakdown)!)}`,
-          ]
-            .filter(Boolean)
-            .join(", ")
-        : null,
-      note: e.note,
-    })),
+    events: events.map((e) => {
+      const placed = e.orderLog ? orderPlacedAt(e.orderLog.breakdown) : null;
+      return {
+        id: e.id,
+        at: when.format(e.createdAt),
+        what:
+          describeEvent(e, methods.actions) +
+          (placed ? ` (placed ${when.format(placed)})` : ""),
+        entries: e.entries,
+        canVoid: e.entries > 0 && !e.dedupeKey?.startsWith("void:"),
+        voided: voided.has(e.id) ? voided.get(e.id) || "no reason given" : null,
+        entrant: {
+          id: entrant.id,
+          email: entrant.email,
+          name: entrant.name,
+          status: entrant.status,
+        },
+      };
+    }),
   };
+};
+
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const { entrant, shop } = await findEntrant(
+    request,
+    params.id,
+    params.entrantId,
+  );
+  const form = await request.formData();
+  const intent = String(form.get("intent"));
+  const reason = String(form.get("reason") ?? "")
+    .trim()
+    .slice(0, 200);
+  const audit = (action: string, data: object) =>
+    db.auditLog.create({
+      data: { shop, action, target: entrant.campaignId, data },
+    });
+  switch (intent) {
+    case "voidEvent":
+    case "restoreEvent": {
+      const eventId = String(form.get("eventId") ?? "");
+      const r =
+        intent === "voidEvent"
+          ? await voidEvent(entrant.campaignId, eventId, reason)
+          : await restoreEvent(entrant.campaignId, eventId);
+      if ("ok" in r) await audit(`entry.${intent}`, { eventId });
+      return r;
+    }
+    case "disqualify": {
+      await db.entrant.update({
+        where: { id: entrant.id },
+        data: { status: "DISQUALIFIED" },
+      });
+      await clawBackReferrals(entrant.id);
+      await audit("entrant.disqualify", { entrantId: entrant.id, reason });
+      return { ok: true };
+    }
+    case "reinstate": {
+      await activate(entrant.id);
+      await audit("entrant.approve", { entrantIds: [entrant.id] });
+      return { ok: true };
+    }
+  }
+  return { error: "Unknown action." };
 };
 
 export default function EntrantEntries() {
   const { campaign, entrant, total, rows, events } =
     useLoaderData<typeof loader>();
+  const fetcher = useFetcher<typeof action>();
+  const submit = (data: Record<string, string>) =>
+    fetcher.submit(data, { method: "post" });
+  const busy = fetcher.state !== "idle";
+  const [reason, setReason] = useState("");
+  const disqualified = entrant.status === "DISQUALIFIED";
   return (
     <s-page heading={entrant.name || entrant.email}>
       <s-link slot="breadcrumb-actions" href={`/app/campaigns/${campaign.id}`}>
         {campaign.title}
       </s-link>
+      {fetcher.data && "error" in fetcher.data && (
+        <s-banner tone="critical">{fetcher.data.error}</s-banner>
+      )}
       <s-section>
         <s-stack gap="small-200">
           <s-stack direction="inline" gap="small-200">
@@ -97,7 +185,47 @@ export default function EntrantEntries() {
           {entrant.phone && <s-text>{entrant.phone}</s-text>}
           <s-text color="subdued">Entered {entrant.createdAt}</s-text>
           <s-heading>{total.toLocaleString()} entries</s-heading>
+          {disqualified && (
+            <s-banner tone="critical">
+              Disqualified
+              {entrant.disqualifiedReason
+                ? `: ${entrant.disqualifiedReason}`
+                : ""}
+              . None of their entries count in any draw.
+            </s-banner>
+          )}
         </s-stack>
+      </s-section>
+
+      <s-section heading="Disqualify Entrant">
+        {disqualified ? (
+          <s-button
+            disabled={flag(busy)}
+            onClick={() => submit({ intent: "reinstate" })}
+          >
+            Reinstate entrant
+          </s-button>
+        ) : (
+          <s-stack gap="base">
+            <TextInput
+              label="Reason (optional)"
+              placeholder="e.g. duplicate account"
+              value={reason}
+              onChange={setReason}
+            />
+            <s-button
+              tone="critical"
+              disabled={flag(busy)}
+              onClick={() => submit({ intent: "disqualify", reason })}
+            >
+              Disqualify entrant
+            </s-button>
+            <s-text color="subdued">
+              Removes them from every draw for this giveaway. To take back just
+              one entry, use Disqualify entry below.
+            </s-text>
+          </s-stack>
+        )}
       </s-section>
 
       <s-section heading="Entries By Method">
@@ -105,32 +233,13 @@ export default function EntrantEntries() {
       </s-section>
 
       <s-section heading="Entry History">
-        {events.length === 0 ? (
-          <s-paragraph>No entries yet.</s-paragraph>
-        ) : (
-          <s-table>
-            <s-table-header-row>
-              <s-table-header listSlot="primary">Method</s-table-header>
-              <s-table-header>Given</s-table-header>
-              <s-table-header format="numeric">Entries</s-table-header>
-              <s-table-header>Order</s-table-header>
-              <s-table-header>Note</s-table-header>
-            </s-table-header-row>
-            <s-table-body>
-              {events.map((e) => (
-                <s-table-row key={e.id}>
-                  <s-table-cell>{e.method}</s-table-cell>
-                  <s-table-cell>{e.at}</s-table-cell>
-                  <s-table-cell>
-                    {e.entries > 0 ? `+${e.entries}` : e.entries}
-                  </s-table-cell>
-                  <s-table-cell>{e.order ?? "—"}</s-table-cell>
-                  <s-table-cell>{e.note ?? "—"}</s-table-cell>
-                </s-table-row>
-              ))}
-            </s-table-body>
-          </s-table>
-        )}
+        <EntryActivityTable
+          items={events}
+          campaignId={campaign.id}
+          submit={submit}
+          busy={busy}
+          showEntrant={false}
+        />
       </s-section>
     </s-page>
   );

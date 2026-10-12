@@ -39,6 +39,13 @@ import {
 import { periodFor } from "../lib/daily";
 import { entriesByMethod } from "../lib/entries/methods.server";
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
+import { EntryActivityTable } from "../components/EntryActivity";
+import { Select } from "../components/fields";
+import {
+  activityFeed,
+  restoreEvent,
+  voidEvent,
+} from "../lib/entries/void.server";
 
 const FILTERS = [
   "ALL",
@@ -165,6 +172,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     dateStyle: "medium",
     timeStyle: "short",
   });
+  const activityMethod = url.searchParams.get("activity") ?? "";
+  const activityQ = url.searchParams.get("aq")?.trim().slice(0, 200) ?? "";
+  const activity = await activityFeed(campaign.id, {
+    method: activityMethod || undefined,
+    q: activityQ,
+  });
   const totalBy = Object.fromEntries(
     totals.map((t) => [t.entrantId, t._sum.entries ?? 0]),
   );
@@ -240,6 +253,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     drawExtras: await drawsSectionExtras(campaign),
     daily,
     methods: { period: methodPeriod, rows: methods.rows },
+    activity: {
+      method: activityMethod,
+      q: activityQ,
+      items: activity.map((a) => ({ ...a, at: when.format(a.at) })),
+    },
   };
 };
 
@@ -350,6 +368,20 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       await audit("campaign.status", { status, startsAt });
       break;
     }
+    case "voidEvent":
+    case "restoreEvent": {
+      const eventId = String(form.get("eventId") ?? "");
+      const r =
+        intent === "voidEvent"
+          ? await voidEvent(
+              campaign.id,
+              eventId,
+              String(form.get("reason") ?? ""),
+            )
+          : await restoreEvent(campaign.id, eventId);
+      if ("ok" in r) await audit(`entry.${intent}`, { eventId });
+      return r;
+    }
     case "removePreStart": {
       const r = await removePreStartOrderEntries(campaign, admin);
       await audit("orders.removePreStart", r);
@@ -408,6 +440,7 @@ export default function CampaignPage() {
     storefrontPath,
     methods,
     startsLabel,
+    activity,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const submit = (data: Record<string, string>) =>
@@ -498,6 +531,51 @@ export default function CampaignPage() {
           <s-text color="subdued">
             People counts each entrant once per method. Click an entrant below
             to see how they earned their entries.
+          </s-text>
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Entry Activity">
+        <s-stack gap="base">
+          <s-stack direction="inline" gap="base" alignItems="end">
+            <Select
+              label="Method"
+              value={activity.method}
+              options={[
+                { value: "", label: "All methods" },
+                ...methods.rows.map((r) => ({ value: r.key, label: r.label })),
+              ]}
+              onChange={(v) =>
+                setSearch((prev) => {
+                  const next = new URLSearchParams(prev);
+                  if (v) next.set("activity", v);
+                  else next.delete("activity");
+                  return next;
+                })
+              }
+            />
+            <Form method="get">
+              {activity.method && (
+                <input type="hidden" name="activity" value={activity.method} />
+              )}
+              <s-search-field
+                name="aq"
+                label="Search entries"
+                labelAccessibilityVisibility="exclusive"
+                placeholder="Search by email or name"
+                defaultValue={activity.q}
+              />
+            </Form>
+          </s-stack>
+          <EntryActivityTable
+            items={activity.items}
+            campaignId={campaign.id}
+            submit={submit}
+            busy={fetcher.state !== "idle"}
+          />
+          <s-text color="subdued">
+            The newest 100 entries. Disqualifying an entry takes back just those
+            entries; Restore gives them back.
           </s-text>
         </s-stack>
       </s-section>
@@ -668,9 +746,7 @@ export default function CampaignPage() {
                   <s-table-row key={o.id}>
                     <s-table-cell>{o.name}</s-table-cell>
                     <s-table-cell>{o.email ?? "—"}</s-table-cell>
-                    <s-table-cell>
-                      {o.status}
-                    </s-table-cell>
+                    <s-table-cell>{o.status}</s-table-cell>
                     <s-table-cell>{o.entries}</s-table-cell>
                   </s-table-row>
                 ))}
