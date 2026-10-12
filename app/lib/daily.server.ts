@@ -4,12 +4,14 @@ import type { Campaign, DailyPrize } from "@prisma/client";
 import db from "../db.server";
 import { unauthenticated } from "../shopify.server";
 import {
+  addDays,
   periodFor,
   pickPrize,
   sourceTypes,
   type Candidate,
   type DailySettings,
 } from "./daily";
+import { queueFor, upcomingPlan } from "./daily-queue.server";
 import { drawWinners, newSeed, snapshotHash } from "./draw";
 import { onlyFullyEntered } from "./entries/ledger.server";
 import { parseSettings } from "./settings";
@@ -308,8 +310,28 @@ export async function ensurePrize(
   });
   if (existing) return existing;
 
-  let pick: Candidate | null;
-  if (opts.productId) {
+  let pick: Candidate | null = null;
+  let queued: string | null = null;
+  if (!opts.productId && !opts.exclude) {
+    // The merchant's queue first: the item pinned to this day, else the next in stock.
+    for (const item of await queueFor(campaign.id, period)) {
+      const variants = await fetchCandidates(admin, cfg, {
+        productId: item.productId,
+      });
+      pick = variants.sort((a, b) => b.available - a.available)[0] ?? null;
+      if (pick) {
+        queued = item.id;
+        break;
+      }
+      await db.dailyQueueItem.update({
+        where: { id: item.id },
+        data: { note: `Out of stock on ${period.key}, skipped` },
+      });
+    }
+  }
+  if (pick) {
+    // From the queue.
+  } else if (opts.productId) {
     // Chosen by the merchant: any in-stock variant of that product, ignoring the price range
     // and product types. The variant with the most stock is reserved.
     const variants = await fetchCandidates(admin, cfg, {
@@ -369,6 +391,11 @@ export async function ensurePrize(
     });
     throw err;
   }
+  if (queued)
+    await db.dailyQueueItem.update({
+      where: { id: queued },
+      data: { usedAt: new Date(), prizeId: prize.id, note: null },
+    });
   return prize;
 }
 
@@ -383,7 +410,8 @@ export async function choosePrize(
   if (prize && prize.status !== "RESERVED")
     throw new Error("Today's prize has already been drawn.");
   if (prize?.productId === productId) return prize;
-  if (prize) await releasePrize(prize.id, admin, "Replaced by a chosen product");
+  if (prize)
+    await releasePrize(prize.id, admin, "Replaced by a chosen product");
   const next = await ensurePrize(campaign, admin, { productId });
   if (!next)
     throw new Error(
@@ -656,8 +684,17 @@ export async function storefrontDaily(
     },
   });
   const lastWinner = last?.draw?.winners[0];
+  // What's lined up for the next few days (only the merchant's queue is known ahead).
+  const upcoming = (await upcomingPlan(campaign, 4)).plan.flatMap((d) =>
+    d.item
+      ? [{ date: d.date, title: d.item.title, imageUrl: d.item.imageUrl }]
+      : [],
+  );
   return {
     drawAt: period.drawAt.toISOString(),
+    // Store-timezone date of the next draw, so the widget can label it "Tomorrow".
+    tomorrow: addDays(period.key, 1),
+    upcoming,
     prize: prize
       ? {
           title: prize.title,

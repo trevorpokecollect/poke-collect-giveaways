@@ -19,6 +19,7 @@ export function previewData(
     imageUrl: string | null;
     entered: boolean;
     dailyPrize?: PreviewPrize | null;
+    upcoming?: { date: string; title: string; imageUrl: string | null }[];
     now?: Date;
   },
 ) {
@@ -53,7 +54,13 @@ export function previewData(
           state: "active",
           referralCode: "preview",
           entries: signup,
-          breakdown: { signup, actions: 0, purchases: 0, referrals: 0, other: 0 },
+          breakdown: {
+            signup,
+            actions: 0,
+            purchases: 0,
+            referrals: 0,
+            other: 0,
+          },
           completedActionIds: [],
           answers: {},
           pollResults: {},
@@ -62,12 +69,18 @@ export function previewData(
       : null,
     daily: daily.enabled
       ? {
-          drawAt: periodFor(now, v.timezone, daily.drawTime).drawAt.toISOString(),
+          drawAt: periodFor(
+            now,
+            v.timezone,
+            daily.drawTime,
+          ).drawAt.toISOString(),
           prize: opts.dailyPrize
             ? { ...opts.dailyPrize, value: 0, url: null }
             : null,
           yourEntries: opts.entered ? signup : null,
           lastWinner: null,
+          upcoming: opts.upcoming ?? [],
+          tomorrow: opts.upcoming?.[0]?.date ?? null,
         }
       : null,
     leaderboard: null,

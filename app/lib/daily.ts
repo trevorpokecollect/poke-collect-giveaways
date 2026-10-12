@@ -22,7 +22,7 @@ function localDate(date: Date, timeZone: string) {
   }).format(date);
 }
 
-function addDays(ymd: string, days: number) {
+export function addDays(ymd: string, days: number) {
   const d = new Date(`${ymd}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
@@ -106,3 +106,32 @@ export function pickPrize(
 export const sourceTypes = (cfg: DailySettings) => [
   ...new Set(cfg.sources.map((s) => s.productType.trim()).filter(Boolean)),
 ];
+
+export interface QueueSlot {
+  id: string;
+  pinnedDate: string | null;
+}
+
+/**
+ * Which queued item is planned for each of `days` days starting at `fromKey`: the item pinned
+ * to that day, else the next unpinned one in order. Pins on days already past count as unpinned.
+ */
+export function planQueue<T extends QueueSlot>(
+  items: T[],
+  fromKey: string,
+  days: number,
+): { date: string; item: T | null }[] {
+  const pinned = new Map<string, T>();
+  const loose: T[] = [];
+  for (const i of items) {
+    if (i.pinnedDate && i.pinnedDate >= fromKey && !pinned.has(i.pinnedDate))
+      pinned.set(i.pinnedDate, i);
+    else loose.push(i);
+  }
+  const out: { date: string; item: T | null }[] = [];
+  for (let d = 0; d < days; d++) {
+    const date = addDays(fromKey, d);
+    out.push({ date, item: pinned.get(date) ?? loose.shift() ?? null });
+  }
+  return out;
+}

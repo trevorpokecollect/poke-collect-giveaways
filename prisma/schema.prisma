@@ -71,6 +71,7 @@ model Campaign {
   orders      OrderLog[]
   draws       Draw[]
   dailyPrizes DailyPrize[]
+  dailyQueue  DailyQueueItem[]
 
   @@unique([shop, slug])
   @@index([shop, status])
@@ -364,3 +365,26 @@ model DailyPrize {
   @@index([campaignId, periodKey])
   @@index([status, drawAt])
 }
+
+// Products the merchant lined up as upcoming daily prizes. Each day's pick takes the item
+// pinned to that day, else the next unpinned one in stock; an empty queue falls back to the
+// automatic pick.
+model DailyQueueItem {
+  id         String    @id @default(cuid())
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  productId  String
+  title      String
+  imageUrl   String?
+  position   Int
+  // Local date (YYYY-MM-DD, the draw's date) this item must be the prize for.
+  pinnedDate String?
+  usedAt     DateTime?
+  prizeId    String?
+  // Why it was passed over last time (e.g. out of stock).
+  note       String?
+  createdAt  DateTime  @default(now())
+
+  @@index([campaignId, usedAt, position])
+}
+

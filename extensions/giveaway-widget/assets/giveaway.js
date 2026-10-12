@@ -389,11 +389,34 @@
   };
 
   // Sections every view shows: leaderboard, winners, rules and the free-entry link.
-  Widget.prototype.extras = function () {
+  Widget.prototype.extras = function (signup) {
     // The last daily winner sits under the prize in the wide layout, and after the tasks when
     // stacked; both copies are rendered and the CSS shows one.
-    return head([this.lastDailyWinner("pcg__last-winner--side")])
+    return head([this.upcoming(signup), this.lastDailyWinner("pcg__last-winner--side")])
       .concat(tasks([this.lastDailyWinner(), this.winners(), this.leaderboard(), this.footer()]));
+  };
+
+  // The next few prizes the store has lined up (daily giveaways), under today's prize. A row of
+  // small cards: "Tomorrow", then weekday dates. Left out of the short phone sign-up screen.
+  Widget.prototype.upcoming = function (signup) {
+    var list = this.data.daily && this.data.daily.upcoming;
+    if (!list || !list.length || (signup && this.compact())) return null;
+    var tomorrowKey = this.data.daily.tomorrow;
+    var label = function (ymd) {
+      if (ymd === tomorrowKey) return "Tomorrow";
+      var d = new Date(ymd + "T12:00:00Z");
+      return d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+    };
+    return el("div", { class: "pcg__upcoming" }, [
+      el("h3", { class: "pcg__subheading", text: "Upcoming Prizes" }),
+      el("ul", { class: "pcg__upcoming-list", role: "list" }, list.map(function (u) {
+        return el("li", { class: "pcg__upcoming-item" }, [
+          u.imageUrl ? el("img", { src: u.imageUrl, alt: "", loading: "lazy" }) : el("span", { class: "pcg__upcoming-ph", "aria-hidden": "true", text: "🎁" }),
+          el("span", { class: "pcg__upcoming-day", text: label(u.date) }),
+          el("span", { class: "pcg__upcoming-title", text: u.title }),
+        ]);
+      })),
+    ]);
   };
 
   Widget.prototype.lastDailyWinner = function (extraClass) {
@@ -648,7 +671,7 @@
       shop,
     ]) : [];
 
-    this.show(this.header().concat([el("div", { class: "pcg__box" }, [form])], preview, this.extras()));
+    this.show(this.header().concat([el("div", { class: "pcg__box" }, [form])], preview, this.extras(true)));
     if (compact) this.setCta(button);
     this.mountTurnstile(turnstileBox, function (t) { turnstileToken = t; });
   };

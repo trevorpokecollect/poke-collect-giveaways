@@ -16,11 +16,22 @@ export interface DailyPrizeRow {
   note: string | null;
 }
 
+export interface QueueRow {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  pinnedDate: string | null;
+  note: string | null;
+  /** The draw date it's planned for, within the next 7 days. */
+  plannedFor: string | null;
+}
+
 export interface DailyData {
   drawTime: string;
   timezone: string;
   currentId: string | null;
   prizes: DailyPrizeRow[];
+  queue: QueueRow[];
 }
 
 const STATUS: Record<
@@ -157,6 +168,30 @@ export function DailySection({ daily }: { daily: DailyData }) {
           entries earned since the previous draw.
         </s-text>
 
+        <UpcomingPrizes
+          queue={daily.queue}
+          busy={busy}
+          submit={submit}
+          pickProducts={async () => {
+            const selected = await shopify.resourcePicker({
+              type: "product",
+              action: "select",
+              multiple: true,
+            });
+            if (!selected?.length) return;
+            submit({
+              intent: "dailyQueueAdd",
+              products: JSON.stringify(
+                selected.map((p) => ({
+                  productId: p.id,
+                  title: p.title,
+                  imageUrl: p.images?.[0]?.originalSrc ?? null,
+                })),
+              ),
+            });
+          }}
+        />
+
         {daily.prizes.length > 0 && (
           <s-table>
             <s-table-header-row>
@@ -218,5 +253,152 @@ export function DailySection({ daily }: { daily: DailyData }) {
         )}
       </s-stack>
     </s-section>
+  );
+}
+
+const dayLabel = (ymd: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${ymd}T12:00:00Z`));
+
+/** The merchant's lineup of upcoming prizes, used ahead of the automatic pick. */
+function UpcomingPrizes(props: {
+  queue: QueueRow[];
+  busy: boolean;
+  submit: (data: Record<string, string>) => void;
+  pickProducts: () => void;
+}) {
+  const { queue, busy, submit } = props;
+  return (
+    <s-box padding="base" borderWidth="base" borderRadius="base">
+      <s-stack gap="base">
+        <s-stack
+          direction="inline"
+          gap="base"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <s-heading>Upcoming Prizes</s-heading>
+          <s-button disabled={busy} onClick={props.pickProducts}>
+            Add Products
+          </s-button>
+        </s-stack>
+        <s-text color="subdued">
+          Each night the next product here that&apos;s in stock becomes the next
+          day&apos;s prize (or the one pinned to that day). When the list is
+          empty, the app picks automatically from your daily rules. The next few
+          also show on the giveaway as &quot;Upcoming Prizes&quot;.
+        </s-text>
+        {queue.length > 0 && queue.length <= 2 && (
+          <s-banner tone="warning">
+            Only {queue.length} upcoming{" "}
+            {queue.length === 1 ? "prize" : "prizes"} left. Add more, or the app
+            goes back to picking automatically.
+          </s-banner>
+        )}
+        {queue.length === 0 ? (
+          <s-paragraph>
+            Nothing lined up. Prizes are picked automatically.
+          </s-paragraph>
+        ) : (
+          <s-table>
+            <s-table-header-row>
+              <s-table-header listSlot="primary">Product</s-table-header>
+              <s-table-header>Planned For</s-table-header>
+              <s-table-header>Pin To Date</s-table-header>
+              <s-table-header />
+            </s-table-header-row>
+            <s-table-body>
+              {queue.map((q, i) => (
+                <s-table-row key={q.id}>
+                  <s-table-cell>
+                    <s-stack
+                      direction="inline"
+                      gap="small-200"
+                      alignItems="center"
+                    >
+                      {q.imageUrl && (
+                        <s-thumbnail
+                          src={q.imageUrl}
+                          alt={q.title}
+                          size="small"
+                        />
+                      )}
+                      <s-stack gap="none">
+                        <s-text>{q.title}</s-text>
+                        {q.note && <s-text tone="critical">{q.note}</s-text>}
+                      </s-stack>
+                    </s-stack>
+                  </s-table-cell>
+                  <s-table-cell>
+                    {q.plannedFor ? dayLabel(q.plannedFor) : "Later"}
+                  </s-table-cell>
+                  <s-table-cell>
+                    <input
+                      type="date"
+                      aria-label={`Pin ${q.title} to a date`}
+                      defaultValue={q.pinnedDate ?? ""}
+                      disabled={busy}
+                      onChange={(e) =>
+                        submit({
+                          intent: "dailyQueuePin",
+                          itemId: q.id,
+                          date: e.currentTarget.value,
+                        })
+                      }
+                    />
+                  </s-table-cell>
+                  <s-table-cell>
+                    <s-stack direction="inline" gap="small-200">
+                      <s-button
+                        variant="tertiary"
+                        disabled={busy || i === 0}
+                        accessibilityLabel="Move up"
+                        onClick={() =>
+                          submit({
+                            intent: "dailyQueueMove",
+                            itemId: q.id,
+                            dir: "up",
+                          })
+                        }
+                      >
+                        ↑
+                      </s-button>
+                      <s-button
+                        variant="tertiary"
+                        disabled={busy || i === queue.length - 1}
+                        accessibilityLabel="Move down"
+                        onClick={() =>
+                          submit({
+                            intent: "dailyQueueMove",
+                            itemId: q.id,
+                            dir: "down",
+                          })
+                        }
+                      >
+                        ↓
+                      </s-button>
+                      <s-button
+                        variant="tertiary"
+                        tone="critical"
+                        disabled={busy}
+                        onClick={() =>
+                          submit({ intent: "dailyQueueRemove", itemId: q.id })
+                        }
+                      >
+                        Remove
+                      </s-button>
+                    </s-stack>
+                  </s-table-cell>
+                </s-table-row>
+              ))}
+            </s-table-body>
+          </s-table>
+        )}
+      </s-stack>
+    </s-box>
   );
 }

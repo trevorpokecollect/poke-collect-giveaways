@@ -39,6 +39,13 @@ import {
 import { periodFor } from "../lib/daily";
 import { entriesByMethod } from "../lib/entries/methods.server";
 import { checkListStatus, listGrowth } from "../lib/entries/list-status.server";
+import {
+  addToQueue,
+  moveQueueItem,
+  pinQueueItem,
+  removeQueueItem,
+  upcomingPlan,
+} from "../lib/daily-queue.server";
 
 type GrowthData = Awaited<ReturnType<typeof listGrowth>>;
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
@@ -134,7 +141,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   ]);
   let daily: DailyData | null = null;
   if (dailyCfg.enabled) {
-    const [current, prizes] = await Promise.all([
+    const [current, prizes, upcoming] = await Promise.all([
       currentPrize(campaign),
       db.dailyPrize.findMany({
         where: { campaignId: campaign.id },
@@ -151,8 +158,20 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           },
         },
       }),
+      upcomingPlan(campaign, 7),
     ]);
+    const plannedFor = new Map(
+      upcoming.plan.flatMap((d) => (d.item ? [[d.item.id, d.date]] : [])),
+    );
     daily = {
+      queue: upcoming.items.map((q) => ({
+        id: q.id,
+        title: q.title,
+        imageUrl: q.imageUrl,
+        pinnedDate: q.pinnedDate,
+        note: q.note,
+        plannedFor: plannedFor.get(q.id) ?? null,
+      })),
       drawTime: dailyCfg.drawTime,
       timezone: campaign.timezone,
       currentId: current?.prize?.id ?? null,
@@ -302,7 +321,51 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return p;
     };
     try {
+      const itemId = String(form.get("itemId") ?? "");
       switch (intent) {
+        case "dailyQueueAdd": {
+          const raw = JSON.parse(String(form.get("products") ?? "[]")) as {
+            productId?: unknown;
+            title?: unknown;
+            imageUrl?: unknown;
+          }[];
+          const products = raw
+            .filter(
+              (p) =>
+                typeof p.productId === "string" &&
+                p.productId.startsWith("gid://shopify/Product/"),
+            )
+            .slice(0, 100)
+            .map((p) => ({
+              productId: p.productId as string,
+              title: String(p.title ?? "").slice(0, 200) || "Product",
+              imageUrl: typeof p.imageUrl === "string" ? p.imageUrl : null,
+            }));
+          if (!products.length) return { error: "Choose a product." };
+          await addToQueue(campaign.id, products);
+          await audit("daily.queueAdd", { count: products.length });
+          return { ok: true };
+        }
+        case "dailyQueueMove": {
+          await moveQueueItem(
+            campaign.id,
+            itemId,
+            form.get("dir") === "up" ? "up" : "down",
+          );
+          return { ok: true };
+        }
+        case "dailyQueueRemove": {
+          await removeQueueItem(campaign.id, itemId);
+          return { ok: true };
+        }
+        case "dailyQueuePin": {
+          await pinQueueItem(
+            campaign.id,
+            itemId,
+            String(form.get("date") ?? "") || null,
+          );
+          return { ok: true };
+        }
         case "dailyPick": {
           const p = await ensurePrize(campaign, admin);
           if (!p)

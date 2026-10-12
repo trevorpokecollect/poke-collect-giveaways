@@ -3,6 +3,7 @@ import {
   eligible,
   periodFor,
   pickPrize,
+  planQueue,
   type Candidate,
 } from "../app/lib/daily";
 import { campaignSettingsSchema } from "../app/lib/settings";
@@ -69,5 +70,44 @@ describe("daily rules", () => {
     );
     expect(pickPrize([a], cfg, new Set(["a"]), () => 0)?.productId).toBe("a");
     expect(pickPrize([card({ value: 5 })], cfg, new Set(), () => 0)).toBeNull();
+  });
+});
+
+describe("planQueue", () => {
+  const item = (id: string, pinnedDate: string | null = null) => ({
+    id,
+    pinnedDate,
+  });
+
+  it("gives each day the next item in order", () => {
+    const plan = planQueue([item("a"), item("b")], "2026-10-13", 3);
+    expect(plan.map((d) => [d.date, d.item?.id ?? null])).toEqual([
+      ["2026-10-13", "a"],
+      ["2026-10-14", "b"],
+      ["2026-10-15", null],
+    ]);
+  });
+
+  it("puts pinned items on their day and the rest around them", () => {
+    const plan = planQueue(
+      [
+        item("a"),
+        item("p", "2026-10-13"),
+        item("b"),
+        item("later", "2026-10-30"),
+      ],
+      "2026-10-13",
+      3,
+    );
+    expect(plan.map((d) => d.item?.id ?? null)).toEqual(["p", "a", "b"]);
+  });
+
+  it("treats pins on past days as unpinned", () => {
+    const plan = planQueue(
+      [item("old", "2026-10-01"), item("a")],
+      "2026-10-13",
+      2,
+    );
+    expect(plan.map((d) => d.item?.id)).toEqual(["old", "a"]);
   });
 });
