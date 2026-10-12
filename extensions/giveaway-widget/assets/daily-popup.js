@@ -102,6 +102,7 @@
       var enteredToday = data.daily ? data.daily.yourEntries > 0 : !!data.entrant;
       pop.classList.toggle("pcg-pop--entered", enteredToday);
       icons.forEach(function (i) { i.classList.toggle("pcg-hicon--entered", enteredToday); });
+      setBadgeWording(!!data.entrant || enteredToday);
       if (pop.getAttribute("data-auto") === "true" && !designMode && !enteredToday && !store(seenKey()) && !autoTimer) {
         var delay = Number(pop.getAttribute("data-delay") || 6) * 1000;
         if (!isPhone() || pageViews >= 2) autoTimer = window.setTimeout(open, delay);
@@ -126,6 +127,16 @@
       window.addEventListener("scroll", onScroll, { passive: true });
     }
 
+    // The product and cart lines open the giveaway too, anywhere on the bar.
+    document.addEventListener("click", function (e) {
+      if (e.target.closest && e.target.closest(".pcg-badge--auto")) { e.preventDefault(); open(); }
+    });
+    document.addEventListener("keydown", function (e) {
+      if ((e.key === "Enter" || e.key === " ") && e.target.classList && e.target.classList.contains("pcg-badge--auto")) { e.preventDefault(); open(); }
+    });
+    // After entering, the lines switch to "This Earns +N Entries In Today's Draw".
+    document.addEventListener("pcg:entered", function () { setBadgeWording(true); });
+
     // Any link to #daily-giveaway (announcement bar, menu, header icon) opens the popup.
     document.addEventListener("click", function (e) {
       var a = e.target.closest && e.target.closest('a[href$="#daily-giveaway"]');
@@ -147,6 +158,27 @@
     dialog.addEventListener("click", function (e) {
       if (e.target === dialog) close();
     });
+  }
+
+  // Not entered yet: "Enter Today's Giveaway Free To Earn +N Entries…" with an "Enter Free" link.
+  // Entered: "This Earns +N Entries In Today's Draw" with "See Today's Prize".
+  function setBadgeWording(entered) {
+    document.querySelectorAll(".pcg-badge--auto").forEach(function (b) {
+      if (b.__entered === entered) return;
+      b.__entered = entered;
+      ["text", "text-one"].forEach(function (k) {
+        var key = "data-" + k, alt = "data-entered-" + k, other = "data-waiting-" + k;
+        if (!b.hasAttribute(other)) b.setAttribute(other, b.getAttribute(key));
+        b.setAttribute(key, b.getAttribute(entered ? alt : other));
+      });
+      var link = b.querySelector(".pcg-badge__link");
+      if (link) {
+        if (!link.hasAttribute("data-waiting-label")) link.setAttribute("data-waiting-label", link.textContent);
+        link.textContent = link.getAttribute(entered ? "data-entered-label" : "data-waiting-label");
+      }
+      b.__key = null;
+    });
+    if (window.__pcgBadges) window.__pcgBadges.boot();
   }
 
   // The embed's "earns +N entries" lines: under the product page's buy buttons, and at the top of

@@ -9,6 +9,8 @@
 .pcg-badge[hidden] { display: none; }
 /* The daily popup embed's lines show only once placed (see daily-popup.js). */
 .pcg-badge--auto:not(.pcg-badge--placed) { display: none !important; }
+.pcg-badge--auto { cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
+.pcg-badge--auto:hover, .pcg-badge--auto:focus-visible { background: #ffe9ea; border-color: #e22f39; }
 .pcg-badge--cart.pcg-badge--auto { max-width: none; margin: 0 0 12px; }
 .pcg-badge__icon {
   flex: none; width: 26px; height: 26px; border-radius: 50%;
