@@ -99,18 +99,31 @@ describe("applyRecommendedDaily", () => {
     expect(v.actions).toContainEqual(custom);
     const follows = v.actions
       .filter((a) => a.type === "SOCIAL_FOLLOW")
-      .map((a) => a.config.url);
+      .map((a) => a.config.url)
+      .sort();
     expect(follows).toEqual([
-      "https://whatnot.com/invite/pokecollectcards",
       "https://discord.gg/Tk4zVvyHan",
+      "https://instagram.com/pokecollectcards",
+      "https://whatnot.com/invite/pokecollectcards",
+      "https://www.facebook.com/pokecollectcards",
     ]);
     expect(applyRecommendedDaily(v).actions).toHaveLength(v.actions.length);
   });
 });
 
 describe("required steps", () => {
+  it("daily uses the live monthly's amounts: texts 100, Whatnot 100 required, $10 = 50", () => {
+    const v = applyRecommendedDaily(base());
+    expect(v.actions.find((a) => a.type === "SMS_OPTIN")).toMatchObject({ mandatory: false, entries: 100 });
+    const whatnot = v.actions.find((a) => a.type === "SOCIAL_FOLLOW" && a.config.url?.includes("whatnot"));
+    expect(whatnot).toMatchObject({ mandatory: true, entries: 100 });
+    expect(v.actions.some((a) => a.type === "DAILY_CHECKIN")).toBe(false);
+    expect(v.rules.base).toMatchObject({ mode: "per_amount", entries: 50, amount: 10 });
+    expect(v.settings.requireEmailConsent).toBe(true);
+  });
+
   it("makes the Whatnot follow and email opt-in required, with texts as a +10 bonus", () => {
-    for (const v of [applyRecommended(base()), applyRecommendedDaily(base())]) {
+    for (const v of [applyRecommended(base())]) {
       const whatnot = v.actions.find((a) => a.config.url?.includes("whatnot"));
       expect(whatnot?.mandatory).toBe(true);
       expect(v.actions.find((a) => a.type === "SMS_OPTIN")).toMatchObject({

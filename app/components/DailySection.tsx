@@ -1,4 +1,5 @@
 import { useFetcher } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 
 // The daily draw on the giveaway page: today's prize and the recent daily prizes,
 // with controls to pick or swap the prize, draw early, release it or mark it sent.
@@ -35,6 +36,7 @@ const STATUS: Record<
 const money = (n: number) => `$${n.toFixed(2)}`;
 
 export function DailySection({ daily }: { daily: DailyData }) {
+  const shopify = useAppBridge();
   const fetcher = useFetcher<{
     ok?: boolean;
     error?: string;
@@ -92,6 +94,24 @@ export function DailySection({ daily }: { daily: DailyData }) {
           </s-paragraph>
         )}
         <s-stack direction="inline" gap="base">
+          {(!current || current.status === "RESERVED") && (
+            <s-button
+              disabled={busy}
+              onClick={async () => {
+                // Any product, outside the price range too; 1 unit is reserved as usual,
+                // and the automatic pick takes over from the next day.
+                const selected = await shopify.resourcePicker({
+                  type: "product",
+                  action: "select",
+                  multiple: false,
+                });
+                const id = selected?.[0]?.id;
+                if (id) submit({ intent: "dailyChoose", productId: id });
+              }}
+            >
+              Choose product
+            </s-button>
+          )}
           {!current && (
             <s-button
               disabled={busy}

@@ -239,7 +239,7 @@
         el("span", { class: "pcg__badge", text: "Daily giveaway" }),
         el("h2", { class: "pcg__title", text: p ? p.title : c.title }),
         p ? el("p", { class: "pcg__prize" }, [
-          document.createTextNode("Today's prize · $" + Math.round(p.value) + " value"),
+          document.createTextNode("Today's prize"),
           p.url ? el("a", { class: "pcg__prize-link", href: p.url, text: "View" }) : null,
         ]) : el("p", { class: "pcg__prize", text: "Today's prize is being picked. Check back in a minute." }),
         el("p", { class: "pcg__timer-label", text: "Drawn tonight in" }),

@@ -47,7 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         ? "Poke-Collect 30th Celebration UPC Case Giveaway!"
         : "",
     prize: daily
-      ? "A new sealed product or English single every day ($70 to $100 value)"
+      ? "A new sealed product or English single every day"
       : monthly
         ? "Sealed Case of 30th Celebration Ultra Premium Collections"
         : "",

@@ -89,11 +89,14 @@ const quote = (s: string) =>
 export async function fetchCandidates(
   admin: Admin,
   cfg: DailySettings,
+  opts: { productId?: string } = {},
 ): Promise<Candidate[]> {
   const types = sourceTypes(cfg);
-  if (!types.length) return [];
+  if (!types.length && !opts.productId) return [];
   const query = [
-    `(${types.map((t) => `product_type:${quote(t)}`).join(" OR ")})`,
+    opts.productId
+      ? `product_id:${opts.productId.split("/").pop()}`
+      : `(${types.map((t) => `product_type:${quote(t)}`).join(" OR ")})`,
     "product_status:active",
     "inventory_quantity:>0",
   ].join(" AND ");
@@ -286,7 +289,7 @@ export async function currentPrize(campaign: Campaign, now = new Date()) {
 export async function ensurePrize(
   campaign: Campaign,
   admin: Admin,
-  opts: { exclude?: string; now?: Date } = {},
+  opts: { exclude?: string; now?: Date; productId?: string } = {},
 ) {
   const cfg = dailySettings(campaign);
   if (!cfg.enabled) return null;
@@ -305,17 +308,31 @@ export async function ensurePrize(
   });
   if (existing) return existing;
 
-  const recent = await recentProducts(campaign.id, cfg.noRepeatDays);
-  if (opts.exclude) recent.add(opts.exclude);
-  const candidates = (await fetchCandidates(admin, cfg)).filter(
-    (c) => c.productId !== opts.exclude,
-  );
-  const pick = pickPrize(
-    candidates,
-    cfg,
-    recent,
-    () => randomInt(2 ** 31) / 2 ** 31,
-  );
+  let pick: Candidate | null;
+  if (opts.productId) {
+    // Chosen by the merchant: any in-stock variant of that product, ignoring the price range
+    // and product types. The variant with the most stock is reserved.
+    const variants = await fetchCandidates(admin, cfg, {
+      productId: opts.productId,
+    });
+    pick = variants.sort((a, b) => b.available - a.available)[0] ?? null;
+    if (!pick)
+      throw new Error(
+        "That product has no in-stock, inventory-tracked variant to reserve.",
+      );
+  } else {
+    const recent = await recentProducts(campaign.id, cfg.noRepeatDays);
+    if (opts.exclude) recent.add(opts.exclude);
+    const candidates = (await fetchCandidates(admin, cfg)).filter(
+      (c) => c.productId !== opts.exclude,
+    );
+    pick = pickPrize(
+      candidates,
+      cfg,
+      recent,
+      () => randomInt(2 ** 31) / 2 ** 31,
+    );
+  }
   if (!pick) {
     console.warn(
       `[daily] ${campaign.shop} ${campaign.slug}: no in-stock product matches the daily rules`,
@@ -353,6 +370,26 @@ export async function ensurePrize(
     throw err;
   }
   return prize;
+}
+
+/** Makes a product the merchant chose today's prize, releasing any automatic pick. */
+export async function choosePrize(
+  campaign: Campaign,
+  admin: Admin,
+  productId: string,
+) {
+  const current = await currentPrize(campaign);
+  const prize = current?.prize;
+  if (prize && prize.status !== "RESERVED")
+    throw new Error("Today's prize has already been drawn.");
+  if (prize?.productId === productId) return prize;
+  if (prize) await releasePrize(prize.id, admin, "Replaced by a chosen product");
+  const next = await ensurePrize(campaign, admin, { productId });
+  if (!next)
+    throw new Error(
+      "Couldn't set today's prize. Check that daily draw is on and the giveaway is live.",
+    );
+  return next;
 }
 
 /** Releases the current prize back to stock and picks a different one. */

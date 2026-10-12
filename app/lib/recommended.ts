@@ -81,47 +81,20 @@ const ACTIONS: Recommended[] = [
   },
 ];
 
-// The daily popup is kept short: sign-ups that each grow a channel Poke-Collect owns,
-// plus two reasons to come back every day (check-in and the Whatnot show code).
-const DAILY_ACTIONS: Recommended[] = [
-  { type: "SIGNUP", label: "Enter today's giveaway", entries: 1 },
-  { type: "SMS_OPTIN", label: "Get text alerts for drops", entries: 10 },
-  {
-    type: "SOCIAL_FOLLOW",
-    label: "Follow us on Whatnot",
-    entries: 3,
-    mandatory: true,
-    config: { url: WHATNOT },
-  },
-  {
-    type: "SOCIAL_FOLLOW",
-    label: "Join our Discord",
-    entries: 3,
-    config: { url: DISCORD },
-  },
-  {
-    type: "DAILY_CHECKIN",
-    label: "Daily check-in",
-    entries: 1,
-    repeatable: true,
-  },
-  {
-    type: "SECRET_CODE",
-    label: "Code from tonight's Whatnot show",
-    entries: 3,
-    repeatable: true,
-    // A starting value so the giveaway saves; change it before each show.
-    config: { code: "WHATNOT" },
-  },
-  { type: "REFERRAL", label: "Refer a friend", entries: 3 },
-];
+// The daily giveaway uses the live monthly giveaway's entry amounts (Trevor, 2026-10-12);
+// the "Bookmark our next live show" visit is the reason to come back each day.
+const DAILY_ACTIONS = (): Recommended[] =>
+  LIVE_MONTHLY_ACTIONS.map((r) =>
+    r.type === "SIGNUP" ? { ...r, label: "Enter today's giveaway" } : r,
+  );
 
 const sameAction = (
   a: { type: ActionType; config: ActionConfigForm },
   r: Recommended,
 ) =>
   a.type === r.type &&
-  (r.type !== "SOCIAL_FOLLOW" || a.config.url === r.config?.url);
+  ((r.type !== "SOCIAL_FOLLOW" && r.type !== "VISIT_URL") ||
+    a.config.url === r.config?.url);
 
 /** Keeps existing actions (updating matching ones' entries) and adds missing ones. */
 function mergeActions(
@@ -226,10 +199,10 @@ export function applyRecommendedDaily(
       v.actions.filter(
         (a) =>
           a.hasEvents ||
-          DAILY_ACTIONS.some((r) => sameAction(a, r)) ||
+          DAILY_ACTIONS().some((r) => sameAction(a, r)) ||
           !ACTIONS.some((r) => sameAction(a, r)),
       ),
-      DAILY_ACTIONS,
+      DAILY_ACTIONS(),
     ),
     rules: {
       ...v.rules,
@@ -237,7 +210,7 @@ export function applyRecommendedDaily(
       autoSignupFromOrders: true,
       orderSource: "online",
       minOrderValue: 0,
-      base: { mode: "per_amount", entries: 1, amount: 1, basis: "subtotal" },
+      base: { mode: "per_amount", entries: 50, amount: 10, basis: "subtotal" },
     },
     settings: {
       ...v.settings,

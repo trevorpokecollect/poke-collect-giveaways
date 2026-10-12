@@ -28,6 +28,7 @@ import {
   markPrizeSent,
   releasePrize,
   swapPrize,
+  choosePrize,
 } from "../lib/daily.server";
 import { publicName } from "../lib/winners";
 
@@ -250,6 +251,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 "No prize picked. Check that daily draw is on, the giveaway is live, and an in-stock product matches the rules.",
             };
           await audit("daily.pick", { prizeId: p.id });
+          return { ok: true, message: `Today's prize: ${p.title}` };
+        }
+        case "dailyChoose": {
+          const productId = String(form.get("productId") ?? "");
+          if (!productId.startsWith("gid://shopify/Product/"))
+            return { error: "Choose a product." };
+          const p = await choosePrize(campaign, admin, productId);
+          await audit("daily.choose", { prizeId: p.id });
           return { ok: true, message: `Today's prize: ${p.title}` };
         }
         case "dailySwap": {
