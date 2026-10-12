@@ -59,6 +59,9 @@
   }
 
   function plural(n, one, many) { return n === 1 ? one : many; }
+  // Store style: buttons, titles, headers and sub text capitalize every word ("Shop & Earn").
+  // Full sentences (notes, errors, consent wording) stay as written.
+  function tc(s) { return String(s || "").replace(/(^|[\s(\/-])([a-z])/g, function (m, sep, c) { return sep + c.toUpperCase(); }); }
 
   var uid = 0;
   function nextId(prefix) { uid += 1; return "pcg-" + prefix + "-" + uid; }
@@ -74,7 +77,7 @@
     { id: "x", label: "X", url: function (link, text) { return "https://x.com/intent/post?text=" + encodeURIComponent(text) + "&url=" + encodeURIComponent(link); } },
     { id: "facebook", label: "Facebook", url: function (link) { return "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(link); } },
     { id: "whatsapp", label: "WhatsApp", url: function (link, text) { return "https://wa.me/?text=" + encodeURIComponent(text + " " + link); } },
-    { id: "copy", label: "Copy link" },
+    { id: "copy", label: "Copy Link" },
   ];
 
   // Brand icons for follow/join buttons (same shapes as the storefront's Social Follow Band).
@@ -237,13 +240,13 @@
       var p = daily.prize;
       if (p && p.imageUrl) nodes.push(el("img", { class: "pcg__image", src: p.imageUrl, alt: p.title, loading: "lazy" }));
       nodes.push(el("div", { class: "pcg__hero" }, [
-        el("span", { class: "pcg__badge", text: "Daily giveaway" }),
+        el("span", { class: "pcg__badge", text: "Daily Giveaway" }),
         el("h2", { class: "pcg__title", text: p ? p.title : c.title }),
         p ? el("p", { class: "pcg__prize" }, [
-          document.createTextNode("Today's prize"),
+          document.createTextNode("Today's Prize"),
           p.url ? el("a", { class: "pcg__prize-link", href: p.url, text: "View" }) : null,
         ]) : el("p", { class: "pcg__prize", text: "Today's prize is being picked. Check back in a minute." }),
-        el("p", { class: "pcg__timer-label", text: "Drawn tonight in" }),
+        el("p", { class: "pcg__timer-label", text: "Drawn Tonight In" }),
         (function (t) { t.classList.add("pcg__timer--daily"); return t; })(this.countdown(new Date(daily.drawAt))),
       ]));
       if (c.description) nodes.push(el("p", { class: "pcg__meta", text: c.description }));
@@ -302,7 +305,7 @@
     var w = this.data.daily && this.data.daily.lastWinner;
     if (!w) return null;
     return el("p", { class: "pcg__last-winner" + (extraClass ? " " + extraClass : "") }, [
-      el("span", { text: "🏆 Last winner: " }),
+      el("span", { text: "🏆 Last Winner: " }),
       el("b", { text: w.name }),
       document.createTextNode(" won " + w.prize),
     ]);
@@ -348,9 +351,9 @@
   // Signing up is free, so that is the free method of entry; the rules spell out the details.
   Widget.prototype.footer = function () {
     var c = this.data.campaign;
-    if (!c.rulesText) return el("p", { class: "pcg__footer pcg__free", text: "No purchase necessary to enter or win." });
+    if (!c.rulesText) return el("p", { class: "pcg__footer pcg__free", text: "No Purchase Necessary To Enter Or Win" });
     return el("details", { class: "pcg__footer pcg__rules" }, [
-      el("summary", {}, [el("span", { text: "No purchase necessary" }), el("span", { "aria-hidden": "true", text: " · " }), el("u", { text: "Official rules" })]),
+      el("summary", {}, [el("span", { text: "No Purchase Necessary" }), el("span", { "aria-hidden": "true", text: " · " }), el("u", { text: "Official Rules" })]),
       el("p", { text: c.rulesText }),
     ]);
   };
@@ -384,8 +387,8 @@
           self.submitAction(a, {}, { error: error, button: btn }).catch(function () {});
         },
       }, [icon(platform), el("span", { class: "pcg__soc-name" }, [
-        a.label,
-        a.mandatory && !finished ? el("small", { class: "pcg__soc-req", text: "Required to enter" }) : null,
+        tc(a.label),
+        a.mandatory && !finished ? el("small", { class: "pcg__soc-req", text: "Required To Enter" }) : null,
       ]), pts]);
       return el("li", { class: a.mandatory ? "pcg__socials-req" : null }, [btn, error]);
     }));
@@ -444,7 +447,7 @@
     var consent = el("input", { type: "checkbox", name: "consent", required: emailRequired });
     var turnstileBox = el("div");
     var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
-    var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", text: this.data.daily ? "Enter today's giveaway" : "Enter giveaway" });
+    var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", text: this.data.daily ? "Enter Today's Giveaway" : "Enter Giveaway" });
     var turnstileToken = "";
 
     // Texts: an optional number plus an unchecked consent box, worth the SMS action's entries.
@@ -456,7 +459,7 @@
       phone = el("input", { class: "pcg__input", id: phoneId, type: "tel", name: "phone", inputmode: "tel", autocomplete: "tel-national", placeholder: "(555) 234-5678", maxlength: "20" });
       smsConsent = el("input", { type: "checkbox", name: "sms-consent" });
       smsBox = el("div", { class: "pcg__sms" }, [
-        el("label", { class: "pcg__label", for: phoneId }, [document.createTextNode("Mobile number (optional) "), el("span", { class: "pcg__pts", text: entriesText(sms.entries) })]),
+        el("label", { class: "pcg__label", for: phoneId }, [document.createTextNode("Mobile Number (Optional) "), el("span", { class: "pcg__pts", text: tc(entriesText(sms.entries)) })]),
         phone,
         el("label", { class: "pcg__check pcg__check--fine" }, [smsConsent, el("span", {}, [
           (sms.config && sms.config.disclosure) || "",
@@ -490,12 +493,12 @@
     }, [
       el("label", { class: "pcg__label", for: emailId, text: "Email" }),
       email,
-      el("label", { class: "pcg__label", for: nameId, text: "Name (optional)" }),
+      el("label", { class: "pcg__label", for: nameId, text: "Name (Optional)" }),
       name,
       el("div", { class: "pcg__hp", "aria-hidden": "true" }, [el("label", { text: "Website" }), honeypot]),
       el("label", { class: "pcg__check" }, [consent, el("span", {}, [
         "Email me deals, drops and stream alerts.",
-        emailRequired ? el("span", { class: "pcg__req", text: " Required to enter" }) : null,
+        emailRequired ? el("span", { class: "pcg__req", text: " Required To Enter" }) : null,
       ])]),
       smsBox,
       turnstileBox,
@@ -507,7 +510,7 @@
     var socials = this.data.campaign.actions.filter(function (a) { return platformOf(a); });
     var shop = this.shopBox();
     var preview = socials.length || shop ? tasks([
-      el("h3", { class: "pcg__subheading", text: "Then earn bonus entries" }),
+      el("h3", { class: "pcg__subheading", text: "Then Earn Bonus Entries" }),
       socials.length ? this.socialGrid(socials, null, {}, true) : null,
       shop,
     ]) : [];
@@ -572,7 +575,7 @@
     var codeId = nextId("code");
     var code = el("input", { class: "pcg__input", id: codeId, inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6", placeholder: "6-digit code" });
     var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
-    var button = el("button", { class: "pcg__btn", type: "submit", text: "Confirm entry" });
+    var button = el("button", { class: "pcg__btn", type: "submit", text: "Confirm Entry" });
     var form = el("form", {
       class: "pcg__form",
       onsubmit: function (e) {
@@ -587,7 +590,7 @@
       code,
       err,
       button,
-      el("button", { class: "pcg__btn pcg__btn--ghost", type: "button", text: "Use a different email", onclick: function () { self.renderSignup(); } }),
+      el("button", { class: "pcg__btn pcg__btn--ghost", type: "button", text: "Use A Different Email", onclick: function () { self.renderSignup(); } }),
     ]);
     this.show(this.header().concat([form]));
     code.focus();
@@ -627,7 +630,7 @@
           if (n.id === "copy") {
             copyText(link).then(
               function () { btn.textContent = "Copied"; if (onShare) onShare(n.id); },
-              function () { window.prompt("Copy your link", link); if (onShare) onShare(n.id); }
+              function () { window.prompt("Copy Your Link", link); if (onShare) onShare(n.id); }
             );
             return;
           }
@@ -650,7 +653,7 @@
 
     var nodes = this.header().concat([
       el("div", { class: "pcg__count", role: "status", "aria-live": "polite" }, [
-        el("span", { text: this.data.daily ? "Your entries today" : plural(entrant.entries, "Your entry", "Your entries") }),
+        el("span", { text: this.data.daily ? "Your Entries Today" : plural(entrant.entries, "Your Entry", "Your Entries") }),
         el("b", { text: String(this.data.daily && this.data.daily.yourEntries !== null ? this.data.daily.yourEntries : entrant.entries) }),
       ]),
       this.data.daily && this.data.daily.yourEntries === 0
@@ -667,7 +670,7 @@
     var shop = this.shopBox();
     if (all.length || shop) {
       nodes = nodes.concat(tasks([
-        el("h3", { class: "pcg__subheading", text: "Earn more entries" }),
+        el("h3", { class: "pcg__subheading", text: "Earn More Entries" }),
         requiredLeft.length
           ? el("p", { class: "pcg__note pcg__note--nudge", text: "Almost in: " + requiredLeft.map(function (a) { return a.label; }).join(" and ") + " to finish entering. Your entries count once " + plural(requiredLeft.length, "it's", "they're") + " done, and the other tasks unlock." })
           : null,
@@ -692,8 +695,8 @@
     return el("div", { class: "pcg__shop" }, [
       el("div", { class: "pcg__shop-head" }, [
         icon("bag"),
-        el("span", { class: "pcg__shop-text" }, [el("b", { text: "Shop & earn" }), el("small", { text: shop.rate })]),
-        el("a", { class: "pcg__shop-btn", href: shop.url || "/collections/all", text: "Shop now" }),
+        el("span", { class: "pcg__shop-text" }, [el("b", { text: "Shop & Earn" }), el("small", { text: tc(shop.rate) })]),
+        el("a", { class: "pcg__shop-btn", href: shop.url || "/collections/all", text: "Shop Now" }),
       ]),
       items.length ? el("ul", { class: "pcg__shop-items", role: "list" }, items.map(function (p) {
         return el("li", {}, [el("a", { class: "pcg__shop-item", href: p.url, "aria-label": p.title + ", " + price(p.price) + ", " + entriesText(p.entries) }, [
@@ -719,19 +722,19 @@
     var href = l.daily ? "#daily-giveaway" : "/apps/giveaways/" + encodeURIComponent(l.slug);
     return el("p", { class: "pcg__linked" }, [
       el("span", { text: text + " " }),
-      el("a", { href: href, text: l.daily ? "See today's prize" : "View" }),
+      el("a", { href: href, text: l.daily ? "See Today's Prize" : "View" }),
     ]);
   };
 
-  // "My entries": where the total came from.
+  // "My Entries": where the total came from.
   Widget.prototype.breakdown = function (entrant) {
     var b = entrant.breakdown;
     if (!b) return null;
-    var rows = [["Signing up", b.signup], ["Actions", b.actions], ["Purchases", b.purchases], ["Referrals", b.referrals], ["Adjustments", b.other]]
+    var rows = [["Signing Up", b.signup], ["Actions", b.actions], ["Purchases", b.purchases], ["Referrals", b.referrals], ["Adjustments", b.other]]
       .filter(function (r) { return r[1]; });
     if (!rows.length) return null;
     return el("details", { class: "pcg__mine" }, [
-      el("summary", { text: "My entries" }),
+      el("summary", { text: "My Entries" }),
       el("dl", { class: "pcg__mine-list" }, rows.reduce(function (out, r) {
         return out.concat([el("dt", { text: r[0] }), el("dd", { text: (r[1] > 0 ? "+" : "") + r[1] })]);
       }, [])),
@@ -770,7 +773,7 @@
     var labelId = nextId("act");
     var head = el("div", { class: "pcg__action-head" }, [
       el("span", { class: "pcg__action-label", id: labelId }, [
-        a.label,
+        tc(a.label),
         a.mandatory ? el("span", { class: "pcg__req", text: "Required" }) : null,
       ]),
       el("span", { class: "pcg__pill", text: finished ? "Done +" + a.entries : "+" + a.entries }),
@@ -784,7 +787,7 @@
   Widget.prototype.doneBody = function (a, entrant) {
     var answer = entrant.answers && entrant.answers[a.id];
     if (a.type === "POLL") return this.pollResults(a, entrant);
-    if (a.type === "QUESTION" && answer) return el("p", { class: "pcg__answered", text: "Your answer: " + answer });
+    if (a.type === "QUESTION" && answer) return el("p", { class: "pcg__answered", text: "Your Answer: " + answer });
     return null;
   };
 
@@ -833,7 +836,7 @@
       case "QUESTION": {
         var inputId = nextId("q");
         var left = entrant.quizAttemptsLeft ? entrant.quizAttemptsLeft[a.id] : undefined;
-        var input = el("input", { class: "pcg__input", id: inputId, type: "text", maxlength: "500", autocomplete: "off", placeholder: "Your answer" });
+        var input = el("input", { class: "pcg__input", id: inputId, type: "text", maxlength: "500", autocomplete: "off", placeholder: "Your Answer" });
         var submit = el("button", { class: "pcg__btn pcg__btn--small", type: "submit", text: "Submit" });
         var hint = cfg.quiz ? el("p", { class: "pcg__hint", text: left === 0 ? "No tries left today." : (left === undefined ? 3 : left) + plural(left === undefined ? 3 : left, " try", " tries") + " left today." }) : null;
         if (left === 0) { input.disabled = true; submit.disabled = true; }
@@ -861,7 +864,7 @@
         return el("form", {
           class: "pcg__inline-form pcg__action-body",
           onsubmit: function (e) { e.preventDefault(); self.submitAction(a, { code: code.value }, ctx).catch(function () {}); },
-        }, [el("label", { class: "pcg__sr", for: codeId, text: "Secret code" }), el("div", { class: "pcg__row" }, [code, go])]);
+        }, [el("label", { class: "pcg__sr", for: codeId, text: "Secret Code" }), el("div", { class: "pcg__row" }, [code, go])]);
       }
 
       case "SMS_OPTIN": {
@@ -869,7 +872,7 @@
         var telId = nextId("tel");
         var tel = el("input", { class: "pcg__input", id: telId, type: "tel", inputmode: "tel", autocomplete: "tel-national", placeholder: "(555) 234-5678", maxlength: "20" });
         var agree = el("input", { type: "checkbox", name: "sms-consent" });
-        var send = el("button", { class: "pcg__btn pcg__btn--small", type: "submit", text: "Sign up" });
+        var send = el("button", { class: "pcg__btn pcg__btn--small", type: "submit", text: "Sign Up" });
         var root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
         ctx.button = send;
         return el("form", {
@@ -881,7 +884,7 @@
             self.submitAction(a, { phone: tel.value, consent: true }, ctx).catch(function () {});
           },
         }, [
-          el("label", { class: "pcg__sr", for: telId, text: "Mobile number" }),
+          el("label", { class: "pcg__sr", for: telId, text: "Mobile Number" }),
           el("div", { class: "pcg__row" }, [tel, send]),
           el("label", { class: "pcg__check" }, [agree, el("span", { class: "pcg__hint", text: cfg.disclosure || "" })]),
           el("p", { class: "pcg__hint" }, [
@@ -908,7 +911,7 @@
       default: {
         // VISIT_URL, SOCIAL_FOLLOW, DAILY_CHECKIN, CUSTOM.
         var url = cfg.url || a.url;
-        var b = btn(a.type === "DAILY_CHECKIN" ? "Check in" : a.type === "SOCIAL_FOLLOW" ? "Follow" : url ? "Visit" : "Done", function () {
+        var b = btn(a.type === "DAILY_CHECKIN" ? "Check In" : a.type === "SOCIAL_FOLLOW" ? "Follow" : url ? "Visit" : "Done", function () {
           if (url) window.open(url, "_blank", "noopener");
           self.submitAction(a, {}, ctx).catch(function () {});
         });
@@ -927,8 +930,8 @@
     var saved = null;
     try { saved = JSON.parse(store(key) || "null"); } catch (e) { saved = null; }
     var status = el("p", { class: "pcg__hint", "aria-live": "polite" });
-    var claim = el("button", { class: "pcg__btn pcg__btn--small", type: "button", text: "Claim entries", disabled: true });
-    var watch = el("a", { class: "pcg__btn pcg__btn--small pcg__btn--ghost", href: cfg.url || "#", target: "_blank", rel: "noopener", text: saved ? "Watch again" : "Watch video" });
+    var claim = el("button", { class: "pcg__btn pcg__btn--small", type: "button", text: "Claim Entries", disabled: true });
+    var watch = el("a", { class: "pcg__btn pcg__btn--small pcg__btn--ghost", href: cfg.url || "#", target: "_blank", rel: "noopener", text: saved ? "Watch Again" : "Watch Video" });
     var tick;
     ctx.button = claim;
 

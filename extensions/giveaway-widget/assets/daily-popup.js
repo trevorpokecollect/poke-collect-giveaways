@@ -33,6 +33,10 @@
     var slug = (widget.getAttribute("data-slug") || "").trim();
     var data = null;
     var timer = null;
+    // Store style: every word capitalized on buttons and links, including text saved in the theme.
+    pop.querySelectorAll(".pcg-pop__text b, .pcg-pop__text small, .pcg-pop__monthly").forEach(function (n) {
+      n.textContent = n.textContent.replace(/(^|[\s(\/-])([a-z])/g, function (m, sep, c) { return sep + c.toUpperCase(); });
+    });
     var autoTimer = null;
     var seenKey = function () {
       return "pcg:pop:" + slug + ":" + (data && data.daily ? data.daily.drawAt : new Date().toDateString());
@@ -54,7 +58,7 @@
       var d = data && data.daily;
       var entries = d && d.yourEntries;
       if (d) {
-        sub.textContent = entries ? "You're in · drawn in " + left(d.drawAt) : "Drawn in " + left(d.drawAt);
+        sub.textContent = entries ? "You're In · Drawn In " + left(d.drawAt) : "Drawn In " + left(d.drawAt);
       }
     }
 
