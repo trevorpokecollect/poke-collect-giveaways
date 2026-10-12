@@ -5,7 +5,7 @@
 {% endcomment %}
 {%- if block.settings.slug != blank -%}
 <div
-  class="pcg-pop pcg-pop--{{ block.settings.position }}"
+  class="pcg-pop pcg-pop--{{ block.settings.position }} pcg-pop--mobile-{{ block.settings.mobile_launcher | default: 'tab' }}"
   data-pcg-pop
   data-auto="{{ block.settings.auto_open }}"
   data-delay="{{ block.settings.delay }}"
@@ -17,6 +17,10 @@
       <b>{{ block.settings.button_text | escape }}</b>
       <small data-pcg-pop-sub>Enter free</small>
     </span>
+  </button>
+  <button class="pcg-pop__tab" type="button" aria-haspopup="dialog" aria-label="{{ block.settings.button_text | escape }}" hidden>
+    <span aria-hidden="true">🎁</span>
+    <span class="pcg-pop__tab-text">Daily</span>
   </button>
   <dialog class="pcg-pop__dialog" aria-label="{{ block.settings.button_text | escape }}">
     <button class="pcg-pop__close" type="button" aria-label="Close">&times;</button>
@@ -61,7 +65,7 @@
       "type": "checkbox",
       "id": "auto_open",
       "label": "Open automatically",
-      "info": "Once per draw, for visitors who haven't entered today.",
+      "info": "Once per draw, for visitors who haven't entered today. On phones it waits for a second page view or a scroll halfway down the page.",
       "default": true
     },
     {
@@ -83,6 +87,18 @@
         { "value": "left", "label": "Bottom left" }
       ],
       "default": "left"
+    },
+    {
+      "type": "select",
+      "id": "mobile_launcher",
+      "label": "On phones",
+      "options": [
+        { "value": "tab", "label": "Small tab on the side of the screen" },
+        { "value": "button", "label": "Same button as on desktop" },
+        { "value": "none", "label": "No button (popup and links only)" }
+      ],
+      "default": "tab",
+      "info": "The tab hides once the visitor has entered today. Any link to #daily-giveaway (e.g. in your announcement bar or menu) opens the popup."
     },
     {
       "type": "url",
