@@ -12,6 +12,13 @@ import { runDraw } from "../lib/draw.server";
 import { activate, clawBackReferrals } from "../lib/entries/signup.server";
 import { riskTone, statusTone } from "../lib/ui";
 import { downloadFile } from "../lib/download";
+import {
+  DRAW_INTENTS,
+  drawsSectionExtras,
+  handleDrawIntent,
+  winnerStatus,
+} from "../lib/winners.server";
+import { DrawsSection } from "../components/DrawsSection";
 
 const FILTERS = [
   "ALL",
@@ -73,6 +80,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       orderBy: { createdAt: "desc" },
       include: {
         winners: {
+          orderBy: { position: "asc" },
           include: { entrant: { select: { email: true, name: true } } },
         },
       },
@@ -130,16 +138,23 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       totalEntries: d.totalEntries,
       eligibleCount: d.eligibleCount,
       winners: d.winners.map((w) => ({
+        id: w.id,
         position: w.position,
         email: w.entrant.email,
         name: w.entrant.name,
+        notifiedAt: w.notifiedAt?.toISOString() ?? null,
+        claimedAt: w.claimedAt?.toISOString() ?? null,
+        forfeited: w.forfeited,
+        claimData: w.claimData as Record<string, string> | null,
+        ...winnerStatus(w, campaign.settings),
       })),
     })),
+    drawExtras: await drawsSectionExtras(campaign),
   };
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const campaign = await db.campaign.findFirst({
     where: { id: params.id, shop: session.shop },
   });
@@ -150,6 +165,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const audit = (action: string, data?: object) =>
     db.auditLog.create({
       data: { shop: session.shop, action, target: campaign.id, data },
+    });
+
+  if (DRAW_INTENTS.has(intent))
+    return handleDrawIntent({
+      admin,
+      shop: session.shop,
+      campaignId: campaign.id,
+      intent,
+      form,
     });
 
   switch (intent) {
@@ -186,10 +210,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       try {
         const draw = await runDraw(campaign.id, count);
         await audit("draw.run", { drawId: draw.id });
+        return { ok: true, drawId: draw.id };
       } catch (err) {
         return { error: (err as Error).message };
       }
-      break;
     }
   }
   return { ok: true };
@@ -203,12 +227,12 @@ export default function CampaignPage() {
     entrants,
     orders,
     draws,
+    drawExtras,
     filter,
     q,
     storefrontPath,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
-  const busy = fetcher.state !== "idle";
   const submit = (data: Record<string, string>) =>
     fetcher.submit(data, { method: "post" });
   const [, setSearch] = useSearchParams();
@@ -383,54 +407,7 @@ export default function CampaignPage() {
         </s-stack>
       </s-section>
 
-      <s-section heading="Draw winners">
-        <fetcher.Form method="post">
-          <input type="hidden" name="intent" value="draw" />
-          <s-stack direction="inline" gap="base" alignItems="end">
-            <s-number-field
-              name="count"
-              label="Number of winners"
-              value="1"
-              min={1}
-              max={50}
-            />
-            <s-button
-              type="submit"
-              variant="primary"
-              {...(busy ? { loading: true } : {})}
-            >
-              Draw
-            </s-button>
-          </s-stack>
-        </fetcher.Form>
-        <s-paragraph>
-          Only verified entrants who are not held or disqualified can win. Each
-          draw records its random seed so the result can be re-checked later.
-        </s-paragraph>
-        {draws.map((d) => (
-          <s-box
-            key={d.id}
-            padding="base"
-            borderWidth="base"
-            borderRadius="base"
-          >
-            <s-stack gap="small-200">
-              <s-text type="strong">
-                {new Date(d.createdAt).toLocaleString()}
-              </s-text>
-              {d.winners.map((w) => (
-                <s-text key={w.position}>
-                  #{w.position}: {w.name ? `${w.name} (${w.email})` : w.email}
-                </s-text>
-              ))}
-              <s-text color="subdued">
-                {d.eligibleCount} eligible entrants, {d.totalEntries} entries.
-                Seed {d.seed.slice(0, 12)}…
-              </s-text>
-            </s-stack>
-          </s-box>
-        ))}
-      </s-section>
+      <DrawsSection draws={draws} extras={drawExtras} />
 
       <s-section heading="Recent orders">
         {orders.length === 0 ? (

@@ -9,8 +9,8 @@ redirect_urls = ["https://app-production-2322.up.railway.app/auth/callback"]
 
 [access_scopes]
 # read_orders: purchase entries. read_customers: link entrants to customer accounts.
-# read_products: pick products for entry rules.
-scopes = "read_orders,read_customers,read_products"
+# read_products: pick products for entry rules. write_discounts: thank-you codes for non-winners.
+scopes = "read_orders,read_customers,read_products,write_discounts"
 
 [app_proxy]
 # Storefront requests to https://<store>/apps/giveaways/* are signed by Shopify and forwarded here.

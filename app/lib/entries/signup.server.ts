@@ -19,6 +19,8 @@ import {
 import { verifyTurnstile } from "../bot/turnstile.server";
 import { issueOtp } from "../otp.server";
 import { issueEntrantToken } from "../token.server";
+import { queueKlaviyoSync } from "../klaviyo.server";
+import { emitWebhook } from "../webhook-out.server";
 import { award, entrantTotal } from "./ledger.server";
 import { slugify } from "../slug";
 
@@ -236,6 +238,10 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
     },
   });
 
+  emitWebhook(campaign.id, "entrant.created", {
+    entrantId: entrant.id,
+    status,
+  });
   if (status === "ACTIVE") await activate(entrant.id);
   if (status === "PENDING_VERIFICATION")
     await issueOtp(entrant, campaign.title);
@@ -324,6 +330,8 @@ export async function activate(entrantId: string) {
       });
     }
   }
+  queueKlaviyoSync(entrantId);
+  emitWebhook(entrant.campaignId, "entrant.activated", { entrantId });
 }
 
 /** Revokes every referral entry an entrant earned for others (used when disqualifying a bot). */
