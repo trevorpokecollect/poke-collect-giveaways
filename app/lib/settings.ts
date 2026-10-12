@@ -89,6 +89,8 @@ export const campaignSettingsSchema = z.object({
   linkedSlug: z.string().default(""),
   // The "Email me deals" box must be ticked to enter (and to be in the draw).
   requireEmailConsent: z.boolean().default(false),
+  // First and last name on the sign-up form, so winners can be shown as "Emily S.".
+  requireName: z.boolean().default(true),
   // Who may enter, used by the official rules generator in the editor.
   eligibility: z
     .string()

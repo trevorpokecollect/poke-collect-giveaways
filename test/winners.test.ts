@@ -128,3 +128,14 @@ describe("outbound webhook signature", () => {
     );
   });
 });
+
+describe("hasFullName", () => {
+  it("needs a first and a last name", async () => {
+    const { hasFullName } = await import("../app/lib/entries/signup.server");
+    expect(hasFullName("Emily Smith")).toBe(true);
+    expect(hasFullName("  José  Núñez ")).toBe(true);
+    expect(hasFullName("Emily")).toBe(false);
+    expect(hasFullName("Emily 5")).toBe(false);
+    expect(hasFullName(null)).toBe(false);
+  });
+});

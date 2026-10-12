@@ -90,6 +90,7 @@ describe.skipIf(!enabled)("linked giveaways", async () => {
       ip: "198.51.100.20",
       elapsedMs: 8000,
       userAgent: "vitest",
+      name: "Ash Ketchum",
       phone: "(555) 222-3333",
       smsConsent: true,
       marketingConsent: true,
@@ -177,6 +178,7 @@ describe.skipIf(!enabled)("linked giveaways", async () => {
       ip: "198.51.100.21",
       elapsedMs: 8000,
       userAgent: "vitest",
+      name: "Ash Ketchum",
     });
     expect(res.ok).toBe(true);
     if (res.ok && res.state === "verify")

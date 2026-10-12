@@ -28,6 +28,16 @@ import { parseSettings } from "../settings";
 import { isArchived } from "./actions";
 import { mirrorEntrant } from "./linked.server";
 
+/** At least a first and a last name (two words with a letter each). */
+export function hasFullName(name: string | undefined | null) {
+  return (
+    (name ?? "")
+      .trim()
+      .split(/\s+/)
+      .filter((w) => /\p{L}/u.test(w)).length >= 2
+  );
+}
+
 export interface SignupInput {
   shop: string;
   campaignSlug: string;
@@ -122,7 +132,16 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
   const email = input.email.trim();
   if (!isValidEmailSyntax(email))
     return { ok: false, error: "Please enter a valid email.", status: 400 };
-  if (parseSettings(campaign.settings).requireEmailConsent && !input.marketingConsent)
+  if (parseSettings(campaign.settings).requireName && !hasFullName(input.name))
+    return {
+      ok: false,
+      error: "Enter your first and last name.",
+      status: 400,
+    };
+  if (
+    parseSettings(campaign.settings).requireEmailConsent &&
+    !input.marketingConsent
+  )
     return {
       ok: false,
       error: "Tick the email box to enter.",

@@ -18,7 +18,15 @@ export interface OrderWebhookPayload {
   subtotal_price?: string;
   total_price?: string;
   payment_gateway_names?: string[];
-  customer?: { id?: number | string } | null;
+  customer?: {
+    id?: number | string;
+    first_name?: string | null;
+    last_name?: string | null;
+  } | null;
+  billing_address?: {
+    first_name?: string | null;
+    last_name?: string | null;
+  } | null;
   line_items: {
     product_id: number | string | null;
     variant_id: number | string | null;
@@ -26,6 +34,18 @@ export interface OrderWebhookPayload {
     current_quantity?: number;
     price: string;
   }[];
+}
+
+/** The buyer's name from the order (customer, else billing address), for winner display. */
+export function orderBuyerName(p: OrderWebhookPayload) {
+  for (const n of [p.customer, p.billing_address]) {
+    const full = [n?.first_name, n?.last_name]
+      .map((x) => x?.trim())
+      .filter(Boolean)
+      .join(" ");
+    if (full) return full;
+  }
+  return null;
 }
 
 const gid = (type: string, id: number | string | null) =>
@@ -73,6 +93,7 @@ async function findOrCreateEntrant(
   email: string,
   customerId: string | null,
   auto: boolean,
+  name: string | null,
 ) {
   const emailNormalized = normalizeEmail(email);
   const existing = await db.entrant.findUnique({
@@ -80,6 +101,9 @@ async function findOrCreateEntrant(
       campaignId_emailNormalized: { campaignId: campaign.id, emailNormalized },
     },
   });
+  // Buyers who signed up without a name get the one from their order.
+  if (existing && !existing.name?.trim() && name)
+    return db.entrant.update({ where: { id: existing.id }, data: { name } });
   if (existing || !auto) return existing;
   // A paid order is strong proof of a real person, so these start ACTIVE.
   const created = await db.entrant.create({
@@ -87,6 +111,7 @@ async function findOrCreateEntrant(
       campaignId: campaign.id,
       email,
       emailNormalized,
+      name,
       shopifyCustomerId: customerId,
       status: "ACTIVE",
       verifiedAt: new Date(),
@@ -127,6 +152,7 @@ export async function processOrder(
           email,
           payload.customer?.id ? gid("Customer", payload.customer.id) : null,
           rules.autoSignupFromOrders && !cancelled,
+          orderBuyerName(payload),
         )
       : null;
 

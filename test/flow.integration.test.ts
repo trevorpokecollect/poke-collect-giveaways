@@ -21,6 +21,7 @@ describe.skipIf(!enabled)("giveaway flow", async () => {
     campaignSlug: "booster-box",
     elapsedMs: 8000,
     userAgent: "vitest",
+    name: "Ash Ketchum",
   };
 
   beforeAll(async () => {

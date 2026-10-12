@@ -244,8 +244,18 @@ export function SettingsEditor(props: {
             onChange={(showWinners) => set({ showWinners })}
           />
           <Check
+            label="Require first and last name to enter"
+            details={
+              'So winners can be shown as "Emily S." People entered automatically from an order get the name on their order.'
+            }
+            checked={s.requireName}
+            onChange={(requireName) => set({ requireName })}
+          />
+          <Check
             label="Require the email opt-in to enter"
-            details={'The "Email me deals" box must be ticked to sign up, and only people who ticked it are in the draw.'}
+            details={
+              'The "Email me deals" box must be ticked to sign up, and only people who ticked it are in the draw.'
+            }
             checked={s.requireEmailConsent}
             onChange={(requireEmailConsent) => set({ requireEmailConsent })}
           />

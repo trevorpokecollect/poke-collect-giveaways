@@ -81,17 +81,40 @@ describe.skipIf(!enabled)("required steps to enter", async () => {
       shop,
       campaignSlug: "monthly",
       email: "gary@example.com",
+      name: "Gary Oak",
       ip: "198.51.100.40",
       elapsedMs: 8000,
     });
-    expect(res).toMatchObject({ ok: false, error: "Tick the email box to enter." });
+    expect(res).toMatchObject({
+      ok: false,
+      error: "Tick the email box to enter.",
+    });
+  });
+
+  it("refuses a sign-up without a first and last name", async () => {
+    for (const name of [undefined, "", "Gary", "Gary 2"])
+      expect(
+        await signup({
+          shop,
+          campaignSlug: "monthly",
+          email: "gary@example.com",
+          name,
+          ip: "198.51.100.40",
+          elapsedMs: 8000,
+          marketingConsent: true,
+        }),
+      ).toMatchObject({ ok: false, error: "Enter your first and last name." });
   });
 
   it("only draws people who did every required step", async () => {
     expect(await eligibleTickets(campaignId)).toEqual([]);
     for (const name of ["ash", "brock"])
       expect(
-        await completeAction(issueEntrantToken(ids[name], campaignId), whatnotId, {}),
+        await completeAction(
+          issueEntrantToken(ids[name], campaignId),
+          whatnotId,
+          {},
+        ),
       ).toMatchObject({ ok: true, awarded: true });
     // Misty skipped Whatnot; Brock never ticked the email box.
     expect(await eligibleTickets(campaignId)).toEqual([

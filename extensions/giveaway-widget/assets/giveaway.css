@@ -1,7 +1,7 @@
 /* Matches the Poke-Collect storefront's newer sections (Newsletter Card, Social Follow Band, Review
    Reward): a dark #111114 card with soft red and blue glows, 22px corners, pill kickers, white
    inputs, red #e22f39 buttons and brand-colored social buttons. */
-.pcg {
+.pcg[data-pcg] {
   --pcg-accent: #e22f39;
   --pcg-accent-dark: #b91c25;
   --pcg-radius: 22px;
@@ -26,28 +26,28 @@
   overflow: clip; /* clip without becoming a scroller, so the sticky left column follows the popup's scroll */
   box-shadow: 0 18px 50px rgba(17, 17, 20, 0.18);
 }
-.pcg::before {
+.pcg[data-pcg]::before {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0.55;
   background:
     radial-gradient(55% 60% at 100% 0%, rgba(226, 47, 57, 0.32), transparent 60%),
     radial-gradient(45% 50% at 0% 100%, rgba(110, 216, 255, 0.16), transparent 60%);
 }
-/* The store theme also styles a "pcg" class (its header logo glow) as inline-block with no line
-   height, which with size containment collapses the widget to zero width. The attribute makes these
-   win over the theme's .pcg whatever order the stylesheets load in. */
+/* The store theme uses a "pcg" class too (its header logo glow). Every rule here is scoped to the
+   widget root, .pcg[data-pcg], so the widget never styles the logo, and these win over the theme's
+   .pcg whatever order the stylesheets load in. Don't add rules on a bare .pcg. */
 .pcg[data-pcg] { display: block; position: relative; isolation: isolate; line-height: 1.45; }
-.pcg *, .pcg *::before, .pcg *::after { box-sizing: border-box; }
-.pcg--wide { max-width: 1120px; }
-.pcg--three { max-width: none; }
+.pcg[data-pcg] *, .pcg[data-pcg] *::before, .pcg[data-pcg] *::after { box-sizing: border-box; }
+.pcg[data-pcg].pcg--wide { max-width: 1120px; }
+.pcg[data-pcg].pcg--three { max-width: none; }
 /* Edge to edge: as wide as the screen, whatever the theme section's width (--pcg-sbw is the
    scrollbar, measured in giveaway.js). */
-.pcg.pcg--bleed {
+.pcg[data-pcg].pcg--bleed {
   width: calc(100vw - var(--pcg-sbw, 0px)); max-width: none; border-radius: 0;
   margin-left: calc(50% - (100vw - var(--pcg-sbw, 0px)) / 2); margin-right: 0;
 }
 /* Specific enough to beat each section's own margin shorthand. */
-.pcg > .pcg__wrap > .pcg__side > :not(.pcg__image), .pcg > .pcg__wrap > .pcg__main > *, .pcg > .pcg__wrap > .pcg__tasks > *, .pcg > .pcg__note--solo { margin-left: 22px; margin-right: 22px; }
-.pcg > .pcg__wrap > .pcg__main > :last-child, .pcg > .pcg__wrap > .pcg__tasks > :last-child { margin-bottom: 22px; }
+.pcg[data-pcg] > .pcg__wrap > .pcg__side > :not(.pcg__image), .pcg[data-pcg] > .pcg__wrap > .pcg__main > *, .pcg[data-pcg] > .pcg__wrap > .pcg__tasks > *, .pcg[data-pcg] > .pcg__note--solo { margin-left: 22px; margin-right: 22px; }
+.pcg[data-pcg] > .pcg__wrap > .pcg__main > :last-child, .pcg[data-pcg] > .pcg__wrap > .pcg__tasks > :last-child { margin-bottom: 22px; }
 .pcg__wrap--single .pcg__main { padding-top: 4px; }
 .pcg__last-winner--side { display: none; }
 
@@ -76,21 +76,21 @@
   .pcg__main .pcg__box { margin-top: 18px; }
   .pcg__main .pcg__count { padding: 12px 18px; }
   .pcg__main .pcg__count b { font-size: 34px; }
-  .pcg > .pcg__wrap:not(.pcg__wrap--no-tasks) > .pcg__main > :last-child { margin-bottom: 0; }
+  .pcg[data-pcg] > .pcg__wrap:not(.pcg__wrap--no-tasks) > .pcg__main > :last-child { margin-bottom: 0; }
 }
 
 /* Very wide three-column block (homepage): prize | sign-up or your entries | ways to enter. */
 @container pcg (min-width: 1000px) {
-  .pcg--three .pcg__wrap:not(.pcg__wrap--single):not(.pcg__wrap--no-tasks) {
+  .pcg[data-pcg].pcg--three .pcg__wrap:not(.pcg__wrap--single):not(.pcg__wrap--no-tasks) {
     grid-template-columns: minmax(0, 4fr) minmax(0, 4fr) minmax(0, 5fr);
     grid-template-areas: "side main tasks"; grid-template-rows: auto;
   }
-  .pcg--three .pcg__tasks { padding-top: 8px; }
-  .pcg--three > .pcg__wrap > .pcg__main > :last-child { margin-bottom: 22px; }
-  .pcg--three .pcg__tasks > :first-child { margin-top: 18px; }
-  .pcg--three .pcg__title { font-size: clamp(26px, 2.4cqi, 36px); }
+  .pcg[data-pcg].pcg--three .pcg__tasks { padding-top: 8px; }
+  .pcg[data-pcg].pcg--three > .pcg__wrap > .pcg__main > :last-child { margin-bottom: 22px; }
+  .pcg[data-pcg].pcg--three .pcg__tasks > :first-child { margin-top: 18px; }
+  .pcg[data-pcg].pcg--three .pcg__title { font-size: clamp(26px, 2.4cqi, 36px); }
 }
-.pcg a { color: inherit; }
+.pcg[data-pcg] a { color: inherit; }
 .pcg__loading { padding: 28px 0; text-align: center; color: var(--pcg-soft); }
 
 /* Header */
@@ -243,13 +243,13 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 .pcg__shop-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .pcg__shop-text b { font-size: 14.5px; font-weight: 900; color: #fff; }
 .pcg__shop-text small { font-size: 12.5px; font-weight: 700; color: var(--pcg-yellow); }
-.pcg .pcg__shop-btn { flex: none; padding: 9px 14px; border-radius: 999px; background: #fff; color: #111; font-size: 13px; font-weight: 900; text-decoration: none; white-space: nowrap; transition: transform 0.15s; }
-.pcg .pcg__shop-btn:hover { transform: translateY(-1px); }
+.pcg[data-pcg] .pcg__shop-btn { flex: none; padding: 9px 14px; border-radius: 999px; background: #fff; color: #111; font-size: 13px; font-weight: 900; text-decoration: none; white-space: nowrap; transition: transform 0.15s; }
+.pcg[data-pcg] .pcg__shop-btn:hover { transform: translateY(-1px); }
 /* One row of examples, scrolling sideways when they don't all fit. */
 .pcg__shop-items { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(112px, 1fr); gap: 8px; margin: 0; padding: 0 0 4px; list-style: none; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
 .pcg__shop-items > li { scroll-snap-align: start; }
-.pcg .pcg__shop-item { display: grid; grid-template-rows: auto 1fr auto; gap: 6px; height: 100%; box-sizing: border-box; padding: 8px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); color: #fff; text-decoration: none; transition: background 0.15s; }
-.pcg .pcg__shop-item:hover { background: rgba(255, 255, 255, 0.1); }
+.pcg[data-pcg] .pcg__shop-item { display: grid; grid-template-rows: auto 1fr auto; gap: 6px; height: 100%; box-sizing: border-box; padding: 8px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); color: #fff; text-decoration: none; transition: background 0.15s; }
+.pcg[data-pcg] .pcg__shop-item:hover { background: rgba(255, 255, 255, 0.1); }
 .pcg__shop-img { display: grid; place-items: center; aspect-ratio: 1; border-radius: 8px; background: #fff; overflow: hidden; }
 .pcg__shop-img img { width: 100%; height: 100%; object-fit: contain; }
 .pcg__shop-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; font-weight: 700; line-height: 1.3; }
@@ -346,8 +346,8 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 .pcg__rules p { max-height: 260px; margin: 12px 0 0; padding: 12px 14px; overflow: auto; border-radius: 12px; background: rgba(255, 255, 255, 0.04); white-space: pre-line; text-align: left; }
 
 /* Keyboard focus */
-.pcg :focus-visible { outline: 3px solid var(--pcg-yellow); outline-offset: 2px; }
-.pcg .pcg__input:focus-visible { outline: none; }
+.pcg[data-pcg] :focus-visible { outline: 3px solid var(--pcg-yellow); outline-offset: 2px; }
+.pcg[data-pcg] .pcg__input:focus-visible { outline: none; }
 
 /* Hosted page at /apps/giveaways/<slug> */
 .pcg-page { padding: 40px 16px 56px; background: #f4f6fb; }
@@ -362,9 +362,9 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 .pcg-page__foot a { color: #b91c25; font-weight: 800; }
 
 @media (max-width: 480px) {
-  .pcg { font-size: 14.5px; }
-  .pcg > .pcg__wrap > .pcg__side > :not(.pcg__image), .pcg > .pcg__wrap > .pcg__main > *, .pcg > .pcg__wrap > .pcg__tasks > * { margin-left: 16px; margin-right: 16px; }
-  .pcg > .pcg__wrap > .pcg__main > :last-child, .pcg > .pcg__wrap > .pcg__tasks > :last-child { margin-bottom: 16px; }
+  .pcg[data-pcg] { font-size: 14.5px; }
+  .pcg[data-pcg] > .pcg__wrap > .pcg__side > :not(.pcg__image), .pcg[data-pcg] > .pcg__wrap > .pcg__main > *, .pcg[data-pcg] > .pcg__wrap > .pcg__tasks > * { margin-left: 16px; margin-right: 16px; }
+  .pcg[data-pcg] > .pcg__wrap > .pcg__main > :last-child, .pcg[data-pcg] > .pcg__wrap > .pcg__tasks > :last-child { margin-bottom: 16px; }
   .pcg__box { padding: 14px; }
   .pcg__soc { min-height: 54px; padding: 9px 10px; gap: 8px; }
   .pcg__soc { gap: 7px; padding: 8px 8px 8px 9px; }
@@ -425,11 +425,11 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 }
 .pcg-pop__dialog::backdrop { background: rgba(17, 17, 20, 0.7); backdrop-filter: blur(3px); }
 .pcg-pop__dialog[open]:not(:modal) { position: fixed; inset: 12px; margin: auto; z-index: 1000; }
-.pcg-pop__dialog .pcg { margin: 0; box-shadow: none; }
+.pcg-pop__dialog .pcg[data-pcg] { margin: 0; box-shadow: none; }
 .pcg-pop__dialog .pcg__image { max-height: 240px; }
 @media (min-width: 750px) {
   .pcg-pop__dialog { width: min(980px, calc(100vw - 48px)); max-height: calc(100vh - 48px); }
-  .pcg-pop__dialog .pcg { max-width: none; }
+  .pcg-pop__dialog .pcg[data-pcg] { max-width: none; }
   .pcg-pop__dialog:has(.pcg__side) .pcg-pop__close { float: left; margin: 10px -46px -46px 10px; }
 }
 .pcg-pop__close {
@@ -470,7 +470,7 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
     width: 100vw; max-width: 100vw; max-height: 88vh; margin: auto 0 0; border-radius: 22px 22px 0 0;
   }
   .pcg-pop__dialog[open] { animation: pcg-sheet 0.28s ease-out; }
-  .pcg-pop__dialog .pcg { border-radius: 22px 22px 0 0; }
+  .pcg-pop__dialog .pcg[data-pcg] { border-radius: 22px 22px 0 0; }
   .pcg-pop__dialog .pcg__image { max-height: 180px; padding: 12px; }
   .pcg-pop__dialog[open]:not(:modal) { inset: auto 0 0 0; }
   .pcg-pop__monthly { margin: 0; border-radius: 0; }

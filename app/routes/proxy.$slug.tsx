@@ -109,6 +109,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       endsAt: campaign.endsAt,
       rulesText: campaign.rulesText,
       requireEmailConsent: parseSettings(campaign.settings).requireEmailConsent,
+      requireName: parseSettings(campaign.settings).requireName,
       actions: visibleActions(campaign.actions).map(publicAction),
     },
     turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? null,

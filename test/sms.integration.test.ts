@@ -135,6 +135,7 @@ describe.skipIf(!enabled)("SMS opt-in", async () => {
       ip: "198.51.100.7",
       elapsedMs: 8000,
       userAgent: "vitest",
+      name: "Ash Ketchum",
       smsConsent: true,
     };
     expect(await signup({ ...base, phone: "12" })).toMatchObject({

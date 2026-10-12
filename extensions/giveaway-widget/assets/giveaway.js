@@ -518,7 +518,8 @@
     var emailId = nextId("email");
     var nameId = nextId("name");
     var email = el("input", { class: "pcg__input", id: emailId, type: "email", name: "email", required: true, autocomplete: "email", placeholder: "you@example.com" });
-    var name = el("input", { class: "pcg__input", id: nameId, type: "text", name: "name", autocomplete: "name", placeholder: "Ash Ketchum" });
+    var nameRequired = this.data.campaign.requireName !== false;
+    var name = el("input", { class: "pcg__input", id: nameId, type: "text", name: "name", autocomplete: "name", placeholder: "Ash Ketchum", required: nameRequired, maxlength: "80" });
     var honeypot = el("input", { type: "text", name: "website", tabindex: "-1", autocomplete: "off" });
     var emailRequired = !!this.data.campaign.requireEmailConsent;
     var consent = el("input", { type: "checkbox", name: "consent", required: emailRequired });
@@ -554,6 +555,8 @@
       onsubmit: function (e) {
         e.preventDefault();
         if (!email.value) { err.textContent = "Please enter your email."; email.focus(); return; }
+        // First and last name, so a winner can be shown as "Emily S.".
+        if (nameRequired && name.value.trim().split(/\s+/).filter(function (w) { return /[^\s\d\W_]/.test(w); }).length < 2) { err.textContent = "Enter your first and last name."; name.focus(); return; }
         if (emailRequired && !consent.checked) { err.textContent = "Tick the email box to enter."; consent.focus(); return; }
         if (phone && phone.value.trim() && !smsConsent.checked) { err.textContent = "Check the box to agree to texts, or leave the number blank."; smsConsent.focus(); return; }
         button.disabled = true;
@@ -570,7 +573,7 @@
     }, [
       el("label", { class: "pcg__label", for: emailId, text: "Email" }),
       email,
-      el("label", { class: "pcg__label", for: nameId, text: "Name (Optional)" }),
+      el("label", { class: "pcg__label", for: nameId, text: nameRequired ? "First And Last Name" : "Name (Optional)" }),
       name,
       el("div", { class: "pcg__hp", "aria-hidden": "true" }, [el("label", { text: "Website" }), honeypot]),
       el("label", { class: "pcg__check" }, [consent, el("span", {}, [
