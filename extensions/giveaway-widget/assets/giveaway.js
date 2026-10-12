@@ -197,9 +197,22 @@
     this.root.replaceChildren(el("p", { class: "pcg__note pcg__note--solo", text: text }));
   };
 
+  // The header (image, title, prize, clock) goes in one column and everything else in another.
+  // They stack in a narrow box and sit side by side in a wide one (see .pcg__wrap in the CSS).
   Widget.prototype.show = function (nodes) {
-    this.root.replaceChildren.apply(this.root, nodes.filter(Boolean));
+    nodes = nodes.filter(Boolean);
+    var side = nodes.filter(function (n) { return n.__pcgHead; });
+    var main = nodes.filter(function (n) { return !n.__pcgHead; });
+    this.root.replaceChildren(el("div", { class: "pcg__wrap" + (side.length ? "" : " pcg__wrap--single") }, [
+      side.length ? el("div", { class: "pcg__side" }, side) : null,
+      el("div", { class: "pcg__main" }, main),
+    ]));
   };
+
+  function head(nodes) {
+    nodes.forEach(function (n) { if (n) n.__pcgHead = true; });
+    return nodes;
+  }
 
   Widget.prototype.header = function () {
     var c = this.data.campaign;
@@ -220,7 +233,7 @@
         (function (t) { t.classList.add("pcg__timer--daily"); return t; })(this.countdown(new Date(daily.drawAt))),
       ]));
       if (c.description) nodes.push(el("p", { class: "pcg__meta", text: c.description }));
-      return nodes;
+      return head(nodes);
     }
     if (c.imageUrl) nodes.push(el("img", { class: "pcg__image", src: c.imageUrl, alt: c.prize || c.title, loading: "lazy" }));
     nodes.push(el("div", { class: "pcg__hero" }, [
@@ -230,7 +243,7 @@
       c.endsAt ? this.countdown(new Date(c.endsAt)) : null,
     ]));
     if (c.description) nodes.push(el("p", { class: "pcg__meta", text: c.description }));
-    return nodes;
+    return head(nodes);
   };
 
   // Days / hours / minutes / seconds until the giveaway ends, ticking once a second.
@@ -265,13 +278,16 @@
 
   // Sections every view shows: leaderboard, winners, rules and the free-entry link.
   Widget.prototype.extras = function () {
-    return [this.lastDailyWinner(), this.winners(), this.leaderboard(), this.footer()];
+    // The last daily winner sits under the prize in the wide layout, and after the tasks when
+    // stacked; both copies are rendered and the CSS shows one.
+    return head([this.lastDailyWinner("pcg__last-winner--side")])
+      .concat([this.lastDailyWinner(), this.winners(), this.leaderboard(), this.footer()]);
   };
 
-  Widget.prototype.lastDailyWinner = function () {
+  Widget.prototype.lastDailyWinner = function (extraClass) {
     var w = this.data.daily && this.data.daily.lastWinner;
     if (!w) return null;
-    return el("p", { class: "pcg__last-winner" }, [
+    return el("p", { class: "pcg__last-winner" + (extraClass ? " " + extraClass : "") }, [
       el("span", { text: "🏆 Last winner: " }),
       el("b", { text: w.name }),
       document.createTextNode(" won " + w.prize),

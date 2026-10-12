@@ -2,7 +2,7 @@
   Poke-Collect Giveaways entry widget. Talks to the app through the app proxy at /apps/giveaways.
 {% endcomment %}
 <div
-  class="pcg"
+  class="pcg{% if block.settings.layout == 'wide' %} pcg--wide{% endif %}"
   data-pcg
   data-slug="{{ block.settings.slug | escape }}"
   data-proxy="/apps/giveaways"
@@ -26,6 +26,17 @@
       "id": "slug",
       "label": "Giveaway link name",
       "info": "The link name shown on the giveaway's page in the app, under On your store (for example delta-reign). The giveaway title also works. Leave blank for the newest open giveaway."
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "Layout",
+      "options": [
+        { "value": "wide", "label": "Wide: picture beside the entry form" },
+        { "value": "narrow", "label": "Narrow: one column" }
+      ],
+      "default": "wide",
+      "info": "Wide uses less height on desktop. On phones it's always one column."
     },
     {
       "type": "color",
