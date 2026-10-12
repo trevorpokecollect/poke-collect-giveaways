@@ -1,8 +1,18 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import db from "../../db.server";
 import { normalizeEmail } from "../bot/email";
+import { hit } from "../bot/rate-limit.server";
 import { checkOtp } from "../otp.server";
 import { issueEntrantToken, readEntrantToken } from "../token.server";
 import { award, entrantTotal } from "./ledger.server";
+import {
+  answerMatches,
+  entriesBreakdown,
+  isArchived,
+  leaderboardName,
+  matchPollOption,
+  visibleActions,
+} from "./actions";
 import { activate, findLiveCampaign } from "./signup.server";
 
 export async function verifyEntrant(
@@ -41,15 +51,73 @@ export async function verifyEntrant(
   };
 }
 
-/** Status for the widget: entries, completed actions, referral link. */
+// Quiz answers allowed per entrant per question in a rolling day (counted in RateLimitHit,
+// which is pruned after a day).
+export const QUIZ_ATTEMPTS = 3;
+const QUIZ_WINDOW_S = 24 * 3600;
+const quizKey = (actionId: string, entrantId: string) =>
+  `quiz:${actionId}:${entrantId}`;
+
+// Actions the entrant can't complete from the action list, so they never lock the others.
+const NOT_GATING = ["SIGNUP", "REFERRAL", "ALTERNATE_ENTRY"];
+
+/** Status for the widget: entries and where they came from, completed actions, referral link. */
 export async function entrantState(token: string) {
   const t = readEntrantToken(token);
   if (!t) return null;
   const entrant = await db.entrant.findUnique({
     where: { id: t.entrantId },
-    include: { events: { select: { actionId: true, dedupeKey: true } } },
+    include: {
+      events: {
+        select: {
+          actionId: true,
+          dedupeKey: true,
+          source: true,
+          entries: true,
+          orderLogId: true,
+        },
+      },
+      responses: {
+        select: {
+          actionId: true,
+          answer: true,
+          action: { select: { type: true } },
+        },
+      },
+    },
   });
   if (!entrant || entrant.campaignId !== t.campaignId) return null;
+
+  const pollIds = entrant.responses
+    .filter((r) => r.action.type === "POLL")
+    .map((r) => r.actionId);
+  const [pollCounts, quizHits] = await Promise.all([
+    pollIds.length
+      ? db.actionResponse.groupBy({
+          by: ["actionId", "answer"],
+          where: { actionId: { in: pollIds } },
+          _count: { _all: true },
+        })
+      : [],
+    db.rateLimitHit.groupBy({
+      by: ["key"],
+      where: {
+        key: { startsWith: "quiz:", endsWith: `:${entrant.id}` },
+        createdAt: { gte: new Date(Date.now() - QUIZ_WINDOW_S * 1000) },
+      },
+      _count: { _all: true },
+    }),
+  ]);
+  const pollResults: Record<string, Record<string, number>> = {};
+  for (const row of pollCounts) {
+    (pollResults[row.actionId] ??= {})[row.answer] = row._count._all;
+  }
+  const quizAttemptsLeft: Record<string, number> = {};
+  for (const row of quizHits) {
+    const actionId = row.key.split(":")[1];
+    quizAttemptsLeft[actionId] = Math.max(0, QUIZ_ATTEMPTS - row._count._all);
+  }
+
   return {
     state:
       entrant.status === "ACTIVE"
@@ -59,47 +127,259 @@ export async function entrantState(token: string) {
           : "verify",
     referralCode: entrant.referralCode,
     entries: await entrantTotal(entrant.id),
+    breakdown: entriesBreakdown(entrant.events),
     completedActionIds: [
       ...new Set(entrant.events.map((e) => e.actionId).filter(Boolean)),
     ],
+    // The entrant's own poll and quiz answers, keyed by action id.
+    answers: Object.fromEntries(
+      entrant.responses
+        .filter((r) => r.action.type !== "ALTERNATE_ENTRY")
+        .map((r) => [r.actionId, r.answer]),
+    ),
+    pollResults,
+    quizAttemptsLeft,
   };
+}
+
+/** Top entrants by entries, shown as first name and last initial only. */
+export async function leaderboard(
+  campaignId: string,
+  token?: string | null,
+  limit = 10,
+) {
+  const rows = await db.entryEvent.groupBy({
+    by: ["entrantId"],
+    where: { campaignId, entrant: { status: "ACTIVE" } },
+    _sum: { entries: true },
+    orderBy: { _sum: { entries: "desc" } },
+    take: limit,
+  });
+  const people = await db.entrant.findMany({
+    where: { id: { in: rows.map((r) => r.entrantId) } },
+    select: { id: true, name: true, email: true },
+  });
+  const byId = new Map(people.map((p) => [p.id, p]));
+  const me = readEntrantToken(token)?.entrantId;
+  return rows
+    .filter((r) => (r._sum.entries ?? 0) > 0 && byId.has(r.entrantId))
+    .map((r, i) => {
+      const p = byId.get(r.entrantId)!;
+      return {
+        rank: i + 1,
+        name: leaderboardName(p.name, p.email),
+        entries: r._sum.entries ?? 0,
+        you: r.entrantId === me,
+      };
+    });
+}
+
+// WATCH_VIDEO: "start" hands back a signed start time, and completing checks that enough
+// time has passed since then. Stateless, so nothing is stored until the entry is earned.
+const VIDEO_GRACE_MS = 1000;
+const VIDEO_MAX_AGE_MS = 6 * 3600 * 1000;
+
+function videoKey() {
+  const s = process.env.ENTRANT_TOKEN_SECRET ?? process.env.SHOPIFY_API_SECRET;
+  if (!s)
+    throw new Error("ENTRANT_TOKEN_SECRET (or SHOPIFY_API_SECRET) must be set");
+  return s;
+}
+
+const videoSig = (entrantId: string, actionId: string, startedAt: number) =>
+  createHmac("sha256", videoKey())
+    .update(`video.${entrantId}.${actionId}.${startedAt}`)
+    .digest("base64url");
+
+export function issueVideoStart(
+  entrantId: string,
+  actionId: string,
+  now = Date.now(),
+) {
+  return `${now}.${videoSig(entrantId, actionId, now)}`;
+}
+
+/** Milliseconds since a valid start token was issued, or null if it's forged or stale. */
+export function videoElapsed(
+  started: string | undefined,
+  entrantId: string,
+  actionId: string,
+  now = Date.now(),
+) {
+  const [ts, sig] = (started ?? "").split(".");
+  const startedAt = Number(ts);
+  if (!ts || !Number.isFinite(startedAt) || !sig) return null;
+  const expected = Buffer.from(videoSig(entrantId, actionId, startedAt));
+  const given = Buffer.from(sig);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given))
+    return null;
+  const elapsed = now - startedAt;
+  return elapsed < 0 || elapsed > VIDEO_MAX_AGE_MS ? null : elapsed;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+export interface ActionPayload {
+  code?: string;
+  /** POLL option, QUESTION answer, or ALTERNATE_ENTRY mailing address. */
+  answer?: string;
+  /** WATCH_VIDEO: "start" when the video is opened; anything else completes it. */
+  step?: string;
+  /** WATCH_VIDEO: the token the "start" step returned. */
+  started?: string;
+  /** SOCIAL_SHARE: x, facebook, whatsapp or copy. */
+  network?: string;
+}
+
+const fail = (error: string, attemptsLeft?: number) => ({
+  ok: false as const,
+  error,
+  ...(attemptsLeft === undefined ? {} : { attemptsLeft }),
+});
+
+const saveResponse = (actionId: string, entrantId: string, answer: string) =>
+  db.actionResponse.upsert({
+    where: { actionId_entrantId: { actionId, entrantId } },
+    create: { actionId, entrantId, answer },
+    update: { answer },
+  });
+
 export async function completeAction(
   token: string,
   actionId: string,
-  payload: { code?: string },
+  payload: ActionPayload,
 ) {
   const t = readEntrantToken(token);
-  if (!t) return { ok: false as const, error: "Please sign up first." };
+  if (!t) return fail("Please sign up first.");
   const [entrant, action] = await Promise.all([
-    db.entrant.findUnique({ where: { id: t.entrantId } }),
-    db.entryAction.findUnique({ where: { id: actionId } }),
+    db.entrant.findUnique({
+      where: { id: t.entrantId },
+      include: { events: { select: { actionId: true } } },
+    }),
+    db.entryAction.findUnique({
+      where: { id: actionId },
+      include: { campaign: { include: { actions: true } } },
+    }),
   ]);
-  if (!entrant || !action || action.campaignId !== t.campaignId) {
-    return { ok: false as const, error: "Unknown action." };
+  if (
+    !entrant ||
+    !action ||
+    action.campaignId !== t.campaignId ||
+    isArchived(action)
+  ) {
+    return fail("Unknown action.");
   }
-  if (entrant.status !== "ACTIVE")
-    return { ok: false as const, error: "Verify your email first." };
+  if (entrant.status !== "ACTIVE") return fail("Verify your email first.");
   if (["SIGNUP", "REFERRAL"].includes(action.type)) {
-    return { ok: false as const, error: "That one is awarded automatically." };
+    return fail("That one is awarded automatically.");
   }
 
-  if (action.type === "SECRET_CODE") {
-    const expected = String(
-      (action.config as { code?: string } | null)?.code ?? "",
-    )
-      .trim()
-      .toLowerCase();
-    if (!expected || payload.code?.trim().toLowerCase() !== expected) {
-      return { ok: false as const, error: "That's not the right code." };
+  // Mandatory actions come first: the rest unlock once they're all done.
+  const done = new Set(entrant.events.map((e) => e.actionId));
+  if (!action.mandatory && action.type !== "ALTERNATE_ENTRY") {
+    const missing = visibleActions(action.campaign.actions).filter(
+      (a) => a.mandatory && !NOT_GATING.includes(a.type) && !done.has(a.id),
+    );
+    if (missing.length)
+      return fail(`Complete "${missing[0].label}" first to unlock the rest.`);
+  }
+
+  const config = (action.config ?? {}) as Record<string, unknown>;
+  const answer = payload.answer?.trim() ?? "";
+  let repeatable = action.type === "DAILY_CHECKIN" || action.repeatable;
+
+  switch (action.type) {
+    case "SECRET_CODE": {
+      const expected = String(config.code ?? "")
+        .trim()
+        .toLowerCase();
+      if (!expected || payload.code?.trim().toLowerCase() !== expected) {
+        return fail("That's not the right code.");
+      }
+      break;
     }
+    case "POLL": {
+      const options = Array.isArray(config.options)
+        ? config.options.filter((o): o is string => typeof o === "string")
+        : [];
+      const option = matchPollOption(options, answer);
+      if (!option) return fail("Please pick one of the options.");
+      // The first vote stands; voting again doesn't change the tally.
+      await db.actionResponse.upsert({
+        where: {
+          actionId_entrantId: { actionId: action.id, entrantId: entrant.id },
+        },
+        create: { actionId: action.id, entrantId: entrant.id, answer: option },
+        update: {},
+      });
+      repeatable = false;
+      break;
+    }
+    case "QUESTION": {
+      if (!answer) return fail("Please type an answer.");
+      if (answer.length > 500) return fail("That answer is too long.");
+      const expected = typeof config.answer === "string" ? config.answer : "";
+      repeatable = false;
+      if (done.has(action.id)) break; // already earned; award() below is a no-op
+      if (expected) {
+        const used = await hit(quizKey(action.id, entrant.id), QUIZ_WINDOW_S);
+        if (used > QUIZ_ATTEMPTS)
+          return fail("No tries left today. Come back tomorrow.", 0);
+        await saveResponse(action.id, entrant.id, answer);
+        if (!answerMatches(answer, expected)) {
+          const left = QUIZ_ATTEMPTS - used;
+          return fail(
+            left > 0
+              ? `Not quite. ${left} ${left === 1 ? "try" : "tries"} left.`
+              : "Not quite, and that was your last try for today.",
+            left,
+          );
+        }
+      } else {
+        await saveResponse(action.id, entrant.id, answer);
+      }
+      break;
+    }
+    case "WATCH_VIDEO": {
+      const seconds = typeof config.seconds === "number" ? config.seconds : 0;
+      if (payload.step === "start") {
+        return {
+          ok: true as const,
+          started: issueVideoStart(entrant.id, action.id),
+          seconds,
+        };
+      }
+      const elapsed = videoElapsed(payload.started, entrant.id, action.id);
+      if (elapsed === null) return fail("Open the video first.");
+      if (elapsed + VIDEO_GRACE_MS < seconds * 1000) {
+        const left = Math.ceil((seconds * 1000 - elapsed) / 1000);
+        return fail(`Keep watching: ${left}s to go.`);
+      }
+      break;
+    }
+    case "SOCIAL_SHARE": {
+      const network = String(config.network ?? "any");
+      if (network !== "any" && payload.network !== network) {
+        return fail(
+          `Share on ${network === "x" ? "X" : "Facebook"} to earn this one.`,
+        );
+      }
+      repeatable = false;
+      break;
+    }
+    case "ALTERNATE_ENTRY": {
+      // No purchase necessary: the mailing address is kept with the entry for the record.
+      if (answer.length < 5) return fail("Please enter your mailing address.");
+      await saveResponse(action.id, entrant.id, answer.slice(0, 500));
+      repeatable = false;
+      break;
+    }
+    default:
+      // VISIT_URL, SOCIAL_FOLLOW, DAILY_CHECKIN and CUSTOM count on click.
+      break;
   }
 
-  const repeatKey =
-    action.type === "DAILY_CHECKIN" || action.repeatable ? `:${today()}` : "";
+  const repeatKey = repeatable ? `:${today()}` : "";
   const awarded = await award({
     campaignId: action.campaignId,
     entrantId: entrant.id,

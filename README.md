@@ -70,10 +70,8 @@ snapshot, so a draw can be re-run and checked later. Previous winners are exclud
   database it can write to.
 - `npm run typecheck`, `npm run lint`, `npm run build`
 
-## Not built yet
+## Setup notes
 
-- Editors for product, bundle and booster rules (the engine supports them; the create form sets only per-$ entries)
-- Backfill of past orders and CSV import/export
-- Klaviyo sync, winner notification emails, and thank-you/checkout entry badges
-- Official rules generator (US sweepstakes need a free way to enter; the free signup covers this, but
-  have the rules reviewed)
+- Consolation discount codes need the `write_discounts` scope (in `shopify.app.toml`); run `shopify app deploy` and re-approve the app.
+- Klaviyo sync needs `KLAVIYO_PRIVATE_KEY`; signed outbound webhooks need `OUTBOUND_WEBHOOK_SECRET` (see `.env.example`).
+- Have the generated official rules reviewed before a public launch.
