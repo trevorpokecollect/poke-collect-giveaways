@@ -3,7 +3,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useFetcher, useLoaderData, useSearchParams } from "react-router";
+import { Form, useFetcher, useLoaderData, useSearchParams } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { CampaignStatus, EntrantStatus } from "@prisma/client";
 import { authenticate } from "../shopify.server";
@@ -11,6 +11,7 @@ import db from "../db.server";
 import { runDraw } from "../lib/draw.server";
 import { activate, clawBackReferrals } from "../lib/entries/signup.server";
 import { riskTone, statusTone } from "../lib/ui";
+import { downloadFile } from "../lib/download";
 
 const FILTERS = [
   "ALL",
@@ -28,7 +29,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   });
   if (!campaign) throw new Response("Not found", { status: 404 });
 
-  const filter = new URL(request.url).searchParams.get("status") ?? "ALL";
+  const url = new URL(request.url);
+  const filter = url.searchParams.get("status") ?? "ALL";
+  // Entrant search: case-insensitive match on email or name.
+  const q = url.searchParams.get("q")?.trim().slice(0, 200) ?? "";
+  const searchWhere = q
+    ? {
+        OR: [
+          { email: { contains: q, mode: "insensitive" as const } },
+          { name: { contains: q, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
   const statusWhere =
     filter !== "ALL" && FILTERS.includes(filter as never)
       ? { status: filter as EntrantStatus }
@@ -41,7 +53,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       _count: true,
     }),
     db.entrant.findMany({
-      where: { campaignId: campaign.id, ...statusWhere },
+      where: { campaignId: campaign.id, ...statusWhere, ...searchWhere },
       orderBy: [{ riskScore: "desc" }, { createdAt: "desc" }],
       take: 100,
       include: { riskSignals: { select: { code: true } } },
@@ -72,6 +84,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   return {
     filter,
+    q,
     storefrontPath: `/apps/giveaways/${campaign.slug}`,
     campaign: {
       id: campaign.id,
@@ -191,6 +204,7 @@ export default function CampaignPage() {
     orders,
     draws,
     filter,
+    q,
     storefrontPath,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
@@ -236,6 +250,36 @@ export default function CampaignPage() {
 
       <s-section heading="Entrants">
         <s-stack gap="base">
+          <s-stack direction="inline" gap="base" alignItems="end">
+            <Form method="get">
+              {filter !== "ALL" && (
+                <input type="hidden" name="status" value={filter} />
+              )}
+              <s-search-field
+                name="q"
+                label="Search entrants"
+                labelAccessibilityVisibility="exclusive"
+                placeholder="Search by email or name"
+                defaultValue={q}
+              />
+            </Form>
+            <s-button href={`/app/campaigns/${campaign.id}/analytics`}>
+              Analytics
+            </s-button>
+            <s-button
+              onClick={() =>
+                downloadFile(
+                  `/app/campaigns/${campaign.id}/export${filter === "ALL" ? "" : `?status=${filter}`}`,
+                  "entrants.csv",
+                )
+              }
+            >
+              Export CSV
+            </s-button>
+            <s-button href={`/app/campaigns/${campaign.id}/import`}>
+              Import and backfill
+            </s-button>
+          </s-stack>
           <s-button-group>
             {FILTERS.map((f) => (
               <s-button

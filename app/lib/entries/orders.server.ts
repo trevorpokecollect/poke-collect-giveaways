@@ -175,7 +175,10 @@ export async function processOrder(
       where: { id: orderLog.id },
       data: {
         entries: target,
-        breakdown: (breakdown ?? { reason: "cancelled" }) as object,
+        // Order amounts ride along so analytics can report revenue.
+        breakdown: (breakdown
+          ? { ...breakdown, subtotal: order.subtotal, total: order.total }
+          : { reason: "cancelled" }) as object,
         status: cancelled
           ? "ROLLED_BACK_CANCELLED"
           : current > 0 && delta !== 0
