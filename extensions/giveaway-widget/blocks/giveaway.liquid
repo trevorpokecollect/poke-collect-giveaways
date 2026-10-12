@@ -6,6 +6,8 @@
   data-pcg
   data-slug="{{ block.settings.slug | escape }}"
   data-proxy="/apps/giveaways"
+  data-gads="{{ block.settings.google_ads_send_to | escape }}"
+  data-pixel="{{ block.settings.meta_pixel_id | escape }}"
   style="--pcg-accent: {{ block.settings.accent }}; --pcg-radius: {{ block.settings.radius }}px;"
   {{ block.shopify_attributes }}
 >
@@ -45,6 +47,24 @@
       "label": "Stretch to the edges of the screen",
       "info": "Three columns only. Ignores the section's page width.",
       "default": false
+    },
+    {
+      "type": "header",
+      "content": "Ad tracking"
+    },
+    {
+      "type": "text",
+      "id": "google_ads_send_to",
+      "label": "Google Ads conversion (send_to)",
+      "default": "AW-10903141720/RrSaCJqVspgdENj6gs8o",
+      "info": "Fires once per visitor when they enter. Your \"Giveaway Entry\" conversion. Leave blank to turn off."
+    },
+    {
+      "type": "text",
+      "id": "meta_pixel_id",
+      "label": "Meta Pixel ID",
+      "default": "2752433665081400",
+      "info": "Sends a Lead event once per visitor when they enter. Leave blank to turn off."
     },
     {
       "type": "color",

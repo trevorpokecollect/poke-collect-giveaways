@@ -513,9 +513,49 @@
     this.mountTurnstile(turnstileBox, function (t) { turnstileToken = t; });
   };
 
+  // Ad conversions for a new entry (block settings): a Google Ads conversion and a Meta Pixel
+  // "Lead", once per giveaway per browser, like the old GiveawayNinja tracking snippet did.
+  Widget.prototype.trackEntry = function () {
+    var sendTo = (this.root.getAttribute("data-gads") || "").trim();
+    var pixel = (this.root.getAttribute("data-pixel") || "").trim();
+    var key = "pcg:tracked:" + this.slug;
+    if ((!sendTo && !pixel) || store(key)) return;
+    store(key, "1");
+    if (sendTo) {
+      var aw = sendTo.split("/")[0];
+      window.dataLayer = window.dataLayer || [];
+      if (typeof window.gtag !== "function") {
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag("js", new Date());
+        var s = document.createElement("script");
+        s.async = true;
+        s.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(aw);
+        document.head.appendChild(s);
+      }
+      try { window.gtag("config", aw); window.gtag("event", "conversion", { send_to: sendTo }); } catch (e) { /* ignore */ }
+    }
+    if (pixel) {
+      if (typeof window.fbq !== "function") {
+        /* eslint-disable */
+        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+        document,'script','https://connect.facebook.net/en_US/fbevents.js');
+        /* eslint-enable */
+      }
+      try {
+        window.fbq("init", pixel);
+        window.fbq("trackSingle", pixel, "Lead", { content_name: "Giveaway Entry", content_category: "Giveaway" },
+          { eventID: "pcg-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10) });
+      } catch (e) { /* ignore */ }
+    }
+  };
+
   Widget.prototype.handleResult = function (res) {
     if (res.token) store(this.tokenKey, res.token);
     if (res.state === "active") {
+      this.trackEntry();
       // Other widgets on the page (the popup, or the giveaway page's box) pick up the entry too.
       document.dispatchEvent(new CustomEvent("pcg:entered", { detail: { root: this.root } }));
       return this.load();
