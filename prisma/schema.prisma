@@ -58,6 +58,9 @@ model Campaign {
   riskPolicy    Json?
   // Branding for the storefront widget (colors, copy).
   theme         Json?
+  // Winner email, consolation discount, Klaviyo and outbound webhook settings.
+  // Shape: app/lib/settings.ts.
+  settings      Json?
   rulesText     String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -81,6 +84,10 @@ enum ActionType {
   SECRET_CODE
   ALTERNATE_ENTRY
   CUSTOM
+  POLL
+  QUESTION
+  WATCH_VIDEO
+  SOCIAL_SHARE
 }
 
 model EntryAction {
@@ -97,7 +104,21 @@ model EntryAction {
   sortOrder  Int        @default(0)
   createdAt  DateTime   @default(now())
 
-  events EntryEvent[]
+  events    EntryEvent[]
+  responses ActionResponse[]
+}
+
+// Answers to POLL and QUESTION actions.
+model ActionResponse {
+  id        String      @id @default(cuid())
+  actionId  String
+  action    EntryAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  entrantId String
+  entrant   Entrant     @relation(fields: [entrantId], references: [id], onDelete: Cascade)
+  answer    String
+  createdAt DateTime    @default(now())
+
+  @@unique([actionId, entrantId])
 }
 
 enum EntrantStatus {
@@ -130,10 +151,14 @@ model Entrant {
   userAgent         String?
   utm               Json?
   marketingConsent  Boolean       @default(false)
+  // Consolation discount code sent after the draw, if any.
+  discountCode      String?
+  klaviyoSyncedAt   DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   events      EntryEvent[]
+  responses   ActionResponse[]
   riskSignals RiskSignal[]
   otps        EmailOtp[]
   wins        Winner[]
@@ -261,6 +286,9 @@ model Winner {
   position   Int
   notifiedAt DateTime?
   forfeited  Boolean   @default(false)
+  // Prize claim: the winner confirms shipping details through a tokenized link.
+  claimedAt  DateTime?
+  claimData  Json?
 }
 
 // Prize images uploaded from the admin, served publicly at /images/<id>.
