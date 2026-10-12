@@ -110,6 +110,17 @@
   }
   function entriesText(n) { return "+" + n + plural(n, " entry", " entries"); }
 
+  function otherTokens(own) {
+    var out = [];
+    try {
+      for (var i = 0; i < window.localStorage.length; i++) {
+        var k = window.localStorage.key(i);
+        if (k && k !== own && k.indexOf(TOKEN_KEY) === 0) out.push(window.localStorage.getItem(k));
+      }
+    } catch (e) { /* storage blocked */ }
+    return out.filter(Boolean).slice(0, 5);
+  }
+
   function Widget(root) {
     this.root = root;
     // A blank link name means the newest open giveaway.
@@ -125,6 +136,11 @@
     var headers = { "Content-Type": "application/json", Accept: "application/json" };
     var token = store(this.tokenKey);
     if (token) headers["x-entrant-token"] = token;
+    else {
+      // Entered in a linked giveaway: the server counts them in this one too, no second form.
+      var linked = otherTokens(this.tokenKey);
+      if (linked.length) headers["x-linked-tokens"] = linked.join(",");
+    }
     return fetch(this.base + "?format=json", {
       method: method,
       headers: headers,
@@ -147,6 +163,7 @@
     return this.request("GET")
       .then(function (data) {
         self.data = data;
+        if (data.linkedToken) store(self.tokenKey, data.linkedToken);
         // Lets the daily popup launcher show the prize and countdown without a second request.
         self.root.dispatchEvent(new CustomEvent("pcg:loaded", { bubbles: true, detail: data }));
         var entrant = data.entrant;
@@ -458,7 +475,11 @@
 
   Widget.prototype.handleResult = function (res) {
     if (res.token) store(this.tokenKey, res.token);
-    if (res.state === "active") return this.load();
+    if (res.state === "active") {
+      // Other widgets on the page (the popup, or the giveaway page's box) pick up the entry too.
+      document.dispatchEvent(new CustomEvent("pcg:entered", { detail: { root: this.root } }));
+      return this.load();
+    }
     if (res.state === "held") return this.renderHeld();
     this.renderVerify();
   };
@@ -553,6 +574,7 @@
         ? el("p", { class: "pcg__note pcg__note--nudge", text: "You have no entries in today's draw yet. Check in or complete a task below to get in." })
         : null,
       this.breakdown(entrant),
+      this.linkedNote(),
     ]);
 
     if (all.length) {
@@ -570,6 +592,20 @@
     if (referral && entrant.referralCode) nodes.push(this.referralBox(referral));
 
     this.show(nodes.concat(this.extras()));
+  };
+
+  // One sign-up enters both linked giveaways; say so, with a way to the other one.
+  Widget.prototype.linkedNote = function () {
+    var l = this.data.linked;
+    if (!l) return null;
+    var text = l.daily
+      ? "You're also in today's daily draw" + (l.prize ? " for " + l.prize : "") + "."
+      : "You're also entered in " + l.title + ".";
+    var href = l.daily ? "#daily-giveaway" : "/apps/giveaways/" + encodeURIComponent(l.slug);
+    return el("p", { class: "pcg__linked" }, [
+      el("span", { text: text + " " }),
+      el("a", { href: href, text: l.daily ? "See today's prize" : "View" }),
+    ]);
   };
 
   // "My entries": where the total came from.
@@ -837,6 +873,10 @@
       if (root.__pcg) return;
       root.__pcg = new Widget(root);
       root.__pcg.load();
+      document.addEventListener("pcg:entered", function (e) {
+        var w = root.__pcg;
+        if (e.detail && e.detail.root !== root && w && !(w.data && w.data.entrant)) w.load();
+      });
     });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

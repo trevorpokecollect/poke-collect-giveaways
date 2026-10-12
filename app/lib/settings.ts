@@ -63,6 +63,10 @@ export const campaignSettingsSchema = z.object({
   webhookUrl: z.string().url().or(z.literal("")).default(""),
   showLeaderboard: z.boolean().default(false),
   showWinners: z.boolean().default(true),
+  // Link name of a partner giveaway (e.g. the daily for a monthly). Signing up for one
+  // enters both, and texts, follows and check-ins count in both. Set on either side.
+  // See app/lib/entries/linked.server.ts.
+  linkedSlug: z.string().default(""),
   // Who may enter, used by the official rules generator in the editor.
   eligibility: z
     .string()

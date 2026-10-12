@@ -14,8 +14,8 @@ import {
   visibleActions,
 } from "./actions";
 import { activate, findLiveCampaign } from "./signup.server";
-import { periodFor } from "../daily";
-import { parseSettings } from "../settings";
+import { actionDedupeKey, repeatSuffix } from "./repeat";
+import { mirrorAction } from "./linked.server";
 import { normalizeUsPhone } from "../phone";
 import { queueKlaviyoSync } from "../klaviyo.server";
 
@@ -221,8 +221,6 @@ export function videoElapsed(
   return elapsed < 0 || elapsed > VIDEO_MAX_AGE_MS ? null : elapsed;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 export interface ActionPayload {
   code?: string;
   /** POLL option, QUESTION answer, or ALTERNATE_ENTRY mailing address. */
@@ -412,20 +410,20 @@ export async function completeAction(
   }
 
   // Daily-draw giveaways repeat on the draw's schedule (e.g. 9pm to 9pm), not the UTC date.
-  const daily = parseSettings(action.campaign.settings).daily;
-  const repeatKey = !repeatable
-    ? ""
-    : daily.enabled
-      ? `:${periodFor(new Date(), action.campaign.timezone, daily.drawTime).key}`
-      : `:${today()}`;
   const awarded = await award({
     campaignId: action.campaignId,
     entrantId: entrant.id,
     entries: action.entries,
     source: "ACTION",
     actionId: action.id,
-    dedupeKey: `action:${action.id}:${entrant.id}${repeatKey}`,
+    dedupeKey: actionDedupeKey(
+      action.id,
+      entrant.id,
+      repeatSuffix(action.campaign, repeatable),
+    ),
   });
+  // Texts, follows and check-ins also count in the linked giveaway, if there is one.
+  if (awarded) await mirrorAction(entrant.id, action.id);
   if (smsOptIn) queueKlaviyoSync(entrant.id);
   return {
     ok: true as const,

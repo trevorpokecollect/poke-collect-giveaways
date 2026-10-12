@@ -243,6 +243,13 @@ export function SettingsEditor(props: {
             checked={s.showWinners}
             onChange={(showWinners) => set({ showWinners })}
           />
+          <TextInput
+            label="Linked giveaway (link name)"
+            placeholder="e.g. monthly-giveaway"
+            details="One sign-up enters both giveaways. Texts, check-ins and follows of the same link count in both, and purchases already count in every live giveaway. Set it on either one."
+            value={s.linkedSlug}
+            onChange={(linkedSlug) => set({ linkedSlug })}
+          />
         </s-stack>
       </s-section>
     </>

@@ -25,6 +25,7 @@ import { award, entrantTotal } from "./ledger.server";
 import { slugify } from "../slug";
 import { normalizeUsPhone } from "../phone";
 import { isArchived } from "./actions";
+import { mirrorEntrant } from "./linked.server";
 
 export interface SignupInput {
   shop: string;
@@ -315,7 +316,10 @@ async function returning(
  * Called once an entrant is verified: grants the signup entries and credits the referrer.
  * Safe to call more than once thanks to dedupe keys.
  */
-export async function activate(entrantId: string) {
+export async function activate(
+  entrantId: string,
+  opts: { mirror?: boolean } = {},
+) {
   const entrant = await db.entrant.update({
     where: { id: entrantId },
     data: { status: "ACTIVE", verifiedAt: new Date() },
@@ -373,6 +377,8 @@ export async function activate(entrantId: string) {
   }
   queueKlaviyoSync(entrantId);
   emitWebhook(entrant.campaignId, "entrant.activated", { entrantId });
+  // One sign-up enters both linked giveaways.
+  if (opts.mirror !== false) await mirrorEntrant(entrantId, activate);
 }
 
 /** Revokes every referral entry an entrant earned for others (used when disqualifying a bot). */

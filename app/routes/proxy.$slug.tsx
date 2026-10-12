@@ -8,10 +8,18 @@ import {
   verifyEntrant,
 } from "../lib/entries/actions.server";
 import { publicAction, visibleActions } from "../lib/entries/actions";
-import { findLiveCampaign, signup } from "../lib/entries/signup.server";
+import {
+  activate,
+  findLiveCampaign,
+  signup,
+} from "../lib/entries/signup.server";
+import {
+  entrantFromLinked,
+  linkedCampaign,
+} from "../lib/entries/linked.server";
 import { publicWinners } from "../lib/winners.server";
-import { storefrontDaily } from "../lib/daily.server";
-import { readEntrantToken } from "../lib/token.server";
+import { currentPrize, storefrontDaily } from "../lib/daily.server";
+import { issueEntrantToken, readEntrantToken } from "../lib/token.server";
 import { campaignSettingsSchema } from "../lib/settings";
 import {
   landingPage,
@@ -55,10 +63,43 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       404,
     );
 
-  const token = request.headers.get("x-entrant-token");
+  let token = request.headers.get("x-entrant-token");
   const t = readEntrantToken(token);
-  const entrantId = t?.campaignId === campaign.id ? t.entrantId : null;
+  let entrantId = t?.campaignId === campaign.id ? t.entrantId : null;
+  // Not entered here yet, but entered in the linked giveaway: count them in this one too
+  // (no second form) and hand back a token for it.
+  let linkedToken: string | null = null;
+  if (!entrantId) {
+    for (const raw of (request.headers.get("x-linked-tokens") ?? "")
+      .split(",")
+      .slice(0, 5)) {
+      const lt = readEntrantToken(raw.trim());
+      if (!lt || lt.campaignId === campaign.id) continue;
+      const here = await entrantFromLinked(
+        campaign,
+        lt.entrantId,
+        lt.campaignId,
+        activate,
+      );
+      if (!here) continue;
+      linkedToken = token = issueEntrantToken(here.id, campaign.id);
+      entrantId = here.id;
+      break;
+    }
+  }
+  const linked = await linkedCampaign(campaign);
+  const linkedDaily = linked && (await currentPrize(linked));
   return json({
+    linkedToken,
+    // The giveaway this one is linked to (one sign-up enters both), for the "you're also in" note.
+    linked: linked
+      ? {
+          title: linked.title,
+          slug: linked.slug,
+          daily: !!linkedDaily,
+          prize: linkedDaily?.prize?.title ?? null,
+        }
+      : null,
     campaign: {
       title: campaign.title,
       description: campaign.description,
