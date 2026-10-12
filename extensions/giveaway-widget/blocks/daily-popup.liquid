@@ -19,10 +19,6 @@
       <small data-pcg-pop-sub>Enter Free</small>
     </span>
   </button>
-  <button class="pcg-pop__tab" type="button" aria-haspopup="dialog" aria-label="{{ block.settings.button_text | escape }}" hidden>
-    <span aria-hidden="true">🎁</span>
-    <span class="pcg-pop__tab-text">Daily</span>
-  </button>
   <dialog class="pcg-pop__dialog" aria-label="{{ block.settings.button_text | escape }}">
     <button class="pcg-pop__close" type="button" aria-label="Close">&times;</button>
     <div
@@ -106,12 +102,12 @@
       "id": "mobile_launcher",
       "label": "On phones",
       "options": [
-        { "value": "tab", "label": "Small tab on the side of the screen" },
+        { "value": "tab", "label": "Gift icon in the header, next to the cart" },
         { "value": "button", "label": "Same button as on desktop" },
         { "value": "none", "label": "No button (popup and links only)" }
       ],
       "default": "tab",
-      "info": "The tab hides once the visitor has entered today. Any link to #daily-giveaway (e.g. in your announcement bar or menu) opens the popup."
+      "info": "The gift icon shows a red dot until the visitor has entered today. If the theme's header icons can't be found, the desktop button shows instead. Any link to #daily-giveaway (e.g. in your announcement bar or menu) opens the popup."
     },
     {
       "type": "url",

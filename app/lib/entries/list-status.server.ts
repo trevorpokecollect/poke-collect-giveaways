@@ -1,6 +1,7 @@
 import type { Campaign } from "@prisma/client";
 import db from "../../db.server";
 import { unauthenticated } from "../../shopify.server";
+import { statusBefore, type CustomerNode } from "./list-status";
 
 // "Were they already on our lists?" For each sign-up, the Shopify customer with that email is
 // checked once: a customer created before they entered is an existing customer, and a
@@ -18,32 +19,6 @@ const QUERY = `#graphql
       }
     }
   }`;
-
-interface Consent {
-  marketingState: string;
-  consentUpdatedAt: string | null;
-}
-interface CustomerNode {
-  createdAt: string;
-  emailMarketingConsent: Consent | null;
-  smsMarketingConsent: Consent | null;
-}
-
-// Allows for the moment between signing up and our own opt-in reaching Shopify.
-const GRACE_MS = 2 * 60 * 1000;
-
-/** Status before entering, from the customer record (null when there's no customer). */
-export function statusBefore(customer: CustomerNode | null, enteredAt: Date) {
-  const before = (iso: string | null | undefined) =>
-    !iso || new Date(iso).getTime() < enteredAt.getTime() - GRACE_MS;
-  const subscribed = (c: Consent | null) =>
-    !!c && c.marketingState === "SUBSCRIBED" && before(c.consentUpdatedAt);
-  return {
-    existingCustomer: !!customer && before(customer.createdAt),
-    emailWasSubscribed: subscribed(customer?.emailMarketingConsent ?? null),
-    smsWasSubscribed: subscribed(customer?.smsMarketingConsent ?? null),
-  };
-}
 
 const running = new Set<string>();
 

@@ -21,11 +21,16 @@
     return h > 0 ? h + "h " + m + "m" : m > 0 ? m + "m" : "under a minute";
   }
 
+  var GIFT =
+    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="icon" aria-hidden="true" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8"/><path d="M12 8v13"/>' +
+    '<path d="M12 8C11 5 7.5 3.5 6.5 5.5S8.5 8 12 8ZM12 8c1-3 4.5-4.5 5.5-2.5S15.5 8 12 8Z"/></svg>';
+
   function setup(pop) {
     if (pop.__pcgPop) return;
     pop.__pcgPop = true;
     var launcher = pop.querySelector(".pcg-pop__launcher");
-    var tab = pop.querySelector(".pcg-pop__tab");
+    var icons = [];
     var thumb = pop.querySelector(".pcg-pop__thumb");
     var sub = pop.querySelector("[data-pcg-pop-sub]");
     var dialog = pop.querySelector(".pcg-pop__dialog");
@@ -54,6 +59,24 @@
       else dialog.removeAttribute("open");
     }
 
+    // Phones: a gift icon among the theme's header icons (search, account, cart), drawn like them,
+    // with a red dot until the visitor has entered today. Without header icons to join, the
+    // phone gets the floating button instead.
+    function addHeaderIcons() {
+      if (icons.length) return;
+      document.querySelectorAll(".header__icons").forEach(function (bar) {
+        if (bar.querySelector(".pcg-hicon")) return;
+        var a = document.createElement("a");
+        a.href = "#daily-giveaway";
+        a.className = "header__icon link header__button-icon flex justify-center align-center por pcg-hicon";
+        a.setAttribute("aria-label", launcher.querySelector(".pcg-pop__text b").textContent);
+        a.innerHTML = GIFT + '<span class="pcg-hicon__dot" aria-hidden="true"></span>';
+        bar.insertBefore(a, bar.querySelector("#cart-icon-bubble, .header__icon--cart"));
+        icons.push(a);
+      });
+      pop.classList.toggle("pcg-pop--no-hicon", icons.length === 0);
+    }
+
     function updateSub() {
       var d = data && data.daily;
       var entries = d && d.yourEntries;
@@ -70,7 +93,7 @@
         thumb.hidden = false;
       }
       launcher.hidden = false;
-      if (tab) tab.hidden = false;
+      if (pop.classList.contains("pcg-pop--mobile-tab")) addHeaderIcons();
       updateSub();
       window.clearInterval(timer);
       timer = window.setInterval(updateSub, 30000);
@@ -78,6 +101,7 @@
       var designMode = window.Shopify && window.Shopify.designMode;
       var enteredToday = data.daily ? data.daily.yourEntries > 0 : !!data.entrant;
       pop.classList.toggle("pcg-pop--entered", enteredToday);
+      icons.forEach(function (i) { i.classList.toggle("pcg-hicon--entered", enteredToday); });
       if (pop.getAttribute("data-auto") === "true" && !designMode && !enteredToday && !store(seenKey()) && !autoTimer) {
         var delay = Number(pop.getAttribute("data-delay") || 6) * 1000;
         if (!isPhone() || pageViews >= 2) autoTimer = window.setTimeout(open, delay);
@@ -118,7 +142,6 @@
     var rain = launcher.querySelector(".pcg-pop__rain");
     if (rain && window.pcgMatrixRain) window.pcgMatrixRain(rain, launcher, { size: 9 });
     launcher.addEventListener("click", open);
-    if (tab) tab.addEventListener("click", open);
     pop.querySelectorAll(".pcg-pop__close, .pcg-pop__done").forEach(function (b) { b.addEventListener("click", close); });
     // A click on the backdrop (outside the dialog box) closes it.
     dialog.addEventListener("click", function (e) {

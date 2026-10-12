@@ -21,6 +21,12 @@ const ACCENT = "#E22F39";
 // Keeps "</script>" inside the inlined code and data from closing the script tag.
 const inline = (code: string) => code.replace(/<\/(script)/gi, "<\\/$1");
 
+// Stand-ins for the theme's header icons, so the phone preview shows where the gift icon goes.
+const ICON_SEARCH =
+  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+const ICON_CART =
+  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2 12h12l2-9H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>';
+
 export function pageHtml(device: Device, view: View, layout: Layout) {
   const widgetClass =
     view === "popup"
@@ -33,10 +39,10 @@ export function pageHtml(device: Device, view: View, layout: Layout) {
   const widget = `<div class="${widgetClass}" data-pcg data-slug="preview" data-proxy="/apps/giveaways" style="--pcg-accent:${ACCENT};--pcg-radius:22px"><div class="pcg__loading">Loading giveaway…</div></div>`;
   const body =
     view === "popup"
-      ? `<div class="fake-page"></div>
+      ? `<header class="fake-header"><b>Poke-Collect</b><div class="header__icons"><span class="header__icon">${ICON_SEARCH}</span><span class="header__icon" id="cart-icon-bubble">${ICON_CART}</span></div></header>
+<div class="fake-page"></div>
 <div class="pcg-pop pcg-pop--left pcg-pop--mobile-tab" data-pcg-pop data-auto="false" data-delay="0" style="--pcg-accent:${ACCENT}">
 <button class="pcg-pop__launcher" type="button" hidden><img class="pcg-pop__thumb" alt="" hidden><span class="pcg-pop__text"><b>Daily giveaway</b><small data-pcg-pop-sub>Enter free</small></span></button>
-<button class="pcg-pop__tab" type="button" hidden><span aria-hidden="true">🎁</span><span class="pcg-pop__tab-text">Daily</span></button>
 <dialog class="pcg-pop__dialog"><button class="pcg-pop__close" type="button" aria-label="Close">&times;</button>${widget}</dialog></div>`
       : `<main class="page">${widget}</main>`;
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -44,6 +50,8 @@ export function pageHtml(device: Device, view: View, layout: Layout) {
 <style>
 html,body{margin:0;background:#fff;color:#1a1a1a;font-family:"Helvetica Neue",Arial,sans-serif}
 .page{padding:${device === "phone" ? "16px 12px" : "32px 48px"}}
+.fake-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid #eee}
+.header__icons{display:flex;align-items:center;gap:6px}.header__icon{display:flex;padding:6px;color:#1a1a1a}
 .fake-page{min-height:100vh;background:repeating-linear-gradient(#f1eee4 0 120px,#fff 120px 240px)}
 </style>
 <script>

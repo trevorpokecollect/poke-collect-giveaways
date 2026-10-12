@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { statusBefore } from "../app/lib/entries/list-status.server";
+import { statusBefore } from "../app/lib/entries/list-status";
 
 const entered = new Date("2026-10-12T15:00:00Z");
 const sub = (at: string | null) => ({
