@@ -28,42 +28,6 @@ import { purchaseRulesSchema } from "../lib/entries/rules";
 import { parseSettings } from "../lib/settings";
 import { applyRecommended } from "../lib/recommended";
 
-// Poke-Collect's preferred starting point for a new giveaway; everything stays editable.
-const follow = (label: string, url: string) => ({
-  ...newAction("SOCIAL_FOLLOW"),
-  label,
-  entries: 3,
-  config: { url },
-});
-
-const defaultActions = () => [
-  newAction("SIGNUP"),
-  newAction("REFERRAL"),
-  newAction("DAILY_CHECKIN"),
-  follow(
-    "Follow @pokecollectcards on Instagram",
-    "https://www.instagram.com/pokecollectcards/",
-  ),
-  follow("Subscribe on YouTube", "https://www.youtube.com/@pokecollectcards"),
-  follow("Follow us on Whatnot", "https://whatnot.com/invite/pokecollectcards"),
-  newAction("SOCIAL_SHARE"),
-  newAction("ALTERNATE_ENTRY"),
-];
-
-const defaultSettings = () => {
-  const s = parseSettings(null);
-  return {
-    ...s,
-    consolation: {
-      ...s.consolation,
-      enabled: true,
-      daysValid: 7,
-      minEntries: 2,
-    },
-    showLeaderboard: true,
-  };
-};
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
   const initial: CampaignFormValues = applyRecommended({
@@ -77,13 +41,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     imageUrl: null,
     removeImage: false,
     rulesText: "",
-    actions: defaultActions(),
-    // 1 entry per $1 of subtotal (no shipping, tax or gift cards), online orders only.
-    rules: rulesToForm(
-      purchaseRulesSchema.parse({ orderSource: "online" }),
-      DEFAULT_TIMEZONE,
-    ),
-    settings: defaultSettings(),
+    actions: [newAction("SIGNUP"), newAction("REFERRAL")],
+    // 1 entry per $1 of subtotal, as before.
+    rules: rulesToForm(purchaseRulesSchema.parse({}), DEFAULT_TIMEZONE),
+    settings: parseSettings(null),
     resources: {},
   });
   return { initial };
