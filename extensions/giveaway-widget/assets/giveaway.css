@@ -34,28 +34,55 @@
 }
 .pcg *, .pcg *::before, .pcg *::after { box-sizing: border-box; }
 .pcg--wide { max-width: 1120px; }
+.pcg--three { max-width: none; }
+/* Edge to edge: as wide as the screen, whatever the theme section's width (--pcg-sbw is the
+   scrollbar, measured in giveaway.js). */
+.pcg.pcg--bleed {
+  width: calc(100vw - var(--pcg-sbw, 0px)); max-width: none; border-radius: 0;
+  margin-left: calc(50% - (100vw - var(--pcg-sbw, 0px)) / 2); margin-right: 0;
+}
 /* Specific enough to beat each section's own margin shorthand. */
-.pcg > .pcg__wrap > .pcg__side > :not(.pcg__image), .pcg > .pcg__wrap > .pcg__main > *, .pcg > .pcg__note--solo { margin-left: 22px; margin-right: 22px; }
-.pcg > .pcg__wrap > .pcg__main > :last-child { margin-bottom: 22px; }
+.pcg > .pcg__wrap > .pcg__side > :not(.pcg__image), .pcg > .pcg__wrap > .pcg__main > *, .pcg > .pcg__wrap > .pcg__tasks > *, .pcg > .pcg__note--solo { margin-left: 22px; margin-right: 22px; }
+.pcg > .pcg__wrap > .pcg__main > :last-child, .pcg > .pcg__wrap > .pcg__tasks > :last-child { margin-bottom: 22px; }
 .pcg__wrap--single .pcg__main { padding-top: 4px; }
 .pcg__last-winner--side { display: none; }
 
-/* Wide box (the homepage block, the desktop popup): header on the left, entry and tasks on the
+/* Wide box (the desktop popup, the two-column block): header on the left, entry and tasks on the
    right, so it reads as a banner instead of a tall column. */
 @container pcg (min-width: 720px) {
-  .pcg__wrap:not(.pcg__wrap--single) { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
-  /* The picture panel grows to the height of the right column. */
+  .pcg__wrap:not(.pcg__wrap--single) {
+    display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    grid-template-areas: "side main" "side tasks"; grid-template-rows: auto 1fr;
+  }
+  .pcg__side { grid-area: side; }
+  .pcg__main { grid-area: main; }
+  .pcg__tasks { grid-area: tasks; }
+  /* The picture panel grows to the height of the other columns. */
   .pcg__side { display: flex; flex-direction: column; padding-bottom: 22px; }
-  .pcg__side .pcg__image { flex: 1 1 auto; min-height: 180px; max-height: none; }
+  .pcg__side .pcg__image { flex: 1 1 0; min-height: 200px; height: auto; max-height: none; }
   .pcg__side .pcg__last-winner--side { display: block; margin-top: 14px; margin-bottom: 0; }
-  .pcg__main .pcg__last-winner { display: none; }
+  .pcg__tasks .pcg__last-winner { display: none; }
   .pcg-pop__dialog .pcg__side .pcg__image { max-height: none; }
   .pcg__side .pcg__title { font-size: clamp(24px, 3.2cqi, 32px); }
-  .pcg__main { padding: 8px 0 0; border-left: 1px solid var(--pcg-line); }
+  .pcg__main, .pcg__tasks { border-left: 1px solid var(--pcg-line); }
+  .pcg__main { padding: 8px 0 0; }
   .pcg__main > :first-child { margin-top: 18px; }
   .pcg__main .pcg__box { margin-top: 18px; }
   .pcg__main .pcg__count { padding: 12px 18px; }
   .pcg__main .pcg__count b { font-size: 34px; }
+  .pcg > .pcg__wrap:not(.pcg__wrap--no-tasks) > .pcg__main > :last-child { margin-bottom: 0; }
+}
+
+/* Very wide three-column block (homepage): prize | sign-up or your entries | ways to enter. */
+@container pcg (min-width: 1000px) {
+  .pcg--three .pcg__wrap:not(.pcg__wrap--single):not(.pcg__wrap--no-tasks) {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 4fr) minmax(0, 5fr);
+    grid-template-areas: "side main tasks"; grid-template-rows: auto;
+  }
+  .pcg--three .pcg__tasks { padding-top: 8px; }
+  .pcg--three > .pcg__wrap > .pcg__main > :last-child { margin-bottom: 22px; }
+  .pcg--three .pcg__tasks > :first-child { margin-top: 18px; }
+  .pcg--three .pcg__title { font-size: clamp(26px, 2.4cqi, 36px); }
 }
 .pcg a { color: inherit; }
 .pcg__loading { padding: 28px 0; text-align: center; color: var(--pcg-soft); }
@@ -281,8 +308,8 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 
 @media (max-width: 480px) {
   .pcg { font-size: 14.5px; }
-  .pcg > .pcg__wrap > .pcg__side > :not(.pcg__image), .pcg > .pcg__wrap > .pcg__main > * { margin-left: 16px; margin-right: 16px; }
-  .pcg > .pcg__wrap > .pcg__main > :last-child { margin-bottom: 16px; }
+  .pcg > .pcg__wrap > .pcg__side > :not(.pcg__image), .pcg > .pcg__wrap > .pcg__main > *, .pcg > .pcg__wrap > .pcg__tasks > * { margin-left: 16px; margin-right: 16px; }
+  .pcg > .pcg__wrap > .pcg__main > :last-child, .pcg > .pcg__wrap > .pcg__tasks > :last-child { margin-bottom: 16px; }
   .pcg__box { padding: 14px; }
   .pcg__soc { min-height: 54px; padding: 9px 10px; gap: 8px; }
   .pcg__soc { gap: 7px; padding: 8px 8px 8px 9px; }

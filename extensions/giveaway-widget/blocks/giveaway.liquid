@@ -2,7 +2,7 @@
   Poke-Collect Giveaways entry widget. Talks to the app through the app proxy at /apps/giveaways.
 {% endcomment %}
 <div
-  class="pcg{% if block.settings.layout == 'wide' %} pcg--wide{% endif %}"
+  class="pcg{% case block.settings.layout %}{% when 'three' %} pcg--wide pcg--three{% when 'wide' %} pcg--wide{% endcase %}{% if block.settings.edge_to_edge and block.settings.layout == 'three' %} pcg--bleed{% endif %}"
   data-pcg
   data-slug="{{ block.settings.slug | escape }}"
   data-proxy="/apps/giveaways"
@@ -32,11 +32,19 @@
       "id": "layout",
       "label": "Layout",
       "options": [
-        { "value": "wide", "label": "Wide: picture beside the entry form" },
-        { "value": "narrow", "label": "Narrow: one column" }
+        { "value": "three", "label": "Three columns, full width" },
+        { "value": "wide", "label": "Two columns" },
+        { "value": "narrow", "label": "One column" }
       ],
-      "default": "wide",
-      "info": "Wide uses less height on desktop. On phones it's always one column."
+      "default": "three",
+      "info": "Three columns (prize, entry form, ways to enter) fills the section's width; good for the homepage. Columns stack on phones."
+    },
+    {
+      "type": "checkbox",
+      "id": "edge_to_edge",
+      "label": "Stretch to the edges of the screen",
+      "info": "Three columns only. Ignores the section's page width.",
+      "default": false
     },
     {
       "type": "color",

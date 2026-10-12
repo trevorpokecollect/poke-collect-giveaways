@@ -129,6 +129,12 @@
     this.tokenKey = TOKEN_KEY + this.slug;
     this.ref = new URLSearchParams(window.location.search).get("ref") || "";
     this.renderedAt = Date.now();
+    // Edge-to-edge layout: 100vw includes the scrollbar, so measure it to avoid a sideways scroll.
+    if (root.classList.contains("pcg--bleed")) {
+      var sbw = function () { root.style.setProperty("--pcg-sbw", (window.innerWidth - document.documentElement.clientWidth) + "px"); };
+      sbw();
+      window.addEventListener("resize", sbw);
+    }
   }
 
   Widget.prototype.request = function (method, body) {
@@ -197,22 +203,29 @@
     this.root.replaceChildren(el("p", { class: "pcg__note pcg__note--solo", text: text }));
   };
 
-  // The header (image, title, prize, clock) goes in one column and everything else in another.
-  // They stack in a narrow box and sit side by side in a wide one (see .pcg__wrap in the CSS).
+  // Three groups: the header (image, title, prize, clock), the main part (the sign-up form or
+  // your entries) and the ways to enter. They stack in a narrow box, sit in two columns in a wide
+  // one (tasks under the main part) and in three in a very wide one (see .pcg__wrap in the CSS).
   Widget.prototype.show = function (nodes) {
     nodes = nodes.filter(Boolean);
-    var side = nodes.filter(function (n) { return n.__pcgHead; });
-    var main = nodes.filter(function (n) { return !n.__pcgHead; });
-    this.root.replaceChildren(el("div", { class: "pcg__wrap" + (side.length ? "" : " pcg__wrap--single") }, [
+    var side = nodes.filter(function (n) { return n.__pcg === "head"; });
+    var main = nodes.filter(function (n) { return !n.__pcg; });
+    var rest = nodes.filter(function (n) { return n.__pcg === "tasks"; });
+    this.root.replaceChildren(el("div", { class: "pcg__wrap" + (side.length ? "" : " pcg__wrap--single") + (rest.length ? "" : " pcg__wrap--no-tasks") }, [
       side.length ? el("div", { class: "pcg__side" }, side) : null,
       el("div", { class: "pcg__main" }, main),
+      rest.length ? el("div", { class: "pcg__tasks" }, rest) : null,
     ]));
   };
 
-  function head(nodes) {
-    nodes.forEach(function (n) { if (n) n.__pcgHead = true; });
-    return nodes;
+  function mark(group) {
+    return function (nodes) {
+      nodes.forEach(function (n) { if (n) n.__pcg = group; });
+      return nodes;
+    };
   }
+  var head = mark("head");
+  var tasks = mark("tasks");
 
   Widget.prototype.header = function () {
     var c = this.data.campaign;
@@ -281,7 +294,7 @@
     // The last daily winner sits under the prize in the wide layout, and after the tasks when
     // stacked; both copies are rendered and the CSS shows one.
     return head([this.lastDailyWinner("pcg__last-winner--side")])
-      .concat([this.lastDailyWinner(), this.winners(), this.leaderboard(), this.footer()]);
+      .concat(tasks([this.lastDailyWinner(), this.winners(), this.leaderboard(), this.footer()]));
   };
 
   Widget.prototype.lastDailyWinner = function (extraClass) {
@@ -480,10 +493,10 @@
 
     // A preview of the follow/join buttons, so visitors see what else they can earn.
     var socials = this.data.campaign.actions.filter(function (a) { return platformOf(a); });
-    var preview = socials.length ? [
+    var preview = socials.length ? tasks([
       el("h3", { class: "pcg__subheading", text: "Then earn bonus entries" }),
       this.socialGrid(socials, null, {}, true),
-    ] : [];
+    ]) : [];
 
     this.show(this.header().concat([el("div", { class: "pcg__box" }, [form])], preview, this.extras()));
     this.mountTurnstile(turnstileBox, function (t) { turnstileToken = t; });
@@ -593,19 +606,22 @@
       this.linkedNote(),
     ]);
 
-    if (all.length) {
-      nodes.push(el("h3", { class: "pcg__subheading", text: "Earn more entries" }));
-      if (requiredLeft.length) {
-        nodes.push(el("p", { class: "pcg__note", text: "Complete the required " + plural(requiredLeft.length, "action", "actions") + " first to unlock the rest." }));
-      }
-      if (socials.length) nodes.push(this.socialGrid(socials, entrant, done, requiredLeft.length > 0));
-      if (actions.length) nodes.push(el("ul", { class: "pcg__actions" }, actions.map(function (a) {
-        return self.actionItem(a, entrant, !!done[a.id], !a.mandatory && requiredLeft.length > 0);
-      })));
-    }
-
+    // The referral box stays with the entry count; the tasks get their own column when wide.
     var referral = this.data.campaign.actions.filter(function (a) { return a.type === "REFERRAL"; })[0];
     if (referral && entrant.referralCode) nodes.push(this.referralBox(referral));
+
+    if (all.length) {
+      nodes = nodes.concat(tasks([
+        el("h3", { class: "pcg__subheading", text: "Earn more entries" }),
+        requiredLeft.length
+          ? el("p", { class: "pcg__note", text: "Complete the required " + plural(requiredLeft.length, "action", "actions") + " first to unlock the rest." })
+          : null,
+        socials.length ? this.socialGrid(socials, entrant, done, requiredLeft.length > 0) : null,
+        actions.length ? el("ul", { class: "pcg__actions" }, actions.map(function (a) {
+          return self.actionItem(a, entrant, !!done[a.id], !a.mandatory && requiredLeft.length > 0);
+        })) : null,
+      ]));
+    }
 
     this.show(nodes.concat(this.extras()));
   };

@@ -14,7 +14,7 @@ import { parseLocalDateTime, toLocalInput } from "./time";
 // when the daily draw is on.
 
 const INSTAGRAM = "https://instagram.com/pokecollectcards";
-const YOUTUBE = "https://www.youtube.com/@pokecollectcards";
+const FACEBOOK = "https://www.facebook.com/pokecollectcards";
 const WHATNOT = "https://whatnot.com/invite/pokecollectcards";
 const DISCORD = "https://discord.gg/Tk4zVvyHan";
 
@@ -48,10 +48,10 @@ const ACTIONS: Recommended[] = [
     config: { url: WHATNOT },
   },
   {
-    type: "WATCH_VIDEO",
-    label: "Watch our latest pack opening",
-    entries: 3,
-    config: { url: YOUTUBE, seconds: 30 },
+    type: "SOCIAL_FOLLOW",
+    label: "Follow us on Facebook",
+    entries: 2,
+    config: { url: FACEBOOK },
   },
   {
     type: "SOCIAL_SHARE",
