@@ -26,10 +26,11 @@ import {
 } from "../lib/campaign-form.server";
 import { purchaseRulesSchema } from "../lib/entries/rules";
 import { parseSettings } from "../lib/settings";
+import { applyRecommended } from "../lib/recommended";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
-  const initial: CampaignFormValues = {
+  const initial: CampaignFormValues = applyRecommended({
     title: "",
     prize: "",
     description: "",
@@ -45,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     rules: rulesToForm(purchaseRulesSchema.parse({}), DEFAULT_TIMEZONE),
     settings: parseSettings(null),
     resources: {},
-  };
+  });
   return { initial };
 };
 

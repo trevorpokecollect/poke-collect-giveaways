@@ -6,6 +6,7 @@ import {
   type CampaignFormValues,
   type ResourceLabels,
 } from "../lib/campaign-form";
+import { applyRecommended } from "../lib/recommended";
 import { ActionsEditor } from "./ActionsEditor";
 import { PurchaseRulesEditor } from "./PurchaseRulesEditor";
 import { SettingsEditor } from "./SettingsEditor";
@@ -40,11 +41,27 @@ export function CampaignForm(props: {
     setRulesKey((k) => k + 1);
   };
 
+  // Remounts the editors so they pick up the new values.
+  const [formKey, setFormKey] = useState(0);
+  const recommend = () => {
+    setV((prev) => applyRecommended(prev));
+    setFormKey((k) => k + 1);
+  };
+
   return (
-    <Form method="post" encType="multipart/form-data">
+    <Form method="post" encType="multipart/form-data" key={formKey}>
       <input type="hidden" name="payload" value={JSON.stringify(v)} />
       <s-stack gap="base">
         {props.error && <s-banner tone="critical">{props.error}</s-banner>}
+        <s-banner tone="info">
+          <s-stack direction="inline" gap="base" alignItems="center">
+            <s-text>
+              Fill in Poke-Collect&apos;s recommended entries, purchase rules
+              and winner settings. Your title, dates and image stay as they are.
+            </s-text>
+            <s-button onClick={recommend}>Use recommended settings</s-button>
+          </s-stack>
+        </s-banner>
 
         <s-section heading="Basics">
           <s-stack gap="base">
@@ -188,6 +205,15 @@ export function CampaignForm(props: {
         </s-section>
 
         {props.error && <s-banner tone="critical">{props.error}</s-banner>}
+        <s-banner tone="info">
+          <s-stack direction="inline" gap="base" alignItems="center">
+            <s-text>
+              Fill in Poke-Collect&apos;s recommended entries, purchase rules
+              and winner settings. Your title, dates and image stay as they are.
+            </s-text>
+            <s-button onClick={recommend}>Use recommended settings</s-button>
+          </s-stack>
+        </s-banner>
         <s-stack direction="inline">
           <s-button
             type="submit"
