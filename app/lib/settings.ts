@@ -13,7 +13,7 @@ export const campaignSettingsSchema = z.object({
         ),
       claimDays: z.number().int().positive().default(7),
     })
-    .default({}),
+    .prefault({}),
   consolation: z
     .object({
       enabled: z.boolean().default(false),
@@ -21,14 +21,14 @@ export const campaignSettingsSchema = z.object({
       daysValid: z.number().int().positive().default(14),
       minEntries: z.number().int().nonnegative().default(1),
     })
-    .default({}),
+    .prefault({}),
   klaviyo: z
     .object({
       enabled: z.boolean().default(false),
       listId: z.string().default(""),
       onlyConsented: z.boolean().default(true),
     })
-    .default({}),
+    .prefault({}),
   webhookUrl: z.string().url().or(z.literal("")).default(""),
   showLeaderboard: z.boolean().default(false),
   showWinners: z.boolean().default(true),
