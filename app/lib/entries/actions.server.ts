@@ -11,6 +11,7 @@ import {
   isArchived,
   leaderboardName,
   matchPollOption,
+  requiredActions,
   visibleActions,
 } from "./actions";
 import { activate, findLiveCampaign } from "./signup.server";
@@ -63,7 +64,6 @@ const quizKey = (actionId: string, entrantId: string) =>
   `quiz:${actionId}:${entrantId}`;
 
 // Actions the entrant can't complete from the action list, so they never lock the others.
-const NOT_GATING = ["SIGNUP", "REFERRAL", "ALTERNATE_ENTRY"];
 
 /** Status for the widget: entries and where they came from, completed actions, referral link. */
 export async function entrantState(token: string) {
@@ -282,9 +282,9 @@ export async function completeAction(
   // Mandatory actions come first: the rest unlock once they're all done.
   const done = new Set(entrant.events.map((e) => e.actionId));
   if (!action.mandatory && action.type !== "ALTERNATE_ENTRY") {
-    const missing = visibleActions(action.campaign.actions).filter(
-      (a) => a.mandatory && !NOT_GATING.includes(a.type) && !done.has(a.id),
-    );
+    const missing = requiredActions(
+      visibleActions(action.campaign.actions),
+    ).filter((a) => !done.has(a.id));
     if (missing.length)
       return fail(`Complete "${missing[0].label}" first to unlock the rest.`);
   }

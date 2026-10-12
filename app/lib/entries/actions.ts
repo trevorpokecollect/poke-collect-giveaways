@@ -24,6 +24,13 @@ const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 export const isArchived = (a: { config: unknown }) =>
   asConfig(a.config).archived === true;
 
+// Signing up, referrals and the mail-in entry never block anything, even when marked required.
+const NOT_GATING: ActionType[] = ["SIGNUP", "REFERRAL", "ALTERNATE_ENTRY"];
+
+/** Actions an entrant must complete to be in the draw (and before the other tasks unlock). */
+export const requiredActions = <T extends ActionLike>(actions: T[]) =>
+  actions.filter((a) => a.mandatory && !isArchived(a) && !NOT_GATING.includes(a.type));
+
 // Awarded by the server on its own, so the widget never offers them as buttons.
 const AUTOMATIC: ActionType[] = ["SIGNUP"];
 

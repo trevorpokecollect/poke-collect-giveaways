@@ -20,7 +20,7 @@ import {
 import { publicWinners } from "../lib/winners.server";
 import { currentPrize, storefrontDaily } from "../lib/daily.server";
 import { issueEntrantToken, readEntrantToken } from "../lib/token.server";
-import { campaignSettingsSchema } from "../lib/settings";
+import { campaignSettingsSchema, parseSettings } from "../lib/settings";
 import {
   landingPage,
   wantsLandingPage,
@@ -107,6 +107,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       imageUrl: campaign.imageUrl,
       endsAt: campaign.endsAt,
       rulesText: campaign.rulesText,
+      requireEmailConsent: parseSettings(campaign.settings).requireEmailConsent,
       actions: visibleActions(campaign.actions).map(publicAction),
     },
     turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? null,

@@ -67,6 +67,8 @@ export const campaignSettingsSchema = z.object({
   // enters both, and texts, follows and check-ins count in both. Set on either side.
   // See app/lib/entries/linked.server.ts.
   linkedSlug: z.string().default(""),
+  // The "Email me deals" box must be ticked to enter (and to be in the draw).
+  requireEmailConsent: z.boolean().default(false),
   // Who may enter, used by the official rules generator in the editor.
   eligibility: z
     .string()

@@ -11,6 +11,7 @@ import {
   type DailySettings,
 } from "./daily";
 import { drawWinners, newSeed, snapshotHash } from "./draw";
+import { onlyFullyEntered } from "./entries/ledger.server";
 import { parseSettings } from "./settings";
 import { emitWebhook } from "./webhook-out.server";
 import { emailDrawWinners, storefrontUrl } from "./winners.server";
@@ -411,12 +412,15 @@ export async function dayTickets(
     },
     _sum: { entries: true },
   });
-  return rows
-    .map((r) => ({
-      entrantId: r.entrantId,
-      entries: Math.max(0, r._sum.entries ?? 0),
-    }))
-    .filter((t) => t.entries > 0);
+  return onlyFullyEntered(
+    prize.campaignId,
+    rows
+      .map((r) => ({
+        entrantId: r.entrantId,
+        entries: Math.max(0, r._sum.entries ?? 0),
+      }))
+      .filter((t) => t.entries > 0),
+  );
 }
 
 /** Entries an entrant has earned in the current daily period. */

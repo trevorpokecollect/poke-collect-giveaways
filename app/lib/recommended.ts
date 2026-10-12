@@ -23,12 +23,17 @@ interface Recommended {
   label: string;
   entries: number;
   repeatable?: boolean;
+  /** Required to enter: no entries count in a draw until it's done. */
+  mandatory?: boolean;
   config?: ActionConfigForm;
 }
 
 const ACTIONS: Recommended[] = [
   { type: "SIGNUP", label: "Enter the giveaway", entries: 1 },
   { type: "REFERRAL", label: "Refer a friend", entries: 5 },
+  // Texts can't be required (consent to marketing texts can't be a condition of entry), so
+  // they're the biggest free bonus instead.
+  { type: "SMS_OPTIN", label: "Get text alerts for drops", entries: 10 },
   {
     type: "DAILY_CHECKIN",
     label: "Daily check-in",
@@ -45,6 +50,7 @@ const ACTIONS: Recommended[] = [
     type: "SOCIAL_FOLLOW",
     label: "Follow us on Whatnot",
     entries: 2,
+    mandatory: true,
     config: { url: WHATNOT },
   },
   {
@@ -79,18 +85,19 @@ const ACTIONS: Recommended[] = [
 // plus two reasons to come back every day (check-in and the Whatnot show code).
 const DAILY_ACTIONS: Recommended[] = [
   { type: "SIGNUP", label: "Enter today's giveaway", entries: 1 },
-  { type: "SMS_OPTIN", label: "Get text alerts for drops", entries: 5 },
+  { type: "SMS_OPTIN", label: "Get text alerts for drops", entries: 10 },
+  {
+    type: "SOCIAL_FOLLOW",
+    label: "Follow us on Whatnot",
+    entries: 3,
+    mandatory: true,
+    config: { url: WHATNOT },
+  },
   {
     type: "SOCIAL_FOLLOW",
     label: "Join our Discord",
     entries: 3,
     config: { url: DISCORD },
-  },
-  {
-    type: "SOCIAL_FOLLOW",
-    label: "Follow us on Whatnot",
-    entries: 3,
-    config: { url: WHATNOT },
   },
   {
     type: "DAILY_CHECKIN",
@@ -124,7 +131,12 @@ function mergeActions(
   const actions = current.map((a) => {
     const r = list.find((x) => sameAction(a, x));
     return r
-      ? { ...a, entries: r.entries, repeatable: r.repeatable ?? a.repeatable }
+      ? {
+          ...a,
+          entries: r.entries,
+          repeatable: r.repeatable ?? a.repeatable,
+          mandatory: r.mandatory ?? a.mandatory,
+        }
       : a;
   });
   for (const r of list) {
@@ -134,6 +146,7 @@ function mergeActions(
       label: r.label,
       entries: r.entries,
       repeatable: r.repeatable ?? false,
+      mandatory: r.mandatory ?? newAction(r.type).mandatory,
       config: { ...newAction(r.type).config, ...r.config },
     });
   }
@@ -189,6 +202,7 @@ export function applyRecommended(v: CampaignFormValues): CampaignFormValues {
       },
       klaviyo: { ...v.settings.klaviyo, onlyConsented: true },
       showWinners: true,
+      requireEmailConsent: true,
       showLeaderboard: false,
     },
   };
@@ -244,6 +258,7 @@ export function applyRecommendedDaily(
       consolation: { ...v.settings.consolation, enabled: false },
       klaviyo: { ...v.settings.klaviyo, enabled: true, onlyConsented: true },
       showWinners: true,
+      requireEmailConsent: true,
       showLeaderboard: false,
     },
   };

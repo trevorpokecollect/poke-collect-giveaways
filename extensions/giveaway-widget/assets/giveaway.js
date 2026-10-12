@@ -362,13 +362,16 @@
   // they're a preview: clicking one points the visitor at the email box.
   Widget.prototype.socialGrid = function (actions, entrant, done, locked) {
     var self = this;
+    // Required ones (e.g. the Whatnot follow) come first, full width, and are never locked.
+    actions = actions.filter(function (a) { return a.mandatory; }).concat(actions.filter(function (a) { return !a.mandatory; }));
     return el("ul", { class: "pcg__socials", role: "list" }, actions.map(function (a) {
       var platform = platformOf(a);
       var finished = !!done[a.id];
+      var isLocked = locked && !a.mandatory;
       var error = el("p", { class: "pcg__error", role: "alert" });
       var pts = el("span", { class: "pcg__soc-pts" }, finished ? [icon("check"), document.createTextNode(" +" + a.entries)] : [document.createTextNode("+" + a.entries)]);
       var btn = el("button", {
-        class: "pcg__soc pcg__soc--" + platform + (finished ? " pcg__soc--done" : ""),
+        class: "pcg__soc pcg__soc--" + platform + (finished ? " pcg__soc--done" : "") + (a.mandatory ? " pcg__soc--req" : ""),
         type: "button",
         "aria-label": a.label + ", " + (finished ? "done, " : "") + entriesText(a.entries),
         onclick: function () {
@@ -376,11 +379,14 @@
           if (!entrant) { self.focusEmail("Enter your email first, then tap to earn " + entriesText(a.entries) + "."); return; }
           if (url) window.open(url, "_blank", "noopener");
           if (finished) return;
-          if (locked) { error.textContent = "Complete the required step first to unlock this one."; return; }
+          if (isLocked) { error.textContent = "Complete the required step first to unlock this one."; return; }
           self.submitAction(a, {}, { error: error, button: btn }).catch(function () {});
         },
-      }, [icon(platform), el("span", { class: "pcg__soc-name", text: a.label }), pts]);
-      return el("li", {}, [btn, error]);
+      }, [icon(platform), el("span", { class: "pcg__soc-name" }, [
+        a.label,
+        a.mandatory && !finished ? el("small", { class: "pcg__soc-req", text: "Required to enter" }) : null,
+      ]), pts]);
+      return el("li", { class: a.mandatory ? "pcg__socials-req" : null }, [btn, error]);
     }));
   };
 
@@ -433,7 +439,8 @@
     var email = el("input", { class: "pcg__input", id: emailId, type: "email", name: "email", required: true, autocomplete: "email", placeholder: "you@example.com" });
     var name = el("input", { class: "pcg__input", id: nameId, type: "text", name: "name", autocomplete: "name", placeholder: "Ash Ketchum" });
     var honeypot = el("input", { type: "text", name: "website", tabindex: "-1", autocomplete: "off" });
-    var consent = el("input", { type: "checkbox", name: "consent" });
+    var emailRequired = !!this.data.campaign.requireEmailConsent;
+    var consent = el("input", { type: "checkbox", name: "consent", required: emailRequired });
     var turnstileBox = el("div");
     var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
     var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", text: this.data.daily ? "Enter today's giveaway" : "Enter giveaway" });
@@ -466,6 +473,7 @@
       onsubmit: function (e) {
         e.preventDefault();
         if (!email.value) { err.textContent = "Please enter your email."; email.focus(); return; }
+        if (emailRequired && !consent.checked) { err.textContent = "Tick the email box to enter."; consent.focus(); return; }
         if (phone && phone.value.trim() && !smsConsent.checked) { err.textContent = "Check the box to agree to texts, or leave the number blank."; smsConsent.focus(); return; }
         button.disabled = true;
         self.signup({
@@ -484,7 +492,10 @@
       el("label", { class: "pcg__label", for: nameId, text: "Name (optional)" }),
       name,
       el("div", { class: "pcg__hp", "aria-hidden": "true" }, [el("label", { text: "Website" }), honeypot]),
-      el("label", { class: "pcg__check" }, [consent, el("span", { text: "Email me deals, drops and stream alerts." })]),
+      el("label", { class: "pcg__check" }, [consent, el("span", {}, [
+        "Email me deals, drops and stream alerts.",
+        emailRequired ? el("span", { class: "pcg__req", text: " Required to enter" }) : null,
+      ])]),
       smsBox,
       turnstileBox,
       err,
@@ -591,7 +602,7 @@
     (entrant.completedActionIds || []).forEach(function (id) { done[id] = true; });
     var all = this.data.campaign.actions.filter(function (a) { return !NOT_LISTED[a.type]; });
     var requiredLeft = all.filter(function (a) { return a.mandatory && !done[a.id]; });
-    var socials = all.filter(function (a) { return platformOf(a) && !a.mandatory; });
+    var socials = all.filter(function (a) { return platformOf(a); });
     var actions = all.filter(function (a) { return socials.indexOf(a) === -1; });
 
     var nodes = this.header().concat([
@@ -614,7 +625,7 @@
       nodes = nodes.concat(tasks([
         el("h3", { class: "pcg__subheading", text: "Earn more entries" }),
         requiredLeft.length
-          ? el("p", { class: "pcg__note", text: "Complete the required " + plural(requiredLeft.length, "action", "actions") + " first to unlock the rest." })
+          ? el("p", { class: "pcg__note pcg__note--nudge", text: "Almost in: " + requiredLeft.map(function (a) { return a.label; }).join(" and ") + " to finish entering. Your entries count once " + plural(requiredLeft.length, "it's", "they're") + " done, and the other tasks unlock." })
           : null,
         socials.length ? this.socialGrid(socials, entrant, done, requiredLeft.length > 0) : null,
         actions.length ? el("ul", { class: "pcg__actions" }, actions.map(function (a) {

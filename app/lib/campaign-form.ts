@@ -720,6 +720,19 @@ export function generateOfficialRules(values: CampaignFormValues): string {
           a.type === "DAILY_CHECKIN" || a.repeatable ? " per day" : ""
         }${a.type === "REFERRAL" ? " per verified referral" : ""}`,
     );
+  // Free steps every entrant must also complete before their entries count in a drawing.
+  const steps = [
+    values.settings.requireEmailConsent
+      ? "agree to receive marketing emails from the Sponsor (you can unsubscribe at any time after entering)"
+      : "",
+    ...actions
+      .filter(
+        (a) =>
+          a.mandatory &&
+          !["SIGNUP", "REFERRAL", "ALTERNATE_ENTRY"].includes(a.type),
+      )
+      .map((a) => (a.label.trim() || ACTION_META[a.type].name).toLowerCase()),
+  ].filter(Boolean);
   const purchases = values.rules.enabled;
   const claimDays = values.settings.winnerEmail.claimDays;
 
@@ -750,6 +763,9 @@ export function generateOfficialRules(values: CampaignFormValues): string {
       `Free entry: ${freeMethod}`,
       signup
         ? `Signing up and verifying your email earns ${entriesWord(signup.entries)}.`
+        : "",
+      steps.length
+        ? `To complete an entry, entrants must also ${steps.join(" and ")}. These steps are free. Entries count in a drawing only once they are done.`
         : "",
       ways.length ? `Bonus entries are available for:\n${ways.join("\n")}` : "",
       purchases

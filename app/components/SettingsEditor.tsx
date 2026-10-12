@@ -243,6 +243,12 @@ export function SettingsEditor(props: {
             checked={s.showWinners}
             onChange={(showWinners) => set({ showWinners })}
           />
+          <Check
+            label="Require the email opt-in to enter"
+            details={'The "Email me deals" box must be ticked to sign up, and only people who ticked it are in the draw.'}
+            checked={s.requireEmailConsent}
+            onChange={(requireEmailConsent) => set({ requireEmailConsent })}
+          />
           <TextInput
             label="Linked giveaway (link name)"
             placeholder="e.g. monthly-giveaway"

@@ -24,6 +24,7 @@ import { emitWebhook } from "../webhook-out.server";
 import { award, entrantTotal } from "./ledger.server";
 import { slugify } from "../slug";
 import { normalizeUsPhone } from "../phone";
+import { parseSettings } from "../settings";
 import { isArchived } from "./actions";
 import { mirrorEntrant } from "./linked.server";
 
@@ -121,6 +122,12 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
   const email = input.email.trim();
   if (!isValidEmailSyntax(email))
     return { ok: false, error: "Please enter a valid email.", status: 400 };
+  if (parseSettings(campaign.settings).requireEmailConsent && !input.marketingConsent)
+    return {
+      ok: false,
+      error: "Tick the email box to enter.",
+      status: 400,
+    };
   let phone: string | null = null;
   if (input.smsConsent && input.phone?.trim()) {
     phone = normalizeUsPhone(input.phone);

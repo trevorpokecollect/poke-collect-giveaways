@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TIMEZONE,
+  generateOfficialRules,
   newAction,
   rulesToForm,
   validateCampaignForm,
@@ -103,5 +104,27 @@ describe("applyRecommendedDaily", () => {
       "https://discord.gg/Tk4zVvyHan",
     ]);
     expect(applyRecommendedDaily(v).actions).toHaveLength(v.actions.length);
+  });
+});
+
+describe("required steps", () => {
+  it("makes the Whatnot follow and email opt-in required, with texts as a +10 bonus", () => {
+    for (const v of [applyRecommended(base()), applyRecommendedDaily(base())]) {
+      const whatnot = v.actions.find((a) => a.config.url?.includes("whatnot"));
+      expect(whatnot?.mandatory).toBe(true);
+      expect(v.actions.find((a) => a.type === "SMS_OPTIN")).toMatchObject({
+        mandatory: false,
+        entries: 10,
+      });
+      expect(v.settings.requireEmailConsent).toBe(true);
+      expect(v.actions.some((a) => a.type === "WATCH_VIDEO")).toBe(false);
+    }
+  });
+
+  it("lists the required steps in the official rules", () => {
+    const rules = generateOfficialRules(applyRecommended(base()));
+    expect(rules).toContain(
+      "To complete an entry, entrants must also agree to receive marketing emails from the Sponsor (you can unsubscribe at any time after entering) and follow us on whatnot.",
+    );
   });
 });

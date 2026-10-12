@@ -172,6 +172,12 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 .pcg__socials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 10px; padding: 0; list-style: none; }
 .pcg__socials > li { display: grid; gap: 4px; min-width: 0; }
 .pcg__socials > li:only-child, .pcg__socials > li:last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* Required follows span the row; with one of them first, the rest still pair up. */
+.pcg__socials > .pcg__socials-req { grid-column: 1 / -1; }
+.pcg__socials:has(> .pcg__socials-req:first-child) > li:last-child:nth-child(odd):not(.pcg__socials-req) { grid-column: auto; }
+.pcg__socials:has(> .pcg__socials-req:first-child) > li:last-child:nth-child(even):not(.pcg__socials-req) { grid-column: 1 / -1; }
+.pcg__soc-name small.pcg__soc-req { display: block; margin-top: 2px; font-size: 11px; font-weight: 900; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.85; }
+.pcg__req { margin-left: 4px; color: var(--pcg-yellow); font-size: 12px; font-weight: 800; white-space: nowrap; }
 .pcg__soc {
   --c: #2a2a31; --c2: #16161b; --ink: #fff;
   position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 58px; padding: 10px 12px;
