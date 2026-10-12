@@ -138,6 +138,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           step: str("step"),
           started: str("started"),
           network: str("network"),
+          phone: str("phone"),
+          consent: body.consent === true,
         },
       );
       return result.ok ? json(result) : json(result, 400);

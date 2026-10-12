@@ -16,6 +16,8 @@ import {
 import { activate, findLiveCampaign } from "./signup.server";
 import { periodFor } from "../daily";
 import { parseSettings } from "../settings";
+import { normalizeUsPhone } from "../phone";
+import { queueKlaviyoSync } from "../klaviyo.server";
 
 export async function verifyEntrant(
   shop: string,
@@ -231,6 +233,9 @@ export interface ActionPayload {
   started?: string;
   /** SOCIAL_SHARE: x, facebook, whatsapp or copy. */
   network?: string;
+  /** SMS_OPTIN: the mobile number, and whether the consent box was checked. */
+  phone?: string;
+  consent?: boolean;
 }
 
 const fail = (error: string, attemptsLeft?: number) => ({
@@ -289,6 +294,7 @@ export async function completeAction(
   const config = (action.config ?? {}) as Record<string, unknown>;
   const answer = payload.answer?.trim() ?? "";
   let repeatable = action.type === "DAILY_CHECKIN" || action.repeatable;
+  let smsOptIn = false;
 
   switch (action.type) {
     case "SECRET_CODE": {
@@ -376,6 +382,30 @@ export async function completeAction(
       repeatable = false;
       break;
     }
+    case "SMS_OPTIN": {
+      // Entries only with the box checked, so nobody is texted without agreeing.
+      const phone = normalizeUsPhone(payload.phone ?? "");
+      if (!phone) return fail("Enter a valid US mobile number.");
+      if (payload.consent !== true)
+        return fail("Check the box to agree to text messages.");
+      repeatable = false;
+      if (done.has(action.id)) break;
+      const taken = await db.entrant.findFirst({
+        where: {
+          campaignId: action.campaignId,
+          phone,
+          id: { not: entrant.id },
+        },
+        select: { id: true },
+      });
+      if (taken) return fail("That number is already entered.");
+      await db.entrant.update({
+        where: { id: entrant.id },
+        data: { phone, smsConsentAt: new Date() },
+      });
+      smsOptIn = true;
+      break;
+    }
     default:
       // VISIT_URL, SOCIAL_FOLLOW, DAILY_CHECKIN and CUSTOM count on click.
       break;
@@ -396,6 +426,7 @@ export async function completeAction(
     actionId: action.id,
     dedupeKey: `action:${action.id}:${entrant.id}${repeatKey}`,
   });
+  if (smsOptIn) queueKlaviyoSync(entrant.id);
   return {
     ok: true as const,
     awarded,

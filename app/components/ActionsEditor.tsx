@@ -7,6 +7,7 @@ import {
   type ActionConfigForm,
   type ActionForm,
 } from "../lib/campaign-form";
+import { DEFAULT_SMS_DISCLOSURE } from "../lib/phone";
 import {
   Check,
   NumberInput,
@@ -298,6 +299,17 @@ function ConfigFields({
           details="Quoted in the official rules, e.g. a mail-in address or a free form."
           value={c.instructions ?? ""}
           onChange={(instructions) => setConfig({ instructions })}
+        />
+      );
+    case "SMS_OPTIN":
+      return (
+        <TextArea
+          label="Consent wording"
+          rows={3}
+          details="Shown next to the unchecked opt-in box, with links to your terms and privacy policy. Leave blank to use the standard wording."
+          placeholder={DEFAULT_SMS_DISCLOSURE}
+          value={c.disclosure ?? ""}
+          onChange={(disclosure) => setConfig({ disclosure })}
         />
       );
     default:

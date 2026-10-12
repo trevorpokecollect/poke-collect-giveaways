@@ -30,6 +30,8 @@ const ENTRANT_HEADER = [
   "referral_code",
   "referred_by_email",
   "marketing_consent",
+  "phone",
+  "sms_consent_at",
   ...UTM_KEYS,
   "created_at",
 ];
@@ -157,6 +159,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                   e.referralCode,
                   e.referredBy?.email,
                   e.marketingConsent ? "yes" : "no",
+                  e.phone,
+                  e.smsConsentAt,
                   ...UTM_KEYS.map((k) =>
                     typeof utm[k] === "string" ? utm[k] : "",
                   ),

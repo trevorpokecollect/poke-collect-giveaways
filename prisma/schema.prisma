@@ -89,6 +89,7 @@ enum ActionType {
   QUESTION
   WATCH_VIDEO
   SOCIAL_SHARE
+  SMS_OPTIN
 }
 
 model EntryAction {
@@ -155,6 +156,9 @@ model Entrant {
   // Consolation discount code sent after the draw, if any.
   discountCode      String?
   klaviyoSyncedAt   DateTime?
+  // Set by the SMS_OPTIN action: E.164 number and when the entrant agreed to texts.
+  phone             String?
+  smsConsentAt      DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -169,6 +173,7 @@ model Entrant {
   @@index([campaignId, ipHash])
   @@index([campaignId, subnetHash])
   @@index([campaignId, deviceHash])
+  @@index([campaignId, phone])
 }
 
 enum EntrySource {

@@ -1,4 +1,5 @@
 import type { ActionType, EntrySource } from "@prisma/client";
+import { DEFAULT_SMS_DISCLOSURE } from "../phone";
 
 // Pure helpers for storefront actions: what the widget may see, answer matching,
 // leaderboard names and the "my entries" breakdown. Server code lives in actions.server.ts.
@@ -60,6 +61,8 @@ export function publicConfig(type: ActionType, raw: unknown) {
       return { question: str(c.question) ?? "", quiz: !!str(c.answer) };
     case "ALTERNATE_ENTRY":
       return { instructions: str(c.instructions) ?? "" };
+    case "SMS_OPTIN":
+      return { disclosure: str(c.disclosure) || DEFAULT_SMS_DISCLOSURE };
     default:
       return {};
   }

@@ -6,7 +6,7 @@ import { parseSettings } from "./settings";
 // Uses the REST API (https://developers.klaviyo.com/en/reference/api_overview)
 // with the private key in KLAVIYO_PRIVATE_KEY:
 //   POST /api/profile-import                          upsert profile + properties
-//   POST /api/profile-subscription-bulk-create-jobs   subscribe (consented) to listId
+//   POST /api/profile-subscription-bulk-create-jobs   subscribe consented email (to listId) and SMS
 //   POST /api/lists/{id}/relationships/profiles       add (not subscribe) to listId
 //   POST /api/events                                  "Entered Giveaway"
 
@@ -58,7 +58,8 @@ export async function syncEntrantToKlaviyo(entrantId: string) {
   if (!entrant || entrant.status !== "ACTIVE") return false;
   const { klaviyo: cfg } = parseSettings(entrant.campaign.settings);
   if (!cfg.enabled || !process.env.KLAVIYO_PRIVATE_KEY) return false;
-  if (cfg.onlyConsented && !entrant.marketingConsent) return false;
+  const sms = !!entrant.smsConsentAt && !!entrant.phone;
+  if (cfg.onlyConsented && !entrant.marketingConsent && !sms) return false;
 
   const entries = await entrantTotal(entrant.id);
   const giveaway = entrant.campaign.title;
@@ -67,48 +68,65 @@ export async function syncEntrantToKlaviyo(entrantId: string) {
       type: "profile",
       attributes: {
         email: entrant.email,
+        ...(sms ? { phone_number: entrant.phone } : {}),
         ...splitName(entrant.name),
         properties: {
           "Giveaway Title": giveaway,
           "Giveaway Entries": entries,
           "Giveaway Referral Code": entrant.referralCode,
+          ...(sms ? { "Giveaway SMS Opt-in": true } : {}),
         },
       },
     },
   });
   const profileId = (profile as { data?: { id?: string } } | null)?.data?.id;
 
-  if (cfg.listId) {
-    if (entrant.marketingConsent) {
-      await klaviyo("/profile-subscription-bulk-create-jobs", {
-        data: {
-          type: "profile-subscription-bulk-create-job",
-          attributes: {
-            custom_source: `Giveaway: ${giveaway}`,
-            profiles: {
-              data: [
-                {
-                  type: "profile",
-                  attributes: {
-                    email: entrant.email,
-                    subscriptions: {
-                      email: { marketing: { consent: "SUBSCRIBED" } },
-                    },
+  // Subscribe only the channels the entrant agreed to: email from the sign-up box,
+  // SMS from the text opt-in action. SMS doesn't need a list (Klaviyo records it on
+  // the profile), so it's sent even when no list is set.
+  const email = entrant.marketingConsent && !!cfg.listId;
+  if (email || sms) {
+    await klaviyo("/profile-subscription-bulk-create-jobs", {
+      data: {
+        type: "profile-subscription-bulk-create-job",
+        attributes: {
+          custom_source: `Giveaway: ${giveaway}`,
+          profiles: {
+            data: [
+              {
+                type: "profile",
+                attributes: {
+                  email: entrant.email,
+                  ...(sms ? { phone_number: entrant.phone } : {}),
+                  subscriptions: {
+                    ...(email
+                      ? { email: { marketing: { consent: "SUBSCRIBED" } } }
+                      : {}),
+                    ...(sms
+                      ? { sms: { marketing: { consent: "SUBSCRIBED" } } }
+                      : {}),
                   },
                 },
-              ],
-            },
+              },
+            ],
           },
-          relationships: { list: { data: { type: "list", id: cfg.listId } } },
         },
-      });
-    } else if (profileId) {
-      // No consent (and onlyConsented is off): list membership only, no subscription.
-      await klaviyo(
-        `/lists/${encodeURIComponent(cfg.listId)}/relationships/profiles`,
-        { data: [{ type: "profile", id: profileId }] },
-      );
-    }
+        ...(cfg.listId
+          ? {
+              relationships: {
+                list: { data: { type: "list", id: cfg.listId } },
+              },
+            }
+          : {}),
+      },
+    });
+  }
+  if (cfg.listId && !entrant.marketingConsent && profileId) {
+    // No email consent: list membership only, no email subscription.
+    await klaviyo(
+      `/lists/${encodeURIComponent(cfg.listId)}/relationships/profiles`,
+      { data: [{ type: "profile", id: profileId }] },
+    );
   }
 
   await klaviyo("/events", {

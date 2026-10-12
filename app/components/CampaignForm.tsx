@@ -6,7 +6,7 @@ import {
   type CampaignFormValues,
   type ResourceLabels,
 } from "../lib/campaign-form";
-import { applyRecommended } from "../lib/recommended";
+import { applyRecommended, applyRecommendedDaily } from "../lib/recommended";
 import { ActionsEditor } from "./ActionsEditor";
 import { PurchaseRulesEditor } from "./PurchaseRulesEditor";
 import { SettingsEditor } from "./SettingsEditor";
@@ -44,9 +44,17 @@ export function CampaignForm(props: {
   // Remounts the editors so they pick up the new values.
   const [formKey, setFormKey] = useState(0);
   const recommend = () => {
-    setV((prev) => applyRecommended(prev));
+    setV((prev) =>
+      prev.settings.daily.enabled
+        ? applyRecommendedDaily(prev)
+        : applyRecommended(prev),
+    );
     setFormKey((k) => k + 1);
   };
+
+  const recommendText = v.settings.daily.enabled
+    ? "Fill in Poke-Collect's recommended daily giveaway setup: the 9pm draw and prize rules, text, Discord and Whatnot sign-ups, purchase entries and winner settings. Your title, dates and image stay as they are."
+    : "Fill in Poke-Collect's recommended entries, purchase rules and winner settings. Your title, dates and image stay as they are.";
 
   return (
     <Form method="post" encType="multipart/form-data" key={formKey}>
@@ -55,10 +63,7 @@ export function CampaignForm(props: {
         {props.error && <s-banner tone="critical">{props.error}</s-banner>}
         <s-banner tone="info">
           <s-stack direction="inline" gap="base" alignItems="center">
-            <s-text>
-              Fill in Poke-Collect&apos;s recommended entries, purchase rules
-              and winner settings. Your title, dates and image stay as they are.
-            </s-text>
+            <s-text>{recommendText}</s-text>
             <s-button onClick={recommend}>Use recommended settings</s-button>
           </s-stack>
         </s-banner>
@@ -207,10 +212,7 @@ export function CampaignForm(props: {
         {props.error && <s-banner tone="critical">{props.error}</s-banner>}
         <s-banner tone="info">
           <s-stack direction="inline" gap="base" alignItems="center">
-            <s-text>
-              Fill in Poke-Collect&apos;s recommended entries, purchase rules
-              and winner settings. Your title, dates and image stay as they are.
-            </s-text>
+            <s-text>{recommendText}</s-text>
             <s-button onClick={recommend}>Use recommended settings</s-button>
           </s-stack>
         </s-banner>

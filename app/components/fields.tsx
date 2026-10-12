@@ -36,6 +36,7 @@ export function TextArea(props: {
   onChange: (v: string) => void;
   rows?: number;
   details?: string;
+  placeholder?: string;
 }) {
   const handle = (e: Event) =>
     props.onChange((e.currentTarget as HTMLTextAreaElement).value);
@@ -45,6 +46,7 @@ export function TextArea(props: {
       value={props.value}
       rows={props.rows ?? 3}
       details={props.details}
+      placeholder={props.placeholder}
       onInput={handle}
       onChange={handle}
     />

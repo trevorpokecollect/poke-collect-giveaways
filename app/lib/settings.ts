@@ -85,6 +85,7 @@ export const parseSettings = (raw: unknown): CampaignSettings =>
  * POLL: { question, options: string[] }
  * QUESTION: { question, answer? }  (answer set = quiz, must match case-insensitively)
  * ALTERNATE_ENTRY: { instructions? }  (free method of entry, quoted in the official rules)
+ * SMS_OPTIN: { disclosure? }  (consent wording next to the checkbox; blank = DEFAULT_SMS_DISCLOSURE)
  * DAILY_CHECKIN, SIGNUP, REFERRAL: none
  *
  * Any type may also carry `archived: true`. The editor sets it (with entries 0)
@@ -112,6 +113,7 @@ export const actionConfigSchema = {
     answer: z.string().optional(),
   }),
   ALTERNATE_ENTRY: z.object({ instructions: z.string().optional() }),
+  SMS_OPTIN: z.object({ disclosure: z.string().optional() }),
 } as const;
 
 export const isArchivedAction = (config: unknown) =>

@@ -116,6 +116,14 @@ export const ACTION_META: Record<ActionType, ActionMeta> = {
     single: true,
     help: "The free method of entry quoted in the official rules.",
   },
+  SMS_OPTIN: {
+    name: "Text (SMS) sign-up",
+    defaultLabel: "Get text alerts for drops",
+    defaultEntries: 5,
+    repeatable: false,
+    single: true,
+    help: "Asks for a US mobile number and an unchecked consent box. Entries are awarded only when they agree, and the number is sent to Klaviyo as an SMS subscriber.",
+  },
   CUSTOM: {
     name: "Custom",
     defaultLabel: "Custom action",
@@ -136,6 +144,7 @@ export const ADDABLE_ACTION_TYPES: ActionType[] = [
   "SECRET_CODE",
   "POLL",
   "QUESTION",
+  "SMS_OPTIN",
   "ALTERNATE_ENTRY",
 ];
 
@@ -148,6 +157,7 @@ export interface ActionConfigForm {
   options?: string[];
   answer?: string;
   instructions?: string;
+  disclosure?: string;
 }
 
 export interface ActionForm {
@@ -494,6 +504,7 @@ export function validateActions(actions: ActionForm[]): Result<ActionData[]> {
         question: c.question?.trim() || undefined,
         answer: c.answer?.trim() || undefined,
         instructions: c.instructions?.trim() || undefined,
+        disclosure: c.disclosure?.trim() || undefined,
         options: c.options?.map((o) => o.trim()).filter(Boolean),
         seconds: c.seconds || undefined,
       };

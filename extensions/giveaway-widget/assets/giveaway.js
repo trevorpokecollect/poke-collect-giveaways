@@ -610,6 +610,34 @@
         }, [el("label", { class: "pcg__sr", for: codeId, text: "Secret code" }), el("div", { class: "pcg__row" }, [code, go])]);
       }
 
+      case "SMS_OPTIN": {
+        // The box starts unchecked and the server refuses the entries without it.
+        var telId = nextId("tel");
+        var tel = el("input", { class: "pcg__input", id: telId, type: "tel", inputmode: "tel", autocomplete: "tel-national", placeholder: "(555) 234-5678", maxlength: "20" });
+        var agree = el("input", { type: "checkbox", name: "sms-consent" });
+        var send = el("button", { class: "pcg__btn pcg__btn--small", type: "submit", text: "Sign up" });
+        var root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
+        ctx.button = send;
+        return el("form", {
+          class: "pcg__inline-form pcg__action-body",
+          onsubmit: function (e) {
+            e.preventDefault();
+            if (!tel.value.trim()) { error.textContent = "Enter your mobile number."; tel.focus(); return; }
+            if (!agree.checked) { error.textContent = "Check the box to agree to text messages."; agree.focus(); return; }
+            self.submitAction(a, { phone: tel.value, consent: true }, ctx).catch(function () {});
+          },
+        }, [
+          el("label", { class: "pcg__sr", for: telId, text: "Mobile number" }),
+          el("div", { class: "pcg__row" }, [tel, send]),
+          el("label", { class: "pcg__check" }, [agree, el("span", { class: "pcg__hint", text: cfg.disclosure || "" })]),
+          el("p", { class: "pcg__hint" }, [
+            el("a", { href: root + "policies/terms-of-service", target: "_blank", rel: "noopener", text: "Terms" }),
+            " · ",
+            el("a", { href: root + "policies/privacy-policy", target: "_blank", rel: "noopener", text: "Privacy Policy" }),
+          ]),
+        ]);
+      }
+
       case "WATCH_VIDEO":
         return this.videoBody(a, cfg, ctx);
 
