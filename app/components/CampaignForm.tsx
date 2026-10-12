@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { Form } from "react-router";
 import {
   IMAGE_TYPES,
@@ -11,6 +12,17 @@ import { ActionsEditor } from "./ActionsEditor";
 import { PurchaseRulesEditor } from "./PurchaseRulesEditor";
 import { SettingsEditor } from "./SettingsEditor";
 import { Check, DateTimeInput, TextArea, TextInput } from "./fields";
+import { GiveawayPreview } from "./GiveawayPreview";
+import type { PreviewPrize } from "../lib/preview";
+
+// Two columns on wide screens, with the preview kept in view while scrolling the form.
+const LAYOUT_CSS = `
+.pcg-editor{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.pcg-editor__preview{order:-1}
+@media (min-width:1100px){
+  .pcg-editor{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .pcg-editor__preview{order:0;position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto}
+}`;
 
 // Shared editor for New and Edit. All state is sent as one JSON "payload"
 // field (plus the image file) and validated by app/lib/campaign-form.server.ts.
@@ -21,9 +33,19 @@ export function CampaignForm(props: {
   error?: string;
   archivedCount?: number;
   isEdit?: boolean;
+  // New daily giveaways: pick today's prize before creating it.
+  dailyChooser?: boolean;
+  // Today's prize, shown in the preview of an existing daily giveaway.
+  dailyPrize?: PreviewPrize | null;
 }) {
+  const shopify = useAppBridge();
   const [v, setV] = useState(props.initial);
   const [preview, setPreview] = useState<string | null>(null);
+  // The chosen image as a data URL, which the sandboxed preview frame can load.
+  const [imageData, setImageData] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<
+    (PreviewPrize & { id: string }) | null
+  >(null);
   // Bumped to remount the rules text area when it is filled programmatically.
   const [rulesKey, setRulesKey] = useState(0);
   const set = (patch: Partial<CampaignFormValues>) =>
@@ -59,6 +81,9 @@ export function CampaignForm(props: {
   return (
     <Form method="post" encType="multipart/form-data" key={formKey}>
       <input type="hidden" name="payload" value={JSON.stringify(v)} />
+      <input type="hidden" name="dailyProductId" value={chosen?.id ?? ""} />
+      <style>{LAYOUT_CSS}</style>
+      <div className="pcg-editor">
       <s-stack gap="base">
         {props.error && <s-banner tone="critical">{props.error}</s-banner>}
         <s-banner tone="info">
@@ -104,6 +129,12 @@ export function CampaignForm(props: {
                 onChange={(e) => {
                   const f = e.currentTarget.files?.[0];
                   setPreview(f ? URL.createObjectURL(f) : null);
+                  setImageData(null);
+                  if (f) {
+                    const reader = new FileReader();
+                    reader.onload = () => setImageData(String(reader.result));
+                    reader.readAsDataURL(f);
+                  }
                 }}
               />
               {v.imageUrl && !preview && (
@@ -149,6 +180,52 @@ export function CampaignForm(props: {
             </s-text>
           </s-stack>
         </s-section>
+
+        {props.dailyChooser && v.settings.daily.enabled && (
+          <s-section heading="Today's prize">
+            <s-stack gap="base">
+              {chosen ? (
+                <s-stack direction="inline" gap="base" alignItems="center">
+                  {chosen.imageUrl && (
+                    <s-thumbnail src={chosen.imageUrl} alt={chosen.title} />
+                  )}
+                  <s-text>{chosen.title}</s-text>
+                </s-stack>
+              ) : (
+                <s-paragraph>
+                  Pick the product for today&apos;s draw, or leave it and the
+                  app picks one automatically when the giveaway goes live. From
+                  tomorrow the app picks each day&apos;s prize.
+                </s-paragraph>
+              )}
+              <s-stack direction="inline" gap="base">
+                <s-button
+                  onClick={async () => {
+                    const selected = await shopify.resourcePicker({
+                      type: "product",
+                      action: "select",
+                      multiple: false,
+                    });
+                    const p = selected?.[0];
+                    if (p)
+                      setChosen({
+                        id: p.id,
+                        title: p.title,
+                        imageUrl: p.images?.[0]?.originalSrc ?? null,
+                      });
+                  }}
+                >
+                  {chosen ? "Choose a different product" : "Choose product"}
+                </s-button>
+                {chosen && (
+                  <s-button variant="tertiary" onClick={() => setChosen(null)}>
+                    Let the app pick
+                  </s-button>
+                )}
+              </s-stack>
+            </s-stack>
+          </s-section>
+        )}
 
         <ActionsEditor
           actions={v.actions}
@@ -226,6 +303,20 @@ export function CampaignForm(props: {
           </s-button>
         </s-stack>
       </s-stack>
+      <div className="pcg-editor__preview">
+        <GiveawayPreview
+          values={v}
+          imageUrl={
+            imageData ?? (v.imageUrl && !v.removeImage ? v.imageUrl : null)
+          }
+          dailyPrize={
+            chosen
+              ? { title: chosen.title, imageUrl: chosen.imageUrl }
+              : props.dailyPrize
+          }
+        />
+      </div>
+      </div>
     </Form>
   );
 }

@@ -23,6 +23,7 @@ import {
   slugTaken,
   updateCampaign,
 } from "../lib/campaign-form.server";
+import { currentPrize } from "../lib/daily.server";
 import { isArchivedAction } from "../lib/settings";
 
 // "$id_" keeps this page out of app.campaigns.$id's layout (that page has no
@@ -40,9 +41,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     admin.graphql,
     ruleResourceIds(campaign.purchaseRules),
   );
+  const today = await currentPrize(campaign);
   return {
     id: campaign.id,
     title: campaign.title,
+    dailyPrize: today?.prize
+      ? { title: today.prize.title, imageUrl: today.prize.imageUrl }
+      : null,
     initial: campaignToForm(campaign, resources),
     archivedCount: campaign.actions.filter((a) => isArchivedAction(a.config))
       .length,
@@ -80,12 +85,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function EditCampaign() {
-  const { id, title, initial, archivedCount } = useLoaderData<typeof loader>();
+  const { id, title, initial, archivedCount, dailyPrize } =
+    useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const saving = useNavigation().state === "submitting";
 
   return (
-    <s-page heading={`Edit ${title}`}>
+    <s-page heading={`Edit ${title}`} inlineSize="large">
       <s-link slot="breadcrumb-actions" href={`/app/campaigns/${id}`}>
         {title}
       </s-link>
@@ -96,6 +102,7 @@ export default function EditCampaign() {
         saving={saving}
         error={result?.error}
         archivedCount={archivedCount}
+        dailyPrize={dailyPrize}
         isEdit
       />
     </s-page>

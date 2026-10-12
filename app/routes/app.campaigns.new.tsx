@@ -25,6 +25,7 @@ import {
   readCampaignForm,
   slugTaken,
 } from "../lib/campaign-form.server";
+import { choosePrize } from "../lib/daily.server";
 import { purchaseRulesSchema } from "../lib/entries/rules";
 import { parseSettings } from "../lib/settings";
 import {
@@ -77,8 +78,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
-  const parsed = await readCampaignForm(await request.formData());
+  const { session, admin } = await authenticate.admin(request);
+  const form = await request.formData();
+  const parsed = await readCampaignForm(form);
   if ("error" in parsed) return { error: parsed.error };
   const { data, image } = parsed;
   if (await slugTaken(session.shop, data.slug)) {
@@ -93,6 +95,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       target: campaign.id,
     },
   });
+  // Today's prize, when one was chosen on the form. If it can't be reserved the giveaway
+  // is still created, and the page says why so another product can be chosen there.
+  const productId = String(form.get("dailyProductId") ?? "");
+  if (productId.startsWith("gid://shopify/Product/")) {
+    try {
+      const prize = await choosePrize(campaign, admin, productId);
+      await db.auditLog.create({
+        data: {
+          shop: session.shop,
+          action: "daily.choose",
+          target: campaign.id,
+          data: { prizeId: prize.id },
+        },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Couldn't reserve that product.";
+      return redirect(
+        `/app/campaigns/${campaign.id}?prizeError=${encodeURIComponent(msg)}`,
+      );
+    }
+  }
   return redirect(`/app/campaigns/${campaign.id}`);
 };
 
@@ -102,8 +125,12 @@ export default function NewCampaign() {
   const saving = useNavigation().state === "submitting";
 
   return (
-    <s-page heading={daily ? "New daily giveaway" : "New giveaway"}>
+    <s-page
+      heading={daily ? "New daily giveaway" : "New giveaway"}
+      inlineSize="large"
+    >
       <CampaignForm
+        dailyChooser
         initial={initial}
         submitLabel="Create giveaway"
         saving={saving}

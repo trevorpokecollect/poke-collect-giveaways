@@ -1,4 +1,4 @@
-import { useFetcher } from "react-router";
+import { useFetcher, useSearchParams } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 
 // The daily draw on the giveaway page: today's prize and the recent daily prizes,
@@ -43,6 +43,9 @@ export function DailySection({ daily }: { daily: DailyData }) {
     message?: string;
   }>();
   const busy = fetcher.state !== "idle";
+  // Set when the prize chosen on the new giveaway form couldn't be reserved.
+  const [params] = useSearchParams();
+  const createError = fetcher.data ? null : params.get("prizeError");
   const submit = (data: Record<string, string>) =>
     fetcher.submit(data, { method: "post" });
   const current = daily.prizes.find((p) => p.id === daily.currentId) ?? null;
@@ -56,6 +59,11 @@ export function DailySection({ daily }: { daily: DailyData }) {
   return (
     <s-section heading="Daily draw">
       <s-stack gap="base">
+        {createError && (
+          <s-banner tone="critical">
+            Today&apos;s prize wasn&apos;t set: {createError}
+          </s-banner>
+        )}
         {fetcher.data?.error && (
           <s-banner tone="critical">{fetcher.data.error}</s-banner>
         )}

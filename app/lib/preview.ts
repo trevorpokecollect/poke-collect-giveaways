@@ -1,0 +1,71 @@
+import type { CampaignFormValues } from "./campaign-form";
+import { periodFor } from "./daily";
+import { parseLocalDateTime } from "./time";
+import { isArchived, publicAction, visibleActions } from "./entries/actions";
+
+// What the storefront widget would get from /apps/giveaways/<slug>, built from the editor's
+// unsaved values, so the admin preview renders the real widget without a live giveaway.
+
+export interface PreviewPrize {
+  title: string;
+  imageUrl: string | null;
+}
+
+export function previewData(
+  v: CampaignFormValues,
+  opts: {
+    imageUrl: string | null;
+    entered: boolean;
+    dailyPrize?: PreviewPrize | null;
+    now?: Date;
+  },
+) {
+  const actions = visibleActions(
+    v.actions
+      .filter((a) => !isArchived(a))
+      .map((a) => ({ ...a, id: a.id ?? a.key })),
+  ).map(publicAction);
+  const signup = v.actions.find((a) => a.type === "SIGNUP")?.entries ?? 1;
+  const daily = v.settings.daily;
+  const now = opts.now ?? new Date();
+  return {
+    linkedToken: null,
+    linked: null,
+    campaign: {
+      title: v.title || "Untitled giveaway",
+      description: v.description,
+      prize: v.prize,
+      imageUrl: opts.imageUrl,
+      endsAt: v.endsAt
+        ? (parseLocalDateTime(v.endsAt, v.timezone)?.toISOString() ?? null)
+        : null,
+      rulesText: v.rulesText,
+      requireEmailConsent: v.settings.requireEmailConsent,
+      actions,
+    },
+    turnstileSiteKey: null,
+    entrant: opts.entered
+      ? {
+          state: "active",
+          referralCode: "preview",
+          entries: signup,
+          breakdown: { signup, actions: 0, purchases: 0, referrals: 0, other: 0 },
+          completedActionIds: [],
+          answers: {},
+          pollResults: {},
+          quizAttemptsLeft: {},
+        }
+      : null,
+    daily: daily.enabled
+      ? {
+          drawAt: periodFor(now, v.timezone, daily.drawTime).drawAt.toISOString(),
+          prize: opts.dailyPrize
+            ? { ...opts.dailyPrize, value: 0, url: null }
+            : null,
+          yourEntries: opts.entered ? signup : null,
+          lastWinner: null,
+        }
+      : null,
+    leaderboard: null,
+  };
+}
