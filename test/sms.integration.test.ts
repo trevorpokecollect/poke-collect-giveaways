@@ -8,6 +8,8 @@ describe.skipIf(!enabled)("SMS opt-in", async () => {
   const { completeAction } = await import("../app/lib/entries/actions.server");
   const { issueEntrantToken } = await import("../app/lib/token.server");
   const { syncEntrantToKlaviyo } = await import("../app/lib/klaviyo.server");
+  const { signup } = await import("../app/lib/entries/signup.server");
+  const { verifyEntrant } = await import("../app/lib/entries/actions.server");
 
   const shop = `sms-${Date.now()}.myshopify.com`;
   let actionId = "";
@@ -118,5 +120,42 @@ describe.skipIf(!enabled)("SMS opt-in", async () => {
     });
     expect(job.data.relationships).toBeUndefined();
     delete process.env.KLAVIYO_PRIVATE_KEY;
+  });
+
+  it("takes the number on the sign-up form and awards it once verified", async () => {
+    const codes: string[] = [];
+    const spy = vi.spyOn(console, "info").mockImplementation((m: string) => {
+      const match = /verification code is (\d{6})/.exec(m);
+      if (match) codes.push(match[1]);
+    });
+    const base = {
+      shop,
+      campaignSlug: "daily",
+      email: "ash.ketchum@gmail.com",
+      ip: "198.51.100.7",
+      elapsedMs: 8000,
+      userAgent: "vitest",
+      smsConsent: true,
+    };
+    expect(await signup({ ...base, phone: "12" })).toMatchObject({
+      ok: false,
+      status: 400,
+    });
+    expect(await signup({ ...base, phone: "(555) 987-6543" })).toMatchObject({
+      ok: true,
+      state: "verify",
+    });
+    const v = await verifyEntrant(shop, "daily", base.email, codes.at(-1)!);
+    expect(v).toMatchObject({ ok: true, state: "active", entries: 1 + 5 });
+    const ash = await db.entrant.findFirstOrThrow({
+      where: { emailNormalized: "ashketchum@gmail.com", campaign: { shop } },
+    });
+    expect(ash.phone).toBe("+15559876543");
+    const again = await completeAction(v.ok ? v.token : "", actionId, {
+      phone: "(555) 987-6543",
+      consent: true,
+    });
+    expect(again).toMatchObject({ ok: true, awarded: false, entries: 6 });
+    spy.mockRestore();
   });
 });

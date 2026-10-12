@@ -73,11 +73,6 @@ const ACTIONS: Recommended[] = [
       ],
     },
   },
-  {
-    type: "ALTERNATE_ENTRY",
-    label: "No purchase necessary: free entry",
-    entries: 1,
-  },
 ];
 
 // The daily popup is kept short: sign-ups that each grow a channel Poke-Collect owns,
@@ -112,11 +107,6 @@ const DAILY_ACTIONS: Recommended[] = [
     config: { code: "WHATNOT" },
   },
   { type: "REFERRAL", label: "Refer a friend", entries: 3 },
-  {
-    type: "ALTERNATE_ENTRY",
-    label: "No purchase necessary: free entry",
-    entries: 1,
-  },
 ];
 
 const sameAction = (

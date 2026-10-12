@@ -23,6 +23,8 @@ import { queueKlaviyoSync } from "../klaviyo.server";
 import { emitWebhook } from "../webhook-out.server";
 import { award, entrantTotal } from "./ledger.server";
 import { slugify } from "../slug";
+import { normalizeUsPhone } from "../phone";
+import { isArchived } from "./actions";
 
 export interface SignupInput {
   shop: string;
@@ -40,6 +42,9 @@ export interface SignupInput {
   /** Set when the visitor is signed in to a Shopify customer account (verified via app proxy). */
   shopifyCustomerId?: string;
   marketingConsent?: boolean;
+  /** Optional mobile number from the sign-up form; only kept when smsConsent is true. */
+  phone?: string;
+  smsConsent?: boolean;
   utm?: Record<string, string>;
 }
 
@@ -115,6 +120,16 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
   const email = input.email.trim();
   if (!isValidEmailSyntax(email))
     return { ok: false, error: "Please enter a valid email.", status: 400 };
+  let phone: string | null = null;
+  if (input.smsConsent && input.phone?.trim()) {
+    phone = normalizeUsPhone(input.phone);
+    if (!phone)
+      return {
+        ok: false,
+        error: "Enter a valid US mobile number, or leave it blank.",
+        status: 400,
+      };
+  }
 
   const ipHash = hashId(input.ip);
   const subnetHash = hashId(subnetOf(input.ip));
@@ -228,6 +243,11 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
       userAgent: input.userAgent?.slice(0, 300) ?? null,
       utm: input.utm ?? undefined,
       marketingConsent: !!input.marketingConsent,
+      // A number already entered by someone else is dropped rather than refused, so the
+      // sign-up still goes through (and doesn't reveal who else entered).
+      ...(phone && !(await phoneTaken(campaign.id, phone))
+        ? { phone, smsConsentAt: new Date() }
+        : {}),
       riskSignals: {
         create: scored.map((s) => ({
           code: s.code,
@@ -255,6 +275,12 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
     entries: await entrantTotal(entrant.id),
   };
 }
+
+const phoneTaken = async (campaignId: string, phone: string) =>
+  !!(await db.entrant.findFirst({
+    where: { campaignId, phone },
+    select: { id: true },
+  }));
 
 async function returning(
   campaign: Campaign,
@@ -329,6 +355,21 @@ export async function activate(entrantId: string) {
         dedupeKey: `referral:${entrant.id}`,
       });
     }
+  }
+  // Texts agreed to on the sign-up form earn the SMS opt-in action's entries, with the
+  // same dedupe key as completing that action, so they can't be earned twice.
+  const smsAction = entrant.campaign.actions.find(
+    (a) => a.type === "SMS_OPTIN" && !isArchived(a),
+  );
+  if (entrant.smsConsentAt && entrant.phone && smsAction) {
+    await award({
+      campaignId: entrant.campaignId,
+      entrantId,
+      entries: smsAction.entries,
+      source: "ACTION",
+      actionId: smsAction.id,
+      dedupeKey: `action:${smsAction.id}:${entrantId}`,
+    });
   }
   queueKlaviyoSync(entrantId);
   emitWebhook(entrant.campaignId, "entrant.activated", { entrantId });

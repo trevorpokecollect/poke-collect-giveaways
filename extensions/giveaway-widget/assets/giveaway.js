@@ -5,7 +5,6 @@
   var TOKEN_KEY = "pcg:token:";
   var DEVICE_KEY = "pcg:device";
   var VIDEO_KEY = "pcg:video:";
-  var AMOE_KEY = "pcg:amoe:";
   // Completed from elsewhere in the widget, never from the action list.
   var NOT_LISTED = { REFERRAL: 1, ALTERNATE_ENTRY: 1, SIGNUP: 1 };
 
@@ -78,6 +77,39 @@
     { id: "copy", label: "Copy link" },
   ];
 
+  // Brand icons for follow/join buttons (same shapes as the storefront's Social Follow Band).
+  var ICONS = {
+    whatnot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="13.5" rx="3"/><path d="M10 9.2v5.1l4.4-2.55z" fill="currentColor"/><path d="M8 21.5h8"/></svg>',
+    discord: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.6 5.3A17 17 0 0 0 15.4 4l-.5 1.1a15.6 15.6 0 0 0-5.8 0L8.6 4a17 17 0 0 0-4.2 1.3C1.8 9.2 1.1 13 1.4 16.7a17 17 0 0 0 5.2 2.6l1.1-1.8c-.6-.2-1.2-.5-1.7-.9l.4-.3a12.2 12.2 0 0 0 11.2 0l.4.3c-.5.4-1.1.7-1.7.9l1.1 1.8a17 17 0 0 0 5.2-2.6c.4-4.3-.7-8-3-11.4zM8.7 14.5c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1zm6.6 0c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1z"/></svg>',
+    youtube: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.5 7.2a3 3 0 0 0-2.1-2.1C18.5 4.6 12 4.6 12 4.6s-6.5 0-8.4.5a3 3 0 0 0-2.1 2.1C1 9.1 1 12 1 12s0 2.9.5 4.8a3 3 0 0 0 2.1 2.1c1.9.5 8.4.5 8.4.5s6.5 0 8.4-.5a3 3 0 0 0 2.1-2.1c.5-1.9.5-4.8.5-4.8s0-2.9-.5-4.8zM9.8 15.1V8.9l5.4 3.1z"/></svg>',
+    instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none"/></svg>',
+    facebook: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.6 21.9v-7.7h2.6l.4-3h-3V9.3c0-.9.3-1.5 1.5-1.5h1.6V5.1c-.3 0-1.2-.1-2.3-.1-2.3 0-3.9 1.4-3.9 4v2.2H7.9v3h2.6v7.7z"/></svg>',
+    tiktok: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 2.5h-3.3v12.7a2.8 2.8 0 1 1-2-2.7V9.1a6.1 6.1 0 1 0 5.3 6V8.6a7.6 7.6 0 0 0 4.4 1.4V6.7a4.4 4.4 0 0 1-4.4-4.2z"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.9zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg>',
+    other: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 1 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 1 0 5.7 5.7l1-1"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  };
+  var PLATFORMS = [
+    ["whatnot", /(^|\.)whatnot\.com$/], ["discord", /(^|\.)discord\.(gg|com)$/], ["youtube", /(^|\.)(youtube\.com|youtu\.be)$/],
+    ["instagram", /(^|\.)instagram\.com$/], ["facebook", /(^|\.)(facebook\.com|fb\.com)$/], ["tiktok", /(^|\.)tiktok\.com$/],
+    ["x", /(^|\.)(x\.com|twitter\.com)$/],
+  ];
+  function icon(name) {
+    var span = el("span", { class: "pcg__ic", "aria-hidden": "true" });
+    span.innerHTML = ICONS[name] || ICONS.other;
+    return span;
+  }
+  // "whatnot", "discord", ... for follow/visit actions pointing at a social site; null otherwise.
+  function platformOf(a) {
+    if (a.type !== "SOCIAL_FOLLOW" && a.type !== "VISIT_URL") return null;
+    var url = (a.config && a.config.url) || a.url;
+    var host = "";
+    try { host = new URL(url).hostname.toLowerCase(); } catch (e) { return a.type === "SOCIAL_FOLLOW" ? "other" : null; }
+    for (var i = 0; i < PLATFORMS.length; i++) if (PLATFORMS[i][1].test(host)) return PLATFORMS[i][0];
+    return a.type === "SOCIAL_FOLLOW" ? "other" : null;
+  }
+  function entriesText(n) { return "+" + n + plural(n, " entry", " entries"); }
+
   function Widget(root) {
     this.root = root;
     // A blank link name means the newest open giveaway.
@@ -118,10 +150,8 @@
         // Lets the daily popup launcher show the prize and countdown without a second request.
         self.root.dispatchEvent(new CustomEvent("pcg:loaded", { bubbles: true, detail: data }));
         var entrant = data.entrant;
-        if (entrant && entrant.state === "active") {
-          self.renderEntrant(entrant);
-          self.flushAlternateEntry().catch(function () { /* stays saved; retried on the next load */ });
-        } else if (entrant && entrant.state === "held") self.renderHeld();
+        if (entrant && entrant.state === "active") self.renderEntrant(entrant);
+        else if (entrant && entrant.state === "held") self.renderHeld();
         else self.renderSignup();
       })
       .catch(function (err) {
@@ -268,15 +298,51 @@
     ]);
   };
 
+  // Signing up is free, so that is the free method of entry; the rules spell out the details.
   Widget.prototype.footer = function () {
-    var self = this;
     var c = this.data.campaign;
-    var free = el("p", { class: "pcg__free" }, [
-      "No purchase necessary. ",
-      el("button", { class: "pcg__link", type: "button", text: "Free alternate entry", onclick: function () { self.openAlternateEntry(); } }),
+    if (!c.rulesText) return el("p", { class: "pcg__footer pcg__free", text: "No purchase necessary to enter or win." });
+    return el("details", { class: "pcg__footer pcg__rules" }, [
+      el("summary", {}, [el("span", { text: "No purchase necessary" }), el("span", { "aria-hidden": "true", text: " · " }), el("u", { text: "Official rules" })]),
+      el("p", { text: c.rulesText }),
     ]);
-    var rules = c.rulesText ? el("details", { class: "pcg__rules" }, [el("summary", { text: "Official rules" }), el("p", { text: c.rulesText })]) : null;
-    return el("div", { class: "pcg__footer" }, [free, rules]);
+  };
+
+  Widget.prototype.smsAction = function () {
+    return this.data.campaign.actions.filter(function (a) { return a.type === "SMS_OPTIN"; })[0] || null;
+  };
+
+  // Follow / join buttons in the brand's colors, with the entries on the button. Before sign-up
+  // they're a preview: clicking one points the visitor at the email box.
+  Widget.prototype.socialGrid = function (actions, entrant, done, locked) {
+    var self = this;
+    return el("ul", { class: "pcg__socials", role: "list" }, actions.map(function (a) {
+      var platform = platformOf(a);
+      var finished = !!done[a.id];
+      var error = el("p", { class: "pcg__error", role: "alert" });
+      var pts = el("span", { class: "pcg__soc-pts" }, finished ? [icon("check"), document.createTextNode(" +" + a.entries)] : [document.createTextNode("+" + a.entries)]);
+      var btn = el("button", {
+        class: "pcg__soc pcg__soc--" + platform + (finished ? " pcg__soc--done" : ""),
+        type: "button",
+        "aria-label": a.label + ", " + (finished ? "done, " : "") + entriesText(a.entries),
+        onclick: function () {
+          var url = (a.config && a.config.url) || a.url;
+          if (!entrant) { self.focusEmail("Enter your email first, then tap to earn " + entriesText(a.entries) + "."); return; }
+          if (url) window.open(url, "_blank", "noopener");
+          if (finished) return;
+          if (locked) { error.textContent = "Complete the required step first to unlock this one."; return; }
+          self.submitAction(a, {}, { error: error, button: btn }).catch(function () {});
+        },
+      }, [icon(platform), el("span", { class: "pcg__soc-name", text: a.label }), pts]);
+      return el("li", {}, [btn, error]);
+    }));
+  };
+
+  Widget.prototype.focusEmail = function (text) {
+    var input = this.root.querySelector("input[type=email]");
+    var err = this.root.querySelector(".pcg__form > .pcg__error");
+    if (err) err.textContent = text;
+    if (input) { input.focus(); input.scrollIntoView({ block: "center", behavior: "smooth" }); }
   };
 
   Widget.prototype.mountTurnstile = function (box, onToken) {
@@ -304,6 +370,8 @@
       name: fields.name,
       website: fields.website,
       consent: fields.consent,
+      phone: fields.phone,
+      smsConsent: fields.smsConsent,
       ref: this.ref,
       turnstileToken: fields.turnstileToken,
       elapsedMs: Date.now() - this.renderedAt,
@@ -322,8 +390,29 @@
     var consent = el("input", { type: "checkbox", name: "consent" });
     var turnstileBox = el("div");
     var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
-    var button = el("button", { class: "pcg__btn", type: "submit", text: "Enter giveaway" });
+    var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", text: this.data.daily ? "Enter today's giveaway" : "Enter giveaway" });
     var turnstileToken = "";
+
+    // Texts: an optional number plus an unchecked consent box, worth the SMS action's entries.
+    var sms = this.smsAction();
+    var phone = null, smsConsent = null, smsBox = null;
+    if (sms) {
+      var phoneId = nextId("tel");
+      var root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
+      phone = el("input", { class: "pcg__input", id: phoneId, type: "tel", name: "phone", inputmode: "tel", autocomplete: "tel-national", placeholder: "(555) 234-5678", maxlength: "20" });
+      smsConsent = el("input", { type: "checkbox", name: "sms-consent" });
+      smsBox = el("div", { class: "pcg__sms" }, [
+        el("label", { class: "pcg__label", for: phoneId }, [document.createTextNode("Mobile number (optional) "), el("span", { class: "pcg__pts", text: entriesText(sms.entries) })]),
+        phone,
+        el("label", { class: "pcg__check pcg__check--fine" }, [smsConsent, el("span", {}, [
+          (sms.config && sms.config.disclosure) || "",
+          " ",
+          el("a", { href: root + "policies/terms-of-service", target: "_blank", rel: "noopener", text: "Terms" }),
+          " · ",
+          el("a", { href: root + "policies/privacy-policy", target: "_blank", rel: "noopener", text: "Privacy" }),
+        ])]),
+      ]);
+    }
 
     var form = el("form", {
       class: "pcg__form",
@@ -331,8 +420,12 @@
       onsubmit: function (e) {
         e.preventDefault();
         if (!email.value) { err.textContent = "Please enter your email."; email.focus(); return; }
+        if (phone && phone.value.trim() && !smsConsent.checked) { err.textContent = "Check the box to agree to texts, or leave the number blank."; smsConsent.focus(); return; }
         button.disabled = true;
-        self.signup({ email: email.value, name: name.value, website: honeypot.value, consent: consent.checked, turnstileToken: turnstileToken })
+        self.signup({
+          email: email.value, name: name.value, website: honeypot.value, consent: consent.checked, turnstileToken: turnstileToken,
+          phone: phone && smsConsent.checked ? phone.value : undefined, smsConsent: !!(smsConsent && smsConsent.checked && phone.value.trim()),
+        })
           .catch(function (e2) {
             err.textContent = e2.message;
             button.disabled = false;
@@ -345,13 +438,21 @@
       el("label", { class: "pcg__label", for: nameId, text: "Name (optional)" }),
       name,
       el("div", { class: "pcg__hp", "aria-hidden": "true" }, [el("label", { text: "Website" }), honeypot]),
-      el("label", { class: "pcg__check" }, [consent, el("span", { text: "Send me news and drops by email." })]),
+      el("label", { class: "pcg__check" }, [consent, el("span", { text: "Email me deals, drops and stream alerts." })]),
+      smsBox,
       turnstileBox,
       err,
       button,
     ]);
 
-    this.show(this.header().concat([form], this.extras()));
+    // A preview of the follow/join buttons, so visitors see what else they can earn.
+    var socials = this.data.campaign.actions.filter(function (a) { return platformOf(a); });
+    var preview = socials.length ? [
+      el("h3", { class: "pcg__subheading", text: "Then earn bonus entries" }),
+      this.socialGrid(socials, null, {}, true),
+    ] : [];
+
+    this.show(this.header().concat([el("div", { class: "pcg__box" }, [form])], preview, this.extras()));
     this.mountTurnstile(turnstileBox, function (t) { turnstileToken = t; });
   };
 
@@ -438,8 +539,10 @@
     var self = this;
     var done = {};
     (entrant.completedActionIds || []).forEach(function (id) { done[id] = true; });
-    var actions = this.data.campaign.actions.filter(function (a) { return !NOT_LISTED[a.type]; });
-    var requiredLeft = actions.filter(function (a) { return a.mandatory && !done[a.id]; });
+    var all = this.data.campaign.actions.filter(function (a) { return !NOT_LISTED[a.type]; });
+    var requiredLeft = all.filter(function (a) { return a.mandatory && !done[a.id]; });
+    var socials = all.filter(function (a) { return platformOf(a) && !a.mandatory; });
+    var actions = all.filter(function (a) { return socials.indexOf(a) === -1; });
 
     var nodes = this.header().concat([
       el("div", { class: "pcg__count", role: "status", "aria-live": "polite" }, [
@@ -452,12 +555,13 @@
       this.breakdown(entrant),
     ]);
 
-    if (actions.length) {
+    if (all.length) {
       nodes.push(el("h3", { class: "pcg__subheading", text: "Earn more entries" }));
       if (requiredLeft.length) {
         nodes.push(el("p", { class: "pcg__note", text: "Complete the required " + plural(requiredLeft.length, "action", "actions") + " first to unlock the rest." }));
       }
-      nodes.push(el("ul", { class: "pcg__actions" }, actions.map(function (a) {
+      if (socials.length) nodes.push(this.socialGrid(socials, entrant, done, requiredLeft.length > 0));
+      if (actions.length) nodes.push(el("ul", { class: "pcg__actions" }, actions.map(function (a) {
         return self.actionItem(a, entrant, !!done[a.id], !a.mandatory && requiredLeft.length > 0);
       })));
     }
@@ -508,7 +612,6 @@
   };
 
   Widget.prototype.actionItem = function (a, entrant, isDone, locked) {
-    var self = this;
     var cfg = a.config || {};
     var repeats = a.type === "DAILY_CHECKIN" || a.repeatable;
     var finished = isDone && !repeats;
@@ -727,101 +830,6 @@
       el("div", { class: "pcg__row" }, [input, copy]),
       this.shareButtons("any", null),
     ]);
-  };
-
-  // ---- Alternate entry (no purchase necessary) ----
-
-  Widget.prototype.alternateAction = function () {
-    return this.data.campaign.actions.filter(function (a) { return a.type === "ALTERNATE_ENTRY"; })[0] || null;
-  };
-
-  Widget.prototype.openAlternateEntry = function () {
-    var self = this;
-    var amoe = this.alternateAction();
-    var entrant = this.data.entrant && this.data.entrant.state === "active" ? this.data.entrant : null;
-    var already = amoe && entrant && (entrant.completedActionIds || []).indexOf(amoe.id) !== -1;
-    var titleId = nextId("amoe");
-    var err = el("p", { class: "pcg__error", role: "alert" });
-    var fields = [];
-    var email, name, address;
-    var turnstileToken = "";
-    var turnstileBox = el("div");
-
-    if (!entrant) {
-      var emailId = nextId("ae");
-      var nameId = nextId("an");
-      email = el("input", { class: "pcg__input", id: emailId, type: "email", required: true, autocomplete: "email" });
-      name = el("input", { class: "pcg__input", id: nameId, type: "text", required: true, autocomplete: "name" });
-      fields.push(el("label", { class: "pcg__label", for: nameId, text: "Full name" }), name, el("label", { class: "pcg__label", for: emailId, text: "Email" }), email);
-    }
-    if (amoe && !already) {
-      var addrId = nextId("aa");
-      address = el("textarea", { class: "pcg__input", id: addrId, rows: "3", required: true, autocomplete: "street-address" });
-      fields.push(el("label", { class: "pcg__label", for: addrId, text: "Mailing address" }), address);
-    }
-
-    var intro = already
-      ? "You've already used your free alternate entry. Thanks!"
-      : "You don't need to buy anything to enter or win. Making a purchase doesn't improve your chances beyond the entries listed in the official rules." +
-        (amoe ? " Send this form to get " + amoe.entries + plural(amoe.entries, " free entry", " free entries") + "." : entrant ? " You're already entered." : " Fill this in to enter free.");
-
-    var submit = el("button", { class: "pcg__btn", type: "submit", text: "Send free entry" });
-    var close = el("button", { class: "pcg__dialog-close", type: "button", "aria-label": "Close", text: "×" });
-    var form = el("form", { class: "pcg__form", novalidate: true }, fields.concat([turnstileBox, err, fields.length ? submit : null]));
-    var dialog = el("dialog", { class: "pcg__dialog", "aria-labelledby": titleId }, [
-      close,
-      el("h3", { class: "pcg__subheading", id: titleId, text: "Free alternate entry" }),
-      el("p", { class: "pcg__note", text: intro }),
-      amoe && amoe.config && amoe.config.instructions ? el("p", { class: "pcg__note", text: amoe.config.instructions }) : null,
-      form,
-    ]);
-
-    function done(text) {
-      form.replaceChildren(el("p", { class: "pcg__note", role: "status", text: text }));
-    }
-
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      if (email && !email.value) { err.textContent = "Please enter your email."; email.focus(); return; }
-      if (address && address.value.trim().length < 5) { err.textContent = "Please enter your mailing address."; address.focus(); return; }
-      submit.disabled = true;
-      err.textContent = "";
-      if (address) store(AMOE_KEY + self.slug, address.value.trim());
-      var p = entrant
-        ? self.flushAlternateEntry()
-        : self.signup({ email: email.value, name: name.value, turnstileToken: turnstileToken });
-      p.then(function () {
-        done(entrant || store(self.tokenKey) ? "Thanks! Your free entry has been received." : "Check your email for a code to confirm your entry.");
-      }).catch(function (e2) { err.textContent = e2.message; submit.disabled = false; });
-    });
-    close.addEventListener("click", function () { dialog.close(); });
-    dialog.addEventListener("close", function () { dialog.remove(); });
-    // Clicking the backdrop closes it too.
-    dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
-
-    this.root.appendChild(dialog);
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
-    if (!entrant) this.mountTurnstile(turnstileBox, function (t) { turnstileToken = t; });
-    var first = form.querySelector("input, textarea");
-    if (first) first.focus();
-  };
-
-  // Completes a pending alternate entry once the entrant is active (right away, or after verifying).
-  Widget.prototype.flushAlternateEntry = function () {
-    var self = this;
-    var key = AMOE_KEY + this.slug;
-    var address = store(key);
-    var amoe = this.alternateAction();
-    if (!address || !amoe) { store(key, null); return Promise.resolve(); }
-    return this.request("POST", { intent: "action", actionId: amoe.id, answer: address }).then(function () {
-      store(key, null);
-      return self.load();
-    }, function (err) {
-      // The server said no (rather than the network failing), so don't retry it on every load.
-      if (err.data) store(key, null);
-      throw err;
-    });
   };
 
   function boot() {

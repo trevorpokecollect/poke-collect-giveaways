@@ -114,7 +114,7 @@ export const ACTION_META: Record<ActionType, ActionMeta> = {
     defaultEntries: 1,
     repeatable: false,
     single: true,
-    help: "The free method of entry quoted in the official rules.",
+    help: "Only needed for a mail-in method: the instructions are quoted in the official rules. Signing up is already free, so the storefront doesn't show this as a button.",
   },
   SMS_OPTIN: {
     name: "Text (SMS) sign-up",
@@ -723,13 +723,19 @@ export function generateOfficialRules(values: CampaignFormValues): string {
   const purchases = values.rules.enabled;
   const claimDays = values.settings.winnerEmail.claimDays;
 
-  const freeMethod = amoe
-    ? `${amoe.config.instructions?.trim() || "Complete the free alternate entry on the giveaway page."} This free method earns ${entriesWord(amoe.entries)}${
+  // Signing up on the giveaway page is free, so it is the free method of entry unless the
+  // merchant adds separate instructions (e.g. a mail-in address) on an alternate entry action.
+  const freeMethod = amoe?.config.instructions?.trim()
+    ? `${amoe.config.instructions.trim()} This free method earns ${entriesWord(amoe.entries)}${
         purchases
           ? ", and no purchase is required to receive the same opportunity to win as entrants who make a purchase"
           : ""
       }.`
-    : "Sign up for free on the giveaway page.";
+    : `Sign up for free with your email on the giveaway page. No purchase is required, and free entrants can earn bonus entries through the free actions listed below${
+        purchases
+          ? "; a purchase does not give a better chance of winning than the entries described in these rules"
+          : ""
+      }.`;
 
   const sections = [
     `${title.toUpperCase()} – OFFICIAL RULES`,
