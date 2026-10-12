@@ -46,6 +46,9 @@ export default function Index() {
       >
         New giveaway
       </s-button>
+      <s-button slot="secondary-actions" href="/app/campaigns/new?type=daily">
+        New daily giveaway
+      </s-button>
 
       {campaigns.length === 0 ? (
         <s-section>
@@ -55,9 +58,14 @@ export default function Index() {
               Every entry is checked for bots automatically, and purchases earn
               entries based on rules you set.
             </s-paragraph>
-            <s-button variant="primary" href="/app/campaigns/new">
-              Create a giveaway
-            </s-button>
+            <s-stack direction="inline" gap="base">
+              <s-button variant="primary" href="/app/campaigns/new">
+                Create a giveaway
+              </s-button>
+              <s-button href="/app/campaigns/new?type=daily">
+                Create a daily giveaway
+              </s-button>
+            </s-stack>
           </s-stack>
         </s-section>
       ) : (

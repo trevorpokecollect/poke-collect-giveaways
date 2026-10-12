@@ -26,15 +26,19 @@ import {
 } from "../lib/campaign-form.server";
 import { purchaseRulesSchema } from "../lib/entries/rules";
 import { parseSettings } from "../lib/settings";
-import { applyRecommended } from "../lib/recommended";
+import { applyRecommended, applyRecommendedDaily } from "../lib/recommended";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
-  const initial: CampaignFormValues = applyRecommended({
-    title: "",
-    prize: "",
+  // ?type=daily starts a daily giveaway (draw on, daily recommended settings).
+  const daily = new URL(request.url).searchParams.get("type") === "daily";
+  const blank: CampaignFormValues = {
+    title: daily ? "Poke-Collect Daily Giveaway" : "",
+    prize: daily
+      ? "A new sealed product or English single every day ($70 to $100 value)"
+      : "",
     description: "",
-    slug: "",
+    slug: daily ? "daily-giveaway" : "",
     startsAt: "",
     endsAt: "",
     timezone: DEFAULT_TIMEZONE,
@@ -46,8 +50,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     rules: rulesToForm(purchaseRulesSchema.parse({}), DEFAULT_TIMEZONE),
     settings: parseSettings(null),
     resources: {},
-  });
-  return { initial };
+  };
+  const initial = daily
+    ? applyRecommendedDaily(blank)
+    : applyRecommended(blank);
+  return { initial, daily };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -71,12 +78,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function NewCampaign() {
-  const { initial } = useLoaderData<typeof loader>();
+  const { initial, daily } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const saving = useNavigation().state === "submitting";
 
   return (
-    <s-page heading="New giveaway">
+    <s-page heading={daily ? "New daily giveaway" : "New giveaway"}>
       <CampaignForm
         initial={initial}
         submitLabel="Create giveaway"
