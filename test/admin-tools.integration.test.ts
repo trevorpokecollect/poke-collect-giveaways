@@ -154,4 +154,30 @@ describe.skipIf(!enabled)("admin data tools", async () => {
     expect(a.utm).toEqual([{ source: "(direct)", count: 2 }]);
     expect(a.conversion).toMatchObject({ buyers: 1, formEntrants: 0 });
   });
+  it("tops up to a newer export's totals without ever lowering them", async () => {
+    const newer = [
+      "Email,Name,Total Entries",
+      "misty@example.com,Misty,40",
+      "brock@example.com,Brock,5",
+    ].join("\n");
+    expect(await previewImport(campaignId, parseImport(newer))).toMatchObject({
+      entriesToAdd: 15,
+    });
+    expect(await runImport(campaignId, parseImport(newer))).toEqual({
+      created: 0,
+      awarded: 1,
+      entries: 15,
+    });
+    expect(await runImport(campaignId, parseImport(newer))).toMatchObject({
+      awarded: 0,
+    });
+    const misty = await db.entrant.findFirstOrThrow({
+      where: { campaignId, emailNormalized: "misty@example.com" },
+    });
+    const imported = await db.entryEvent.aggregate({
+      where: { entrantId: misty.id, source: "IMPORT" },
+      _sum: { entries: true },
+    });
+    expect(imported._sum.entries).toBe(40);
+  });
 });

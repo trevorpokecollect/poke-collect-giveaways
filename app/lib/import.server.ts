@@ -147,8 +147,11 @@ export function parseImport(text: string): ParsedImport {
   return { rows: [...byEmail.values()], errors, duplicates, columns };
 }
 
-export const importDedupeKey = (emailNormalized: string) =>
-  `import:${emailNormalized}`;
+// One key per imported total, so re-importing the same file is a no-op while
+// a newer export with a higher total only adds the difference. Totals never
+// go down: entries earned here after the switch are never removed.
+export const importDedupeKey = (emailNormalized: string, total: number) =>
+  `import:${emailNormalized}:${total}`;
 
 const CHUNK = 500;
 const chunks = <T>(items: T[]) =>
@@ -156,35 +159,45 @@ const chunks = <T>(items: T[]) =>
     items.slice(i * CHUNK, (i + 1) * CHUNK),
   );
 
+type Db = Pick<typeof db, "entrant" | "entryEvent">;
+
+/** Entries already imported per normalized email for these rows. */
+async function importedSoFar(client: Db, campaignId: string, emails: string[]) {
+  const events = await client.entryEvent.findMany({
+    where: {
+      campaignId,
+      source: "IMPORT",
+      entrant: { emailNormalized: { in: emails } },
+    },
+    select: { entries: true, entrant: { select: { emailNormalized: true } } },
+  });
+  const sums = new Map<string, number>();
+  for (const e of events) {
+    const k = e.entrant.emailNormalized;
+    sums.set(k, (sums.get(k) ?? 0) + e.entries);
+  }
+  return sums;
+}
+
 /** What an import would do, without writing anything. */
 export async function previewImport(campaignId: string, parsed: ParsedImport) {
   let existing = 0;
   let alreadyImported = 0;
   let entriesToAdd = 0;
   for (const part of chunks(parsed.rows)) {
-    const [entrants, events] = await Promise.all([
+    const emails = part.map((r) => r.emailNormalized);
+    const [entrants, sums] = await Promise.all([
       db.entrant.findMany({
-        where: {
-          campaignId,
-          emailNormalized: { in: part.map((r) => r.emailNormalized) },
-        },
+        where: { campaignId, emailNormalized: { in: emails } },
         select: { emailNormalized: true },
       }),
-      db.entryEvent.findMany({
-        where: {
-          campaignId,
-          dedupeKey: {
-            in: part.map((r) => importDedupeKey(r.emailNormalized)),
-          },
-        },
-        select: { dedupeKey: true },
-      }),
+      importedSoFar(db, campaignId, emails),
     ]);
-    const done = new Set(events.map((e) => e.dedupeKey));
     existing += entrants.length;
     for (const r of part) {
-      if (done.has(importDedupeKey(r.emailNormalized))) alreadyImported++;
-      else entriesToAdd += r.entries;
+      const delta = r.entries - (sums.get(r.emailNormalized) ?? 0);
+      if (delta > 0) entriesToAdd += delta;
+      else if (sums.has(r.emailNormalized)) alreadyImported++;
     }
   }
   return {
@@ -197,8 +210,8 @@ export async function previewImport(campaignId: string, parsed: ParsedImport) {
 }
 
 /**
- * Creates missing entrants and their IMPORT events. Existing entrants keep
- * their status and details; they only receive the imported entries (once).
+ * Creates missing entrants and tops up their IMPORT entries to the CSV total.
+ * Existing entrants keep their status and details.
  */
 export async function runImport(campaignId: string, parsed: ParsedImport) {
   let created = 0;
@@ -222,25 +235,30 @@ export async function runImport(campaignId: string, parsed: ParsedImport) {
       });
       created += made.count;
 
-      const entrants = await tx.entrant.findMany({
-        where: {
-          campaignId,
-          emailNormalized: { in: part.map((r) => r.emailNormalized) },
-        },
-        select: { id: true, emailNormalized: true },
-      });
+      const emails = part.map((r) => r.emailNormalized);
+      const [entrants, sums] = await Promise.all([
+        tx.entrant.findMany({
+          where: { campaignId, emailNormalized: { in: emails } },
+          select: { id: true, emailNormalized: true },
+        }),
+        importedSoFar(tx, campaignId, emails),
+      ]);
       const idByEmail = new Map(entrants.map((e) => [e.emailNormalized, e.id]));
       const events = part
-        .filter((r) => r.entries > 0 && idByEmail.has(r.emailNormalized))
         .map((r) => ({
+          r,
+          delta: r.entries - (sums.get(r.emailNormalized) ?? 0),
+        }))
+        .filter(({ r, delta }) => delta > 0 && idByEmail.has(r.emailNormalized))
+        .map(({ r, delta }) => ({
           campaignId,
           entrantId: idByEmail.get(r.emailNormalized)!,
           source: "IMPORT" as const,
-          entries: r.entries,
-          note: "imported from CSV",
-          dedupeKey: importDedupeKey(r.emailNormalized),
+          entries: delta,
+          note: `imported from CSV (total ${r.entries})`,
+          dedupeKey: importDedupeKey(r.emailNormalized, r.entries),
         }));
-      // The (campaignId, dedupeKey) unique index makes a re-run a no-op.
+      // The (campaignId, dedupeKey) unique index makes a concurrent re-run a no-op.
       const added = await tx.entryEvent.createManyAndReturn({
         data: events,
         skipDuplicates: true,
