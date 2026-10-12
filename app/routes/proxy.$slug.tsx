@@ -25,6 +25,7 @@ import {
   landingPage,
   wantsLandingPage,
 } from "../lib/storefront/landing.server";
+import { shopPromo } from "../lib/storefront/shop-promo.server";
 
 // Storefront API, reached through the Shopify app proxy at /apps/giveaways/<slug>.
 // Shopify signs every proxied request, and authenticate.public.appProxy checks it.
@@ -114,6 +115,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     entrant: token ? await entrantState(token) : null,
     // Set for giveaways with the daily draw on: today's prize, when it's drawn, the last winner.
     daily: await storefrontDaily(campaign, entrantId),
+    // "Shop & earn" under the bonus entries; null when purchases don't earn entries.
+    shop: await shopPromo(campaign),
     leaderboard: campaignSettingsSchema.safeParse(campaign.settings ?? {}).data
       ?.showLeaderboard
       ? await leaderboard(campaign.id, token)

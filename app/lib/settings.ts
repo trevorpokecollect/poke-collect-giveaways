@@ -60,6 +60,26 @@ export const campaignSettingsSchema = z.object({
       winCooldownDays: z.number().int().nonnegative().default(30),
     })
     .prefault({}),
+  // "Shop & earn" under the bonus entries: the purchase-entry rate, a Shop now link and a few
+  // example products with the entries each earns. See app/lib/storefront/shop-promo.server.ts.
+  shop: z
+    .object({
+      enabled: z.boolean().default(true),
+      url: z.string().default("/collections/all"),
+      products: z
+        .array(
+          z.object({
+            id: z.string(),
+            title: z.string().default(""),
+            imageUrl: z.string().nullable().default(null),
+            // When picked; only the admin preview uses it, the store shows live prices.
+            price: z.number().nonnegative().default(0),
+          }),
+        )
+        .max(6)
+        .default([]),
+    })
+    .prefault({}),
   webhookUrl: z.string().url().or(z.literal("")).default(""),
   showLeaderboard: z.boolean().default(false),
   showWinners: z.boolean().default(true),

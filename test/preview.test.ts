@@ -43,6 +43,18 @@ describe("previewData", () => {
     expect(d.entrant).toBeNull();
   });
 
+  it("shows the shop box with each example's entries", () => {
+    const v = daily();
+    v.settings.shop.products = [
+      { id: "gid://shopify/Product/1", title: "Booster box", imageUrl: null, price: 98.95 },
+    ];
+    const d = previewData(v, { imageUrl: null, entered: false });
+    expect(d.shop).toMatchObject({
+      rate: "50 entries for every $10 you spend",
+      items: [{ title: "Booster box", price: 98.95, entries: 450 }],
+    });
+  });
+
   it("can show the entered view", () => {
     const d = previewData(daily(), { imageUrl: null, entered: true });
     expect(d.entrant).toMatchObject({ state: "active", entries: 1 });

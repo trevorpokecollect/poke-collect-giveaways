@@ -1,6 +1,8 @@
-import type { CampaignFormValues } from "./campaign-form";
+import { rulesFromForm, type CampaignFormValues } from "./campaign-form";
 import { periodFor } from "./daily";
 import { parseLocalDateTime } from "./time";
+import { estimateEntries } from "./entries/estimate";
+import { purchaseRateText } from "./shop-promo";
 import { isArchived, publicAction, visibleActions } from "./entries/actions";
 
 // What the storefront widget would get from /apps/giveaways/<slug>, built from the editor's
@@ -29,6 +31,7 @@ export function previewData(
   const daily = v.settings.daily;
   const now = opts.now ?? new Date();
   return {
+    shop: shopPreview(v),
     linkedToken: null,
     linked: null,
     campaign: {
@@ -67,5 +70,28 @@ export function previewData(
         }
       : null,
     leaderboard: null,
+  };
+}
+
+/** The "Shop & earn" box from unsaved values, with prices from when each product was picked. */
+function shopPreview(v: CampaignFormValues) {
+  const cfg = v.settings.shop;
+  if (!cfg.enabled) return null;
+  const rules = rulesFromForm(v.rules, v.timezone);
+  if (!rules.ok) return null;
+  const rate = purchaseRateText(rules.value);
+  if (!rate) return null;
+  return {
+    rate,
+    url: cfg.url || "/collections/all",
+    items: cfg.products.map((p) => ({
+      title: p.title,
+      url: "#",
+      imageUrl: p.imageUrl,
+      price: p.price,
+      entries: estimateEntries(rules.value, [
+        { productId: p.id, quantity: 1, price: Math.round(p.price * 100) },
+      ]),
+    })),
   };
 }

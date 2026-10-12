@@ -87,6 +87,7 @@
     tiktok: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 2.5h-3.3v12.7a2.8 2.8 0 1 1-2-2.7V9.1a6.1 6.1 0 1 0 5.3 6V8.6a7.6 7.6 0 0 0 4.4 1.4V6.7a4.4 4.4 0 0 1-4.4-4.2z"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.9zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg>',
     other: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 1 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 1 0 5.7 5.7l1-1"/></svg>',
+    bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/></svg>',
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
   };
   var PLATFORMS = [
@@ -504,9 +505,11 @@
 
     // A preview of the follow/join buttons, so visitors see what else they can earn.
     var socials = this.data.campaign.actions.filter(function (a) { return platformOf(a); });
-    var preview = socials.length ? tasks([
+    var shop = this.shopBox();
+    var preview = socials.length || shop ? tasks([
       el("h3", { class: "pcg__subheading", text: "Then earn bonus entries" }),
-      this.socialGrid(socials, null, {}, true),
+      socials.length ? this.socialGrid(socials, null, {}, true) : null,
+      shop,
     ]) : [];
 
     this.show(this.header().concat([el("div", { class: "pcg__box" }, [form])], preview, this.extras()));
@@ -661,7 +664,8 @@
     var referral = this.data.campaign.actions.filter(function (a) { return a.type === "REFERRAL"; })[0];
     if (referral && entrant.referralCode) nodes.push(this.referralBox(referral));
 
-    if (all.length) {
+    var shop = this.shopBox();
+    if (all.length || shop) {
       nodes = nodes.concat(tasks([
         el("h3", { class: "pcg__subheading", text: "Earn more entries" }),
         requiredLeft.length
@@ -671,10 +675,38 @@
         actions.length ? el("ul", { class: "pcg__actions" }, actions.map(function (a) {
           return self.actionItem(a, entrant, !!done[a.id], !a.mandatory && requiredLeft.length > 0);
         })) : null,
+        shop,
       ]));
     }
 
     this.show(nodes.concat(this.extras()));
+  };
+
+  // "Shop & earn": the purchase-entry rate, a Shop now link and example products with the
+  // entries each one earns. Orders are entered automatically, so there's nothing to tap here.
+  Widget.prototype.shopBox = function () {
+    var shop = this.data.shop;
+    if (!shop || !shop.rate) return null;
+    var price = function (n) { return "$" + (Math.round(n * 100) % 100 ? n.toFixed(2) : String(Math.round(n))); };
+    var items = (shop.items || []).filter(function (p) { return p.entries > 0; });
+    return el("div", { class: "pcg__shop" }, [
+      el("div", { class: "pcg__shop-head" }, [
+        icon("bag"),
+        el("span", { class: "pcg__shop-text" }, [el("b", { text: "Shop & earn" }), el("small", { text: shop.rate })]),
+        el("a", { class: "pcg__shop-btn", href: shop.url || "/collections/all", text: "Shop now" }),
+      ]),
+      items.length ? el("ul", { class: "pcg__shop-items", role: "list" }, items.map(function (p) {
+        return el("li", {}, [el("a", { class: "pcg__shop-item", href: p.url, "aria-label": p.title + ", " + price(p.price) + ", " + entriesText(p.entries) }, [
+          el("span", { class: "pcg__shop-img" }, [p.imageUrl ? el("img", { src: p.imageUrl, alt: "", loading: "lazy" }) : null]),
+          el("span", { class: "pcg__shop-name", text: p.title }),
+          el("span", { class: "pcg__shop-row" }, [
+            el("span", { class: "pcg__shop-price", text: price(p.price) }),
+            el("span", { class: "pcg__shop-pts", text: "+" + p.entries }),
+          ]),
+        ])]);
+      })) : null,
+      el("p", { class: "pcg__shop-note", text: "Check out with the email you entered with and your entries are added automatically." }),
+    ]);
   };
 
   // One sign-up enters both linked giveaways; say so, with a way to the other one.

@@ -13,6 +13,7 @@ import { PurchaseRulesEditor } from "./PurchaseRulesEditor";
 import { SettingsEditor } from "./SettingsEditor";
 import { Check, DateTimeInput, TextArea, TextInput } from "./fields";
 import { GiveawayPreview } from "./GiveawayPreview";
+import { ShopPromoEditor } from "./ShopPromoEditor";
 import type { PreviewPrize } from "../lib/preview";
 
 // Two columns on wide screens, with the preview kept in view while scrolling the form.
@@ -244,6 +245,11 @@ export function CampaignForm(props: {
               resources: { ...prev.resources, ...labels },
             }))
           }
+        />
+
+        <ShopPromoEditor
+          shop={v.settings.shop}
+          onChange={(shop) => set({ settings: { ...v.settings, shop } })}
         />
 
         <SettingsEditor
