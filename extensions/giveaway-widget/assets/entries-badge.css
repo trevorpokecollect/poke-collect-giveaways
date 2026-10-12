@@ -7,6 +7,9 @@
   font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.95em; line-height: 1.35;
 }
 .pcg-badge[hidden] { display: none; }
+/* The daily popup embed's lines show only once placed (see daily-popup.js). */
+.pcg-badge--auto:not(.pcg-badge--placed) { display: none !important; }
+.pcg-badge--cart.pcg-badge--auto { max-width: none; margin: 0 0 12px; }
 .pcg-badge__icon {
   flex: none; width: 26px; height: 26px; border-radius: 50%;
   background: linear-gradient(120deg, #e22f39, #b81d27);

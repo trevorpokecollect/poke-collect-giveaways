@@ -149,7 +149,43 @@
     });
   }
 
+  // The embed's "earns +N entries" lines: under the product page's buy buttons, and at the top of
+  // the cart drawer's footer (put back whenever the theme re-renders the drawer; it stays hidden
+  // until there's a drawer). Each is dropped where the theme already has the app's own block.
+  function placeBadges() {
+    var product = document.querySelector('[data-pcg-auto="product"]');
+    if (product && !product.__placed) {
+      product.__placed = true;
+      var own = document.querySelector('[data-pcg-badge="product"]:not([data-pcg-auto])');
+      var form = document.querySelector('main form[action*="/cart/add"]');
+      var buttons = form && (form.querySelector(".product-form__buttons") || form);
+      if (own || !buttons) product.remove();
+      else {
+        buttons.parentNode.insertBefore(product, buttons.nextSibling);
+        product.classList.add("pcg-badge--placed");
+      }
+    }
+    var cart = document.querySelector('[data-pcg-auto="cart"]');
+    if (cart && !cart.__placed) {
+      cart.__placed = true;
+      var ownCart = document.querySelector('[data-pcg-badge="cart"]:not([data-pcg-auto])');
+      var place = function () {
+        var spot = document.querySelector("#CartDrawer .drawer__footer__inner, cart-drawer .drawer__footer, #CartDrawer .drawer__footer");
+        if (spot && cart.parentNode !== spot) spot.insertBefore(cart, spot.firstChild);
+        cart.classList.toggle("pcg-badge--placed", !!spot);
+      };
+      if (ownCart) cart.remove();
+      else {
+        place();
+        new MutationObserver(function () { if (!cart.isConnected || !cart.closest("#CartDrawer, cart-drawer")) place(); })
+          .observe(document.body, { childList: true, subtree: true });
+      }
+    }
+    if (window.__pcgBadges) window.__pcgBadges.boot();
+  }
+
   function boot() {
+    placeBadges();
     document.querySelectorAll("[data-pcg-pop]").forEach(setup);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

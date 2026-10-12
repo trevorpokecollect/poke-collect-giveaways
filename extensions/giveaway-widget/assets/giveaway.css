@@ -488,3 +488,23 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 }
 @keyframes pcg-sheet { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .pcg-pop__dialog[open] { animation: none; } }
+
+/* Phones in the popup: compact sign-up with the Enter button pinned to the bottom of the sheet,
+   and the bonus tasks sliding in once they've entered. */
+.pcg[data-pcg].pcg--compact .pcg__image { max-height: 130px; }
+.pcg[data-pcg] .pcg__more {
+  display: block; width: 100%; margin: 4px 0 10px; padding: 10px 12px; border: 1px dashed rgba(250, 204, 21, 0.6);
+  border-radius: 12px; background: rgba(250, 204, 21, 0.08); color: #facc15; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+}
+.pcg-pop__cta {
+  position: sticky; bottom: 0; z-index: 4; padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(rgba(17, 17, 20, 0), #111114 35%);
+}
+.pcg-pop__cta .pcg__btn { width: 100%; min-height: 54px; font-size: 17px; }
+@media (max-width: 749px) {
+  .pcg-pop__dialog .pcg[data-pcg].pcg--just-entered .pcg__tasks > * { animation: pcg-rise 0.4s ease-out both; }
+  .pcg-pop__dialog .pcg[data-pcg].pcg--just-entered .pcg__tasks > :nth-child(2) { animation-delay: 0.06s; }
+  .pcg-pop__dialog .pcg[data-pcg].pcg--just-entered .pcg__tasks > :nth-child(n+3) { animation-delay: 0.12s; }
+}
+@keyframes pcg-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pcg-pop__dialog .pcg[data-pcg] .pcg__tasks > * { animation: none !important; } }

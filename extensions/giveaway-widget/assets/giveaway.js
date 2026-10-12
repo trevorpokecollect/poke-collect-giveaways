@@ -210,7 +210,25 @@
   // Three groups: the header (image, title, prize, clock), the main part (the sign-up form or
   // your entries) and the ways to enter. They stack in a narrow box, sit in two columns in a wide
   // one (tasks under the main part) and in three in a very wide one (see .pcg__wrap in the CSS).
+  // Phones, inside the daily popup: a shorter sign-up (no bonus-task preview, texts behind a
+  // button) with the Enter button pinned to the bottom of the sheet.
+  Widget.prototype.compact = function () {
+    return !!(this.root.closest && this.root.closest(".pcg-pop__dialog")) &&
+      !!window.matchMedia && window.matchMedia("(max-width: 749px)").matches;
+  };
+
+  // The pinned Enter button lives at the end of the sheet (outside the widget) so it can stick.
+  Widget.prototype.setCta = function (node) {
+    var dialog = this.root.closest && this.root.closest(".pcg-pop__dialog");
+    if (this.cta) { this.cta.remove(); this.cta = null; }
+    this.root.classList.toggle("pcg--compact", !!node);
+    if (!node || !dialog) return;
+    this.cta = el("div", { class: "pcg-pop__cta" }, [node]);
+    dialog.appendChild(this.cta);
+  };
+
   Widget.prototype.show = function (nodes) {
+    this.setCta(null);
     nodes = nodes.filter(Boolean);
     var side = nodes.filter(function (n) { return n.__pcg === "head"; });
     var main = nodes.filter(function (n) { return !n.__pcg; });
@@ -525,7 +543,9 @@
     var consent = el("input", { type: "checkbox", name: "consent", required: emailRequired });
     var turnstileBox = el("div");
     var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
-    var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", text: this.data.daily ? "Enter Today's Giveaway" : "Enter Giveaway" });
+    var compact = this.compact();
+    var formId = nextId("form");
+    var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", form: formId, text: compact ? "Enter Free" : this.data.daily ? "Enter Today's Giveaway" : "Enter Giveaway" });
     var turnstileToken = "";
 
     // Texts: an optional number plus an unchecked consent box, worth the SMS action's entries.
@@ -549,8 +569,19 @@
       ]);
     }
 
+    // Compact: the text sign-up opens from a button, so the first screen is just name and email.
+    var smsToggle = null;
+    if (smsBox && compact) {
+      smsBox.hidden = true;
+      smsToggle = el("button", {
+        class: "pcg__more", type: "button", text: "+ Add Your Phone For " + tc(entriesText(sms.entries)),
+        onclick: function () { smsBox.hidden = false; smsToggle.remove(); phone.focus(); },
+      });
+    }
+
     var form = el("form", {
       class: "pcg__form",
+      id: formId,
       novalidate: true,
       onsubmit: function (e) {
         e.preventDefault();
@@ -580,22 +611,24 @@
         "Email me deals, drops and stream alerts.",
         emailRequired ? el("span", { class: "pcg__req", text: " Required To Enter" }) : null,
       ])]),
+      smsToggle,
       smsBox,
       turnstileBox,
       err,
-      button,
+      compact ? null : button,
     ]);
 
     // A preview of the follow/join buttons, so visitors see what else they can earn.
     var socials = this.data.campaign.actions.filter(function (a) { return platformOf(a); });
     var shop = this.shopBox();
-    var preview = socials.length || shop ? tasks([
+    var preview = !compact && (socials.length || shop) ? tasks([
       el("h3", { class: "pcg__subheading", text: "Then Earn Bonus Entries" }),
       socials.length ? this.socialGrid(socials, null, {}, true) : null,
       shop,
     ]) : [];
 
     this.show(this.header().concat([el("div", { class: "pcg__box" }, [form])], preview, this.extras()));
+    if (compact) this.setCta(button);
     this.mountTurnstile(turnstileBox, function (t) { turnstileToken = t; });
   };
 
@@ -642,6 +675,10 @@
     if (res.token) store(this.tokenKey, res.token);
     if (res.state === "active") {
       this.trackEntry();
+      // The bonus tasks slide in on the first view after entering (see giveaway.css).
+      var root = this.root;
+      root.classList.add("pcg--just-entered");
+      window.setTimeout(function () { root.classList.remove("pcg--just-entered"); }, 1500);
       // Other widgets on the page (the popup, or the giveaway page's box) pick up the entry too.
       document.dispatchEvent(new CustomEvent("pcg:entered", { detail: { root: this.root } }));
       return this.load();
