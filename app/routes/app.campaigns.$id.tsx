@@ -38,6 +38,9 @@ import {
 } from "../lib/entries/orders.server";
 import { periodFor } from "../lib/daily";
 import { entriesByMethod } from "../lib/entries/methods.server";
+import { checkListStatus, listGrowth } from "../lib/entries/list-status.server";
+
+type GrowthData = Awaited<ReturnType<typeof listGrowth>>;
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
 import { EntryActivityTable } from "../components/EntryActivity";
 import { flag, Select } from "../components/fields";
@@ -119,12 +122,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     dailyCfg.enabled && url.searchParams.get("methods") !== "all"
       ? "today"
       : "all";
-  const methods = await entriesByMethod(campaign.id, {
-    since:
-      methodPeriod === "today"
-        ? periodFor(new Date(), campaign.timezone, dailyCfg.drawTime).opensAt
-        : undefined,
-  });
+  const methodsSince =
+    methodPeriod === "today"
+      ? periodFor(new Date(), campaign.timezone, dailyCfg.drawTime).opensAt
+      : undefined;
+  // Looks up new sign-ups in Shopify in the background; counts fill in on later visits.
+  void checkListStatus(campaign);
+  const [methods, growth] = await Promise.all([
+    entriesByMethod(campaign.id, { since: methodsSince }),
+    listGrowth(campaign.id, methodsSince),
+  ]);
   let daily: DailyData | null = null;
   if (dailyCfg.enabled) {
     const [current, prizes] = await Promise.all([
@@ -253,6 +260,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     drawExtras: await drawsSectionExtras(campaign),
     daily,
     methods: { period: methodPeriod, rows: methods.rows },
+    growth,
     activity: {
       method: activityMethod,
       q: activityQ,
@@ -450,6 +458,7 @@ export default function CampaignPage() {
     methods,
     startsLabel,
     activity,
+    growth,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const submit = (data: Record<string, string>) =>
@@ -586,6 +595,9 @@ export default function CampaignPage() {
               {methodSwitch}
               <EntriesByMethodTable rows={methods.rows} />
             </s-stack>
+          </s-section>
+          <s-section heading="New Sign-Ups">
+            <NewSignups growth={growth} />
           </s-section>
           <s-section heading="Latest Entries">
             <s-stack gap="base">
@@ -861,3 +873,45 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 export const headers: HeadersFunction = (headersArgs) =>
   boundary.headers(headersArgs);
+
+function NewSignups({ growth }: { growth: GrowthData }) {
+  const stat = (label: string, value: number, sub: string) => (
+    <s-stack gap="small-200">
+      <s-text color="subdued">{label}</s-text>
+      <s-heading>{value.toLocaleString()}</s-heading>
+      <s-text color="subdued">{sub}</s-text>
+    </s-stack>
+  );
+  const checked = growth.signups - growth.unchecked;
+  return (
+    <s-stack gap="base">
+      <s-grid
+        gridTemplateColumns="repeat(auto-fit, minmax(180px, 1fr))"
+        gap="base"
+      >
+        {stat(
+          "New Customers",
+          growth.newCustomers,
+          `of ${checked.toLocaleString()} sign-ups checked`,
+        )}
+        {stat(
+          "New Email Subscribers",
+          growth.email.new,
+          `of ${growth.email.optIns.toLocaleString()} email opt-ins (${(growth.email.optIns - growth.email.new).toLocaleString()} already subscribed)`,
+        )}
+        {stat(
+          "New SMS Subscribers",
+          growth.sms.new,
+          `of ${growth.sms.optIns.toLocaleString()} SMS opt-ins (${(growth.sms.optIns - growth.sms.new).toLocaleString()} already subscribed)`,
+        )}
+      </s-grid>
+      <s-text color="subdued">
+        {growth.unchecked > 0
+          ? `Checking ${growth.unchecked.toLocaleString()} more sign-ups against Shopify. Refresh in a minute. `
+          : ""}
+        Based on each Shopify customer&apos;s created date and consent date, so
+        counts are close, not exact. Imported entrants aren&apos;t counted.
+      </s-text>
+    </s-stack>
+  );
+}

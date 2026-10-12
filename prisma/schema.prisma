@@ -131,36 +131,42 @@ enum EntrantStatus {
 }
 
 model Entrant {
-  id                String        @id @default(cuid())
-  campaignId        String
-  campaign          Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  email             String
+  id                 String        @id @default(cuid())
+  campaignId         String
+  campaign           Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email              String
   // Canonical form (lowercased, gmail dots/+tags stripped) used for de-duplication.
-  emailNormalized   String
-  name              String?
-  shopifyCustomerId String?
-  status            EntrantStatus @default(PENDING_VERIFICATION)
-  verifiedAt        DateTime?
-  referralCode      String        @unique
-  referredById      String?
-  referredBy        Entrant?      @relation("Referrals", fields: [referredById], references: [id])
-  referrals         Entrant[]     @relation("Referrals")
-  riskScore         Int           @default(0)
+  emailNormalized    String
+  name               String?
+  shopifyCustomerId  String?
+  status             EntrantStatus @default(PENDING_VERIFICATION)
+  verifiedAt         DateTime?
+  referralCode       String        @unique
+  referredById       String?
+  referredBy         Entrant?      @relation("Referrals", fields: [referredById], references: [id])
+  referrals          Entrant[]     @relation("Referrals")
+  riskScore          Int           @default(0)
   // Hashed (HMAC) network/device identifiers; raw IPs are never stored.
-  ipHash            String?
-  subnetHash        String?
-  deviceHash        String?
-  userAgent         String?
-  utm               Json?
-  marketingConsent  Boolean       @default(false)
+  ipHash             String?
+  subnetHash         String?
+  deviceHash         String?
+  userAgent          String?
+  utm                Json?
+  marketingConsent   Boolean       @default(false)
   // Consolation discount code sent after the draw, if any.
-  discountCode      String?
-  klaviyoSyncedAt   DateTime?
+  discountCode       String?
+  klaviyoSyncedAt    DateTime?
   // Set by the SMS_OPTIN action: E.164 number and when the entrant agreed to texts.
-  phone             String?
-  smsConsentAt      DateTime?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  phone              String?
+  smsConsentAt       DateTime?
+  // Whether they were already on the store's lists before entering (Shopify customer record),
+  // so analytics can count genuinely new customers and subscribers. Null until checked.
+  existingCustomer   Boolean?
+  emailWasSubscribed Boolean?
+  smsWasSubscribed   Boolean?
+  listsCheckedAt     DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   events      EntryEvent[]
   responses   ActionResponse[]
