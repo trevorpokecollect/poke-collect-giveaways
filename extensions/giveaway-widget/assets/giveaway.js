@@ -459,7 +459,7 @@
       phone = el("input", { class: "pcg__input", id: phoneId, type: "tel", name: "phone", inputmode: "tel", autocomplete: "tel-national", placeholder: "(555) 234-5678", maxlength: "20" });
       smsConsent = el("input", { type: "checkbox", name: "sms-consent" });
       smsBox = el("div", { class: "pcg__sms" }, [
-        el("label", { class: "pcg__label", for: phoneId }, [document.createTextNode("Mobile Number (Optional) "), el("span", { class: "pcg__pts", text: tc(entriesText(sms.entries)) })]),
+        el("label", { class: "pcg__label", for: phoneId }, [el("span", { text: "Mobile Number (Optional)" }), el("span", { class: "pcg__pts", text: tc(entriesText(sms.entries)) })]),
         phone,
         el("label", { class: "pcg__check pcg__check--fine" }, [smsConsent, el("span", {}, [
           (sms.config && sms.config.disclosure) || "",
