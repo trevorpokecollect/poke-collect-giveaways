@@ -235,6 +235,23 @@ export default function CampaignPage() {
           Go live
         </s-button>
       )}
+      <s-button
+        slot="secondary-actions"
+        href={`/app/campaigns/${campaign.id}/edit`}
+      >
+        Edit
+      </s-button>
+      <s-button
+        slot="secondary-actions"
+        onClick={() =>
+          fetcher.submit(
+            { intent: "duplicate" },
+            { method: "post", action: `/app/campaigns/${campaign.id}/edit` },
+          )
+        }
+      >
+        Duplicate
+      </s-button>
 
       <s-section>
         <s-grid gridTemplateColumns="repeat(4, 1fr)" gap="base">

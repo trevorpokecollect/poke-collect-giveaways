@@ -1,0 +1,203 @@
+import { useState } from "react";
+import { Form } from "react-router";
+import {
+  IMAGE_TYPES,
+  generateOfficialRules,
+  type CampaignFormValues,
+  type ResourceLabels,
+} from "../lib/campaign-form";
+import { ActionsEditor } from "./ActionsEditor";
+import { PurchaseRulesEditor } from "./PurchaseRulesEditor";
+import { SettingsEditor } from "./SettingsEditor";
+import { Check, DateTimeInput, TextArea, TextInput } from "./fields";
+
+// Shared editor for New and Edit. All state is sent as one JSON "payload"
+// field (plus the image file) and validated by app/lib/campaign-form.server.ts.
+export function CampaignForm(props: {
+  initial: CampaignFormValues;
+  submitLabel: string;
+  saving: boolean;
+  error?: string;
+  archivedCount?: number;
+  isEdit?: boolean;
+}) {
+  const [v, setV] = useState(props.initial);
+  const [preview, setPreview] = useState<string | null>(null);
+  // Bumped to remount the rules text area when it is filled programmatically.
+  const [rulesKey, setRulesKey] = useState(0);
+  const set = (patch: Partial<CampaignFormValues>) =>
+    setV((prev) => ({ ...prev, ...patch }));
+  const zone = v.timezone === "America/New_York" ? "Eastern time" : v.timezone;
+
+  const generate = () => {
+    if (
+      v.rulesText.trim() &&
+      !window.confirm("Replace the current official rules with a new draft?")
+    ) {
+      return;
+    }
+    set({ rulesText: generateOfficialRules(v) });
+    setRulesKey((k) => k + 1);
+  };
+
+  return (
+    <Form method="post" encType="multipart/form-data">
+      <input type="hidden" name="payload" value={JSON.stringify(v)} />
+      <s-stack gap="base">
+        {props.error && <s-banner tone="critical">{props.error}</s-banner>}
+
+        <s-section heading="Basics">
+          <s-stack gap="base">
+            <TextInput
+              label="Title"
+              placeholder="Win a Prismatic Evolutions Booster Box"
+              required
+              value={v.title}
+              onChange={(title) => set({ title })}
+            />
+            <TextInput
+              label="Prize"
+              placeholder="1x sealed booster box"
+              value={v.prize}
+              onChange={(prize) => set({ prize })}
+            />
+            <TextArea
+              label="Description"
+              value={v.description}
+              onChange={(description) => set({ description })}
+            />
+            <s-stack gap="small-200">
+              <s-text>Prize image</s-text>
+              {preview || (v.imageUrl && !v.removeImage) ? (
+                <img
+                  src={preview ?? v.imageUrl!}
+                  alt="Prize"
+                  style={{ maxWidth: 240, borderRadius: 8 }}
+                />
+              ) : null}
+              <input
+                type="file"
+                name="image"
+                accept={IMAGE_TYPES.join(",")}
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  setPreview(f ? URL.createObjectURL(f) : null);
+                }}
+              />
+              {v.imageUrl && !preview && (
+                <Check
+                  label="Remove the current image"
+                  checked={v.removeImage}
+                  onChange={(removeImage) => set({ removeImage })}
+                />
+              )}
+              <s-text color="subdued">
+                PNG, JPG, WebP or GIF, up to 5 MB.
+                {v.imageUrl
+                  ? " Choosing a file replaces the current image."
+                  : ""}
+              </s-text>
+            </s-stack>
+            <TextInput
+              label="Link name"
+              value={v.slug}
+              details={
+                props.isEdit
+                  ? "Used in the giveaway URL. Changing it breaks links and theme blocks that use the old name."
+                  : "Used in the giveaway URL. Leave blank to use the title."
+              }
+              onChange={(slug) => set({ slug })}
+            />
+            <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+              <DateTimeInput
+                label="Starts"
+                zoneLabel={zone}
+                value={v.startsAt}
+                onChange={(startsAt) => set({ startsAt })}
+              />
+              <DateTimeInput
+                label="Ends"
+                zoneLabel={zone}
+                value={v.endsAt}
+                onChange={(endsAt) => set({ endsAt })}
+              />
+            </s-grid>
+            <s-text color="subdued">
+              Leave Starts blank to open as soon as you click Go live.
+            </s-text>
+          </s-stack>
+        </s-section>
+
+        <ActionsEditor
+          actions={v.actions}
+          archivedCount={props.archivedCount}
+          onChange={(actions) => set({ actions })}
+        />
+
+        <PurchaseRulesEditor
+          rules={v.rules}
+          timezone={v.timezone}
+          resources={v.resources}
+          onChange={(rules) => set({ rules })}
+          onResources={(labels: ResourceLabels) =>
+            setV((prev) => ({
+              ...prev,
+              resources: { ...prev.resources, ...labels },
+            }))
+          }
+        />
+
+        <SettingsEditor
+          settings={v.settings}
+          onChange={(settings) => set({ settings })}
+        />
+
+        <s-section heading="Official rules">
+          <s-stack gap="base">
+            <TextInput
+              label="Who can enter"
+              value={v.settings.eligibility}
+              details="Used in the eligibility section of the generated rules."
+              onChange={(eligibility) =>
+                set({ settings: { ...v.settings, eligibility } })
+              }
+            />
+            <s-stack direction="inline">
+              <s-button icon="wand" onClick={generate}>
+                Generate from giveaway details
+              </s-button>
+            </s-stack>
+            <TextArea
+              key={rulesKey}
+              label="Rules text"
+              rows={14}
+              value={v.rulesText}
+              details="Shown on the giveaway as the official rules. Review it before going live; it isn't legal advice."
+              onChange={(rulesText) => set({ rulesText })}
+            />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Bot protection">
+          <s-paragraph>
+            On by default: Cloudflare Turnstile, email verification codes,
+            disposable and alias email checks, IP, subnet and device limits, and
+            referral fraud checks. Suspicious entries are held for your review
+            automatically.
+          </s-paragraph>
+        </s-section>
+
+        {props.error && <s-banner tone="critical">{props.error}</s-banner>}
+        <s-stack direction="inline">
+          <s-button
+            type="submit"
+            variant="primary"
+            {...(props.saving ? { loading: true } : {})}
+          >
+            {props.submitLabel}
+          </s-button>
+        </s-stack>
+      </s-stack>
+    </Form>
+  );
+}
