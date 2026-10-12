@@ -3,6 +3,7 @@ import type { Campaign } from "@prisma/client";
 import db from "../../db.server";
 import { normalizeEmail } from "../bot/email";
 import { award } from "./ledger.server";
+import { emitWebhook } from "../webhook-out.server";
 import { purchaseRulesSchema, scoreOrder, type ScorableOrder } from "./rules";
 
 /** Subset of the Shopify `orders/*` webhook payload that we use. */
@@ -81,7 +82,7 @@ async function findOrCreateEntrant(
   });
   if (existing || !auto) return existing;
   // A paid order is strong proof of a real person, so these start ACTIVE.
-  return db.entrant.create({
+  const created = await db.entrant.create({
     data: {
       campaignId: campaign.id,
       email,
@@ -92,6 +93,11 @@ async function findOrCreateEntrant(
       referralCode: randomBytes(5).toString("base64url"),
     },
   });
+  emitWebhook(campaign.id, "entrant.created", {
+    entrantId: created.id,
+    status: "ACTIVE",
+  });
+  return created;
 }
 
 /** Handles orders/create, orders/updated (edits) and orders/cancelled. Idempotent. */
@@ -168,6 +174,12 @@ export async function processOrder(
           : current === 0
             ? undefined
             : "order edited",
+      });
+      emitWebhook(campaign.id, "purchase.entries", {
+        entrantId: entrant.id,
+        orderId: shopifyOrderId,
+        orderName: payload.name,
+        entries: delta,
       });
     }
 

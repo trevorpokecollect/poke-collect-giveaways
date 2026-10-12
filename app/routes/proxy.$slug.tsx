@@ -7,6 +7,7 @@ import {
   verifyEntrant,
 } from "../lib/entries/actions.server";
 import { findLiveCampaign, signup } from "../lib/entries/signup.server";
+import { publicWinners } from "../lib/winners.server";
 
 // Storefront API, reached through the Shopify app proxy at /apps/giveaways/<slug>.
 // Shopify signs every proxied request, and authenticate.public.appProxy checks it.
@@ -28,7 +29,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   await authenticate.public.appProxy(request);
   const campaign = await findLiveCampaign(shopFrom(request), params.slug!);
   if (!campaign)
-    return json({ error: "This giveaway isn't open right now." }, 404);
+    return json(
+      {
+        error: "This giveaway isn't open right now.",
+        // Set (as [{ position, name: "Ash K." }]) when the giveaway has ENDED and showWinners is on.
+        winners: await publicWinners(shopFrom(request), params.slug!),
+      },
+      404,
+    );
 
   const token = request.headers.get("x-entrant-token");
   return json({
