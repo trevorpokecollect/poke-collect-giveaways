@@ -61,7 +61,7 @@
   function plural(n, one, many) { return n === 1 ? one : many; }
   // Store style: buttons, titles, headers and sub text capitalize every word ("Shop & Earn").
   // Full sentences (notes, errors, consent wording) stay as written.
-  function tc(s) { return String(s || "").replace(/(^|[\s(\/-])([a-z])/g, function (m, sep, c) { return sep + c.toUpperCase(); }); }
+  function tc(s) { return String(s || "").replace(/(^|[\s(/-])([a-z])/g, function (m, sep, c) { return sep + c.toUpperCase(); }); }
 
   var uid = 0;
   function nextId(prefix) { uid += 1; return "pcg-" + prefix + "-" + uid; }
