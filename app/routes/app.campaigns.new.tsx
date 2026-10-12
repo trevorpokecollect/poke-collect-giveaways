@@ -15,6 +15,7 @@ import db from "../db.server";
 import { CampaignForm } from "../components/CampaignForm";
 import {
   DEFAULT_TIMEZONE,
+  generateOfficialRules,
   newAction,
   rulesToForm,
   type CampaignFormValues,
@@ -26,21 +27,35 @@ import {
 } from "../lib/campaign-form.server";
 import { purchaseRulesSchema } from "../lib/entries/rules";
 import { parseSettings } from "../lib/settings";
-import { applyRecommended, applyRecommendedDaily } from "../lib/recommended";
+import {
+  applyLiveMonthly,
+  applyRecommended,
+  applyRecommendedDaily,
+} from "../lib/recommended";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
-  // ?type=daily starts a daily giveaway (draw on, daily recommended settings).
-  const daily = new URL(request.url).searchParams.get("type") === "daily";
+  // ?type=daily starts a daily giveaway (draw on, daily recommended settings);
+  // ?type=monthly the live monthly giveaway copied from GiveawayNinja.
+  const type = new URL(request.url).searchParams.get("type");
+  const daily = type === "daily";
+  const monthly = type === "monthly";
   const blank: CampaignFormValues = {
-    title: daily ? "Poke-Collect Daily Giveaway" : "",
+    title: daily
+      ? "Poke-Collect Daily Giveaway"
+      : monthly
+        ? "Poke-Collect 30th Celebration UPC Case Giveaway!"
+        : "",
     prize: daily
       ? "A new sealed product or English single every day ($70 to $100 value)"
-      : "",
+      : monthly
+        ? "Sealed Case of 30th Celebration Ultra Premium Collections"
+        : "",
     description: "",
-    slug: daily ? "daily-giveaway" : "",
+    slug: daily ? "daily-giveaway" : monthly ? "monthly-giveaway" : "",
     startsAt: "",
-    endsAt: "",
+    // Drawn November 1.
+    endsAt: monthly ? "2026-10-31T23:59" : "",
     timezone: DEFAULT_TIMEZONE,
     imageUrl: null,
     removeImage: false,
@@ -53,7 +68,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
   const initial = daily
     ? applyRecommendedDaily(blank)
-    : applyRecommended(blank);
+    : monthly
+      ? applyLiveMonthly(blank)
+      : applyRecommended(blank);
+  // A first draft of the official rules, so a new giveaway can go live without that step.
+  initial.rulesText = generateOfficialRules(initial);
   return { initial, daily };
 };
 

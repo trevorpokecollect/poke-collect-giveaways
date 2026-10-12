@@ -9,6 +9,7 @@ import {
 } from "../app/lib/campaign-form";
 import { purchaseRulesSchema } from "../app/lib/entries/rules";
 import {
+  applyLiveMonthly,
   applyRecommended,
   applyRecommendedDaily,
 } from "../app/lib/recommended";
@@ -126,5 +127,23 @@ describe("required steps", () => {
     expect(rules).toContain(
       "To complete an entry, entrants must also agree to receive marketing emails from the Sponsor (you can unsubscribe at any time after entering) and follow us on whatnot.",
     );
+  });
+});
+
+describe("applyLiveMonthly", () => {
+  it("copies the GiveawayNinja amounts with texts at 100", () => {
+    const v = applyLiveMonthly({ ...base(), actions: [] });
+    expect(validateCampaignForm(v).ok).toBe(true);
+    const by = Object.fromEntries(v.actions.map((a) => [a.label, a]));
+    expect(by["Get text alerts for drops"]).toMatchObject({ entries: 100, mandatory: false });
+    expect(by["Follow us on Whatnot"]).toMatchObject({ entries: 100, mandatory: true });
+    expect(by["Join our Discord"].entries).toBe(50);
+    expect(by["Bookmark our next live show"]).toMatchObject({ type: "VISIT_URL", entries: 20, repeatable: true });
+    expect(by["Like us on Facebook"].entries).toBe(10);
+    expect(by["Follow us on Instagram"].entries).toBe(10);
+    expect(by["Refer a friend"].entries).toBe(25);
+    expect(v.actions.map((a) => a.type)).not.toContain("WATCH_VIDEO");
+    expect(v.rules.base).toMatchObject({ mode: "per_amount", entries: 50, amount: 10 });
+    expect(v.settings.requireEmailConsent).toBe(true);
   });
 });

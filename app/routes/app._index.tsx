@@ -46,6 +46,9 @@ export default function Index() {
       >
         New giveaway
       </s-button>
+      <s-button slot="secondary-actions" href="/app/campaigns/new?type=monthly">
+        New monthly (GiveawayNinja setup)
+      </s-button>
       <s-button slot="secondary-actions" href="/app/campaigns/new?type=daily">
         New daily giveaway
       </s-button>

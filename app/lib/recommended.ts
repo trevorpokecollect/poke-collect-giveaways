@@ -263,3 +263,68 @@ export function applyRecommendedDaily(
     },
   };
 }
+
+// The live monthly giveaway's entry amounts, copied from GiveawayNinja (2026-10-12) with texts
+// added at 100 and YouTube dropped.
+const LIVE_MONTHLY_ACTIONS: Recommended[] = [
+  { type: "SIGNUP", label: "Enter the giveaway", entries: 1 },
+  { type: "SMS_OPTIN", label: "Get text alerts for drops", entries: 100 },
+  {
+    type: "SOCIAL_FOLLOW",
+    label: "Follow us on Whatnot",
+    entries: 100,
+    mandatory: true,
+    config: { url: WHATNOT },
+  },
+  {
+    type: "SOCIAL_FOLLOW",
+    label: "Join our Discord",
+    entries: 50,
+    config: { url: DISCORD },
+  },
+  {
+    type: "VISIT_URL",
+    label: "Bookmark our next live show",
+    entries: 20,
+    repeatable: true,
+    config: { url: WHATNOT },
+  },
+  {
+    type: "SOCIAL_FOLLOW",
+    label: "Like us on Facebook",
+    entries: 10,
+    config: { url: FACEBOOK },
+  },
+  {
+    type: "SOCIAL_FOLLOW",
+    label: "Follow us on Instagram",
+    entries: 10,
+    config: { url: INSTAGRAM },
+  },
+  { type: "REFERRAL", label: "Refer a friend", entries: 25 },
+];
+
+/**
+ * The live monthly giveaway, matching GiveawayNinja's setup so the switch-over (and the
+ * entrant import) keeps everyone's odds the same: its actions only, 50 entries per $10.
+ */
+export function applyLiveMonthly(v: CampaignFormValues): CampaignFormValues {
+  const base = applyRecommended(v);
+  return {
+    ...base,
+    actions: mergeActions(
+      v.actions.filter((a) => a.hasEvents),
+      LIVE_MONTHLY_ACTIONS,
+    ),
+    rules: {
+      ...base.rules,
+      minOrderValue: 0,
+      base: { mode: "per_amount", entries: 50, amount: 10, basis: "subtotal" },
+      periodMultipliers: [],
+    },
+    settings: {
+      ...base.settings,
+      consolation: { ...base.settings.consolation, enabled: false },
+    },
+  };
+}
