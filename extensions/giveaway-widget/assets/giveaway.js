@@ -98,13 +98,37 @@
     var c = this.data.campaign;
     var nodes = [];
     if (c.imageUrl) nodes.push(el("img", { class: "pcg__image", src: c.imageUrl, alt: c.prize || c.title, loading: "lazy" }));
-    nodes.push(el("h2", { class: "pcg__title", text: c.title }));
-    if (c.prize) nodes.push(el("p", { class: "pcg__prize", text: c.prize }));
-    var meta = [];
-    if (c.description) meta.push(c.description);
-    if (c.endsAt) meta.push("Ends " + new Date(c.endsAt).toLocaleString());
-    if (meta.length) nodes.push(el("p", { class: "pcg__meta", text: meta.join(" · ") }));
+    nodes.push(el("div", { class: "pcg__hero" }, [
+      el("span", { class: "pcg__badge", text: "Giveaway" }),
+      el("h2", { class: "pcg__title", text: c.title }),
+      c.prize ? el("p", { class: "pcg__prize", text: c.prize }) : null,
+      c.endsAt ? this.countdown(new Date(c.endsAt)) : null,
+    ]));
+    if (c.description) nodes.push(el("p", { class: "pcg__meta", text: c.description }));
     return nodes;
+  };
+
+  // Days / hours / minutes / seconds until the giveaway ends, ticking once a second.
+  Widget.prototype.countdown = function (endsAt) {
+    var units = [["d", 86400], ["h", 3600], ["m", 60], ["s", 1]];
+    var labels = { d: "Days", h: "Hours", m: "Mins", s: "Secs" };
+    var cells = {};
+    var box = el("div", { class: "pcg__timer", "aria-label": "Ends " + endsAt.toLocaleString() }, units.map(function (u) {
+      cells[u[0]] = el("b", { text: "0" });
+      return el("div", {}, [cells[u[0]], el("span", { text: labels[u[0]] })]);
+    }));
+    function tick() {
+      var left = Math.max(0, Math.floor((endsAt.getTime() - Date.now()) / 1000));
+      units.forEach(function (u) {
+        var v = Math.floor(left / u[1]);
+        left -= v * u[1];
+        cells[u[0]].textContent = u[0] === "d" ? String(v) : ("0" + v).slice(-2);
+      });
+    }
+    tick();
+    window.clearInterval(this.timer);
+    this.timer = window.setInterval(tick, 1000);
+    return box;
   };
 
   Widget.prototype.footer = function () {
@@ -238,25 +262,28 @@
             .catch(function (e2) { btn.disabled = false; window.alert(e2.message); });
         },
       });
+      if (btn) btn.className = "pcg__btn pcg__btn--small";
       list.appendChild(el("li", { class: "pcg__action" + (isDone ? " pcg__action--done" : "") }, [
-        el("span", { text: a.label }), input, el("span", {}, [pill]), btn,
+        el("span", { class: "pcg__action-label", text: a.label }), input, pill, btn,
       ]));
     });
 
     var nodes = this.header().concat([
-      el("div", { class: "pcg__count", text: String(entrant.entries) }, [el("small", { text: entrant.entries === 1 ? "entry" : "entries" })]),
-      list,
+      el("div", { class: "pcg__count" }, [
+        el("span", { text: entrant.entries === 1 ? "Your entry" : "Your entries" }),
+        el("b", { text: String(entrant.entries) }),
+      ]),
     ]);
+    if (list.children.length) nodes.push(el("h3", { class: "pcg__subheading", text: "Earn more entries" }), list);
 
     var referral = this.data.campaign.actions.filter(function (a) { return a.type === "REFERRAL"; })[0];
     if (referral && entrant.referralCode) {
       var link = window.location.origin + window.location.pathname + "?ref=" + encodeURIComponent(entrant.referralCode);
       var input = el("input", { class: "pcg__input", readonly: "", value: link });
-      nodes.push(el("p", { class: "pcg__note", text: "Get +" + referral.entries + " entries for every friend who enters with your link." }));
       nodes.push(el("div", { class: "pcg__ref" }, [
-        input,
-        el("button", {
-          class: "pcg__btn", type: "button", text: "Copy",
+        el("p", { class: "pcg__note", text: "Get +" + referral.entries + " entries for every friend who enters with your link." }),
+        el("div", { class: "pcg__ref-row" }, [input, el("button", {
+          class: "pcg__btn pcg__btn--small", type: "button", text: "Copy",
           onclick: function (e) {
             var b = e.currentTarget;
             (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
@@ -264,7 +291,7 @@
               function () { input.select(); }
             );
           },
-        }),
+        })]),
       ]));
     }
     nodes.push(this.footer());
