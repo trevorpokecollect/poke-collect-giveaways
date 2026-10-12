@@ -5,6 +5,7 @@ api_version = "2026-07"
 name = "Giveaway entries (thank-you and order status)"
 handle = "giveaway-thank-you"
 type = "ui_extension"
+uid = "b476f053-18e2-3ea2-a18d-157ba2b44d884f05fde2"
 
 [[extensions.targeting]]
 module = "./src/ThankYou.jsx"
