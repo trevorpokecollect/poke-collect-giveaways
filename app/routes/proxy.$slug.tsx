@@ -10,6 +10,8 @@ import {
 import { publicAction, visibleActions } from "../lib/entries/actions";
 import { findLiveCampaign, signup } from "../lib/entries/signup.server";
 import { publicWinners } from "../lib/winners.server";
+import { storefrontDaily } from "../lib/daily.server";
+import { readEntrantToken } from "../lib/token.server";
 import { campaignSettingsSchema } from "../lib/settings";
 import {
   landingPage,
@@ -54,6 +56,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
 
   const token = request.headers.get("x-entrant-token");
+  const t = readEntrantToken(token);
+  const entrantId = t?.campaignId === campaign.id ? t.entrantId : null;
   return json({
     campaign: {
       title: campaign.title,
@@ -66,6 +70,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     },
     turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? null,
     entrant: token ? await entrantState(token) : null,
+    // Set for giveaways with the daily draw on: today's prize, when it's drawn, the last winner.
+    daily: await storefrontDaily(campaign, entrantId),
     leaderboard: campaignSettingsSchema.safeParse(campaign.settings ?? {}).data
       ?.showLeaderboard
       ? await leaderboard(campaign.id, token)

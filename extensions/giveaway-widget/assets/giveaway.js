@@ -115,6 +115,8 @@
     return this.request("GET")
       .then(function (data) {
         self.data = data;
+        // Lets the daily popup launcher show the prize and countdown without a second request.
+        self.root.dispatchEvent(new CustomEvent("pcg:loaded", { bubbles: true, detail: data }));
         var entrant = data.entrant;
         if (entrant && entrant.state === "active") {
           self.renderEntrant(entrant);
@@ -154,7 +156,25 @@
 
   Widget.prototype.header = function () {
     var c = this.data.campaign;
+    var daily = this.data.daily;
     var nodes = [];
+    if (daily) {
+      // Daily draw: today's product is the prize, and the clock runs to tonight's draw.
+      var p = daily.prize;
+      if (p && p.imageUrl) nodes.push(el("img", { class: "pcg__image", src: p.imageUrl, alt: p.title, loading: "lazy" }));
+      nodes.push(el("div", { class: "pcg__hero" }, [
+        el("span", { class: "pcg__badge", text: "Daily giveaway" }),
+        el("h2", { class: "pcg__title", text: p ? p.title : c.title }),
+        p ? el("p", { class: "pcg__prize" }, [
+          document.createTextNode("Today's prize · $" + Math.round(p.value) + " value"),
+          p.url ? el("a", { class: "pcg__prize-link", href: p.url, text: "View" }) : null,
+        ]) : el("p", { class: "pcg__prize", text: "Today's prize is being picked. Check back in a minute." }),
+        el("p", { class: "pcg__timer-label", text: "Drawn tonight in" }),
+        (function (t) { t.classList.add("pcg__timer--daily"); return t; })(this.countdown(new Date(daily.drawAt))),
+      ]));
+      if (c.description) nodes.push(el("p", { class: "pcg__meta", text: c.description }));
+      return nodes;
+    }
     if (c.imageUrl) nodes.push(el("img", { class: "pcg__image", src: c.imageUrl, alt: c.prize || c.title, loading: "lazy" }));
     nodes.push(el("div", { class: "pcg__hero" }, [
       el("span", { class: "pcg__badge", text: "Giveaway" }),
@@ -175,8 +195,15 @@
       cells[u[0]] = el("b", { text: "0", "aria-hidden": "true" });
       return el("div", {}, [cells[u[0]], el("span", { text: labels[u[0]], "aria-hidden": "true" })]);
     }));
+    var self = this;
+    var reloaded = false;
     function tick() {
       var left = Math.max(0, Math.floor((endsAt.getTime() - Date.now()) / 1000));
+      // A daily draw just happened: fetch the next day's prize (and the new winner).
+      if (left === 0 && self.data && self.data.daily && !reloaded) {
+        reloaded = true;
+        window.setTimeout(function () { self.load(); }, 90000);
+      }
       units.forEach(function (u) {
         var v = Math.floor(left / u[1]);
         left -= v * u[1];
@@ -191,7 +218,17 @@
 
   // Sections every view shows: leaderboard, winners, rules and the free-entry link.
   Widget.prototype.extras = function () {
-    return [this.winners(), this.leaderboard(), this.footer()];
+    return [this.lastDailyWinner(), this.winners(), this.leaderboard(), this.footer()];
+  };
+
+  Widget.prototype.lastDailyWinner = function () {
+    var w = this.data.daily && this.data.daily.lastWinner;
+    if (!w) return null;
+    return el("p", { class: "pcg__last-winner" }, [
+      el("span", { text: "🏆 Last winner: " }),
+      el("b", { text: w.name }),
+      document.createTextNode(" won " + w.prize),
+    ]);
   };
 
   Widget.prototype.leaderboard = function () {
@@ -406,9 +443,12 @@
 
     var nodes = this.header().concat([
       el("div", { class: "pcg__count", role: "status", "aria-live": "polite" }, [
-        el("span", { text: plural(entrant.entries, "Your entry", "Your entries") }),
-        el("b", { text: String(entrant.entries) }),
+        el("span", { text: this.data.daily ? "Your entries today" : plural(entrant.entries, "Your entry", "Your entries") }),
+        el("b", { text: String(this.data.daily && this.data.daily.yourEntries !== null ? this.data.daily.yourEntries : entrant.entries) }),
       ]),
+      this.data.daily && this.data.daily.yourEntries === 0
+        ? el("p", { class: "pcg__note pcg__note--nudge", text: "You have no entries in today's draw yet. Check in or complete a task below to get in." })
+        : null,
       this.breakdown(entrant),
     ]);
 

@@ -5,6 +5,10 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { type EntryContext } from "react-router";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { startDailyScheduler } from "./lib/daily.server";
+
+// Picks, reserves and draws the daily prizes once a minute (see app/lib/daily.server.ts).
+startDailyScheduler();
 
 export const streamTimeout = 5000;
 

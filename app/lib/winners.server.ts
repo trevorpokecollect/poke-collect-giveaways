@@ -79,8 +79,13 @@ export async function emailWinner(winnerId: string, siteUrl: string) {
     claimDeadline(notifiedAt, cfg.claimDays)!,
   );
   const claimUrl = `${siteUrl}/apps/giveaways/claim/${token}`;
+  // Daily draws give away that day's product rather than the giveaway's main prize.
+  const daily = await db.dailyPrize.findUnique({
+    where: { drawId: winner.drawId },
+    select: { title: true },
+  });
   const vars = {
-    prize: campaign.prize || campaign.title,
+    prize: daily?.title || campaign.prize || campaign.title,
     title: campaign.title,
     claim_url: claimUrl,
   };

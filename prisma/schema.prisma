@@ -65,11 +65,12 @@ model Campaign {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  actions  EntryAction[]
-  entrants Entrant[]
-  events   EntryEvent[]
-  orders   OrderLog[]
-  draws    Draw[]
+  actions     EntryAction[]
+  entrants    Entrant[]
+  events      EntryEvent[]
+  orders      OrderLog[]
+  draws       Draw[]
+  dailyPrizes DailyPrize[]
 
   @@unique([shop, slug])
   @@index([shop, status])
@@ -274,7 +275,8 @@ model Draw {
   createdBy     String?
   createdAt     DateTime @default(now())
 
-  winners Winner[]
+  winners    Winner[]
+  dailyPrize DailyPrize?
 }
 
 model Winner {
@@ -310,4 +312,44 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([shop, createdAt])
+}
+
+enum DailyPrizeStatus {
+  // Picked and held back in Shopify (moved from available to reserved).
+  RESERVED
+  // Drawn; the unit stays reserved until the prize is sent.
+  DRAWN
+  // Sent to the winner; the reserved unit was removed from inventory.
+  SENT
+  // Back in normal stock: nobody entered, or the merchant released or swapped it.
+  RELEASED
+}
+
+// One prize per day for giveaways with the daily draw on (settings.daily). Each picks a
+// product from inventory, reserves one unit, and is drawn from that day's entries only.
+model DailyPrize {
+  id              String           @id @default(cuid())
+  campaignId      String
+  campaign        Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // Local date (in the campaign timezone) of the draw that closes this prize's day.
+  periodKey       String
+  opensAt         DateTime
+  drawAt          DateTime
+  productId       String
+  variantId       String
+  productHandle   String?
+  title           String
+  imageUrl        String?
+  value           Float
+  inventoryItemId String
+  locationId      String
+  status          DailyPrizeStatus @default(RESERVED)
+  drawId          String?          @unique
+  draw            Draw?            @relation(fields: [drawId], references: [id], onDelete: SetNull)
+  note            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([campaignId, periodKey])
+  @@index([status, drawAt])
 }

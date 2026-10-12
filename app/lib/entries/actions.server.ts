@@ -14,6 +14,8 @@ import {
   visibleActions,
 } from "./actions";
 import { activate, findLiveCampaign } from "./signup.server";
+import { periodFor } from "../daily";
+import { parseSettings } from "../settings";
 
 export async function verifyEntrant(
   shop: string,
@@ -379,7 +381,13 @@ export async function completeAction(
       break;
   }
 
-  const repeatKey = repeatable ? `:${today()}` : "";
+  // Daily-draw giveaways repeat on the draw's schedule (e.g. 9pm to 9pm), not the UTC date.
+  const daily = parseSettings(action.campaign.settings).daily;
+  const repeatKey = !repeatable
+    ? ""
+    : daily.enabled
+      ? `:${periodFor(new Date(), action.campaign.timezone, daily.drawTime).key}`
+      : `:${today()}`;
   const awarded = await award({
     campaignId: action.campaignId,
     entrantId: entrant.id,

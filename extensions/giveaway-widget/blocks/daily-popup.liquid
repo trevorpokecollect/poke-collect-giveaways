@@ -1,0 +1,107 @@
+{% comment %}
+  Daily giveaway popup (app embed): a floating launcher on every page that opens the
+  giveaway widget in a dialog, and opens itself once per draw for visitors who haven't
+  entered today. Turn it on in Theme settings > App embeds.
+{% endcomment %}
+{%- if block.settings.slug != blank -%}
+<div
+  class="pcg-pop pcg-pop--{{ block.settings.position }}"
+  data-pcg-pop
+  data-auto="{{ block.settings.auto_open }}"
+  data-delay="{{ block.settings.delay }}"
+  style="--pcg-accent: {{ block.settings.accent }};"
+>
+  <button class="pcg-pop__launcher" type="button" aria-haspopup="dialog" hidden>
+    <img class="pcg-pop__thumb" alt="" hidden>
+    <span class="pcg-pop__text">
+      <b>{{ block.settings.button_text | escape }}</b>
+      <small data-pcg-pop-sub>Enter free</small>
+    </span>
+  </button>
+  <dialog class="pcg-pop__dialog" aria-label="{{ block.settings.button_text | escape }}">
+    <button class="pcg-pop__close" type="button" aria-label="Close">&times;</button>
+    <div
+      class="pcg"
+      data-pcg
+      data-slug="{{ block.settings.slug | escape }}"
+      data-proxy="/apps/giveaways"
+      style="--pcg-accent: {{ block.settings.accent }};"
+    >
+      <div class="pcg__loading" aria-live="polite">Loading giveaway…</div>
+    </div>
+    {%- if block.settings.monthly_url != blank -%}
+      <a class="pcg-pop__monthly" href="{{ block.settings.monthly_url }}">{{ block.settings.monthly_label | escape }} &rarr;</a>
+    {%- endif -%}
+  </dialog>
+</div>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<script src="{{ 'giveaway.js' | asset_url }}" defer></script>
+<script src="{{ 'daily-popup.js' | asset_url }}" defer></script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Daily giveaway popup",
+  "target": "body",
+  "stylesheet": "giveaway.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "slug",
+      "label": "Giveaway link name",
+      "info": "The daily giveaway's link name from the app (On your store), e.g. daily-giveaway."
+    },
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Button text",
+      "default": "Daily giveaway"
+    },
+    {
+      "type": "checkbox",
+      "id": "auto_open",
+      "label": "Open automatically",
+      "info": "Once per draw, for visitors who haven't entered today.",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "delay",
+      "label": "Open after",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "s",
+      "default": 6
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "Button position",
+      "options": [
+        { "value": "right", "label": "Bottom right" },
+        { "value": "left", "label": "Bottom left" }
+      ],
+      "default": "left"
+    },
+    {
+      "type": "url",
+      "id": "monthly_url",
+      "label": "Monthly giveaway page",
+      "info": "Adds an \"Also enter our monthly giveaway\" link under the daily giveaway."
+    },
+    {
+      "type": "text",
+      "id": "monthly_label",
+      "label": "Monthly link text",
+      "default": "Also enter our monthly giveaway"
+    },
+    {
+      "type": "color",
+      "id": "accent",
+      "label": "Accent color",
+      "default": "#E3350D"
+    }
+  ]
+}
+{% endschema %}

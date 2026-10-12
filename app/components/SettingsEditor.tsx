@@ -1,5 +1,12 @@
 import type { CampaignSettings } from "../lib/settings";
-import { Check, NumberInput, TextArea, TextInput } from "./fields";
+import {
+  Check,
+  NumberInput,
+  RowCard,
+  TextArea,
+  TextInput,
+  list,
+} from "./fields";
 
 // Stores Campaign.settings only; the winner email, discounts, Klaviyo sync
 // and webhook delivery read these elsewhere.
@@ -16,9 +23,118 @@ export function SettingsEditor(props: {
     set({ consolation: { ...s.consolation, ...patch } });
   const klaviyo = (patch: Partial<CampaignSettings["klaviyo"]>) =>
     set({ klaviyo: { ...s.klaviyo, ...patch } });
+  const daily = (patch: Partial<CampaignSettings["daily"]>) =>
+    set({ daily: { ...s.daily, ...patch } });
+  const sources = s.daily.sources;
 
   return (
     <>
+      <s-section heading="Daily draw">
+        <s-stack gap="base">
+          <Check
+            label="Give away a different product every day"
+            checked={s.daily.enabled}
+            details="Each day the app picks an in-stock product that matches the rules below and reserves one in Shopify so it can't sell. At the draw time one winner is drawn from the entries earned that day, and tomorrow's prize is picked."
+            onChange={(enabled) => daily({ enabled })}
+          />
+          {s.daily.enabled && (
+            <>
+              <s-grid gridTemplateColumns="1fr 1fr 1fr" gap="base">
+                <TextInput
+                  label="Draw time"
+                  value={s.daily.drawTime}
+                  placeholder="21:00"
+                  details="24-hour time in the giveaway's timezone."
+                  onChange={(drawTime) => daily({ drawTime })}
+                />
+                <NumberInput
+                  label="Minimum price"
+                  prefix="$"
+                  min={0}
+                  value={s.daily.minPrice}
+                  onChange={(minPrice) => daily({ minPrice })}
+                />
+                <NumberInput
+                  label="Maximum price"
+                  prefix="$"
+                  min={0}
+                  value={s.daily.maxPrice}
+                  onChange={(maxPrice) => daily({ maxPrice })}
+                />
+              </s-grid>
+              <s-text type="strong">Products that can be picked</s-text>
+              {sources.map((src, i) => (
+                <RowCard
+                  key={i}
+                  heading={src.productType || `Source ${i + 1}`}
+                  actions={
+                    <s-button
+                      variant="tertiary"
+                      icon="delete"
+                      accessibilityLabel="Remove"
+                      onClick={() =>
+                        daily({ sources: list.remove(sources, i) })
+                      }
+                    />
+                  }
+                >
+                  <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+                    <TextInput
+                      label="Product type"
+                      value={src.productType}
+                      placeholder="Pokemon Sealed"
+                      details="Exactly as it appears on the product in Shopify."
+                      onChange={(productType) =>
+                        daily({
+                          sources: list.set(sources, i, { productType }),
+                        })
+                      }
+                    />
+                    <TextInput
+                      label="Languages"
+                      value={src.languages}
+                      placeholder="Any language"
+                      details='e.g. "English" (matches the Language_English tag). Blank allows any.'
+                      onChange={(languages) =>
+                        daily({ sources: list.set(sources, i, { languages }) })
+                      }
+                    />
+                  </s-grid>
+                </RowCard>
+              ))}
+              <s-stack direction="inline">
+                <s-button
+                  icon="plus"
+                  onClick={() =>
+                    daily({
+                      sources: [...sources, { productType: "", languages: "" }],
+                    })
+                  }
+                >
+                  Add product type
+                </s-button>
+              </s-stack>
+              <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+                <NumberInput
+                  label="Don't repeat a product for"
+                  suffix="days"
+                  min={0}
+                  value={s.daily.noRepeatDays}
+                  onChange={(noRepeatDays) => daily({ noRepeatDays })}
+                />
+                <NumberInput
+                  label="A daily winner can win again after"
+                  suffix="days"
+                  min={0}
+                  value={s.daily.winCooldownDays}
+                  onChange={(winCooldownDays) => daily({ winCooldownDays })}
+                />
+              </s-grid>
+            </>
+          )}
+        </s-stack>
+      </s-section>
+
       <s-section heading="Winner email">
         <s-stack gap="base">
           <Check

@@ -580,7 +580,19 @@ export function validateCampaignForm(
       error:
         field === "webhookUrl"
           ? "The webhook URL must be a full link starting with https://, or blank."
-          : `Settings (${field}): ${issue(settings.error)}`,
+          : field === "daily.drawTime"
+            ? "Daily draw: enter the draw time as HH:MM in 24-hour time, e.g. 21:00."
+            : field?.startsWith("daily.sources")
+              ? "Daily draw: every product source needs a product type."
+              : `Settings (${field}): ${issue(settings.error)}`,
+    };
+  }
+
+  const daily = settings.data.daily;
+  if (daily.enabled && daily.minPrice > daily.maxPrice) {
+    return {
+      ok: false,
+      error: "Daily draw: the minimum price can't be above the maximum.",
     };
   }
 

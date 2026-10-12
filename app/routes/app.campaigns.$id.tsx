@@ -19,6 +19,17 @@ import {
   winnerStatus,
 } from "../lib/winners.server";
 import { DrawsSection } from "../components/DrawsSection";
+import { DailySection, type DailyData } from "../components/DailySection";
+import {
+  currentPrize,
+  dailySettings,
+  drawPrize,
+  ensurePrize,
+  markPrizeSent,
+  releasePrize,
+  swapPrize,
+} from "../lib/daily.server";
+import { publicName } from "../lib/winners";
 
 const FILTERS = [
   "ALL",
@@ -86,6 +97,49 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       },
     }),
   ]);
+  const dailyCfg = dailySettings(campaign);
+  let daily: DailyData | null = null;
+  if (dailyCfg.enabled) {
+    const [current, prizes] = await Promise.all([
+      currentPrize(campaign),
+      db.dailyPrize.findMany({
+        where: { campaignId: campaign.id },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        include: {
+          draw: {
+            include: {
+              winners: {
+                take: 1,
+                include: { entrant: { select: { name: true, email: true } } },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    daily = {
+      drawTime: dailyCfg.drawTime,
+      timezone: campaign.timezone,
+      currentId: current?.prize?.id ?? null,
+      prizes: prizes.map((p) => {
+        const w = p.draw?.winners[0];
+        return {
+          id: p.id,
+          periodKey: p.periodKey,
+          title: p.title,
+          imageUrl: p.imageUrl,
+          value: p.value,
+          status: p.status,
+          drawAt: p.drawAt.toISOString(),
+          winner: w
+            ? `${publicName(w.entrant.name, w.entrant.email)} (${w.entrant.email})`
+            : null,
+          note: p.note,
+        };
+      }),
+    };
+  }
   const totalBy = Object.fromEntries(
     totals.map((t) => [t.entrantId, t._sum.entries ?? 0]),
   );
@@ -150,6 +204,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       })),
     })),
     drawExtras: await drawsSectionExtras(campaign),
+    daily,
   };
 };
 
@@ -175,6 +230,69 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       intent,
       form,
     });
+
+  if (intent.startsWith("daily")) {
+    const prizeId = String(form.get("prizeId") ?? "");
+    const owned = async () => {
+      const p = await db.dailyPrize.findFirst({
+        where: { id: prizeId, campaignId: campaign.id },
+      });
+      if (!p) throw new Error("Prize not found.");
+      return p;
+    };
+    try {
+      switch (intent) {
+        case "dailyPick": {
+          const p = await ensurePrize(campaign, admin);
+          if (!p)
+            return {
+              error:
+                "No prize picked. Check that daily draw is on, the giveaway is live, and an in-stock product matches the rules.",
+            };
+          await audit("daily.pick", { prizeId: p.id });
+          return { ok: true, message: `Today's prize: ${p.title}` };
+        }
+        case "dailySwap": {
+          const p = await swapPrize(campaign, admin);
+          await audit("daily.swap", { prizeId: p.id });
+          return { ok: true, message: `Swapped. Today's prize: ${p.title}` };
+        }
+        case "dailyDrawNow": {
+          const p = (await currentPrize(campaign))?.prize;
+          if (!p || p.status !== "RESERVED")
+            return { error: "There's no reserved prize to draw." };
+          const draw = await drawPrize(p, admin);
+          await audit("daily.draw", { prizeId: p.id, drawId: draw?.id });
+          return draw
+            ? { ok: true, message: "Winner drawn and emailed." }
+            : {
+                ok: true,
+                message:
+                  "Nobody has entered today, so the prize went back to stock.",
+              };
+        }
+        case "dailySent": {
+          await markPrizeSent((await owned()).id, admin);
+          await audit("daily.sent", { prizeId });
+          return {
+            ok: true,
+            message: "Marked sent and removed from inventory.",
+          };
+        }
+        case "dailyRelease": {
+          await releasePrize(
+            (await owned()).id,
+            admin,
+            "Released from the admin",
+          );
+          await audit("daily.release", { prizeId });
+          return { ok: true, message: "Prize put back in stock." };
+        }
+      }
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+  }
 
   switch (intent) {
     case "status": {
@@ -228,6 +346,7 @@ export default function CampaignPage() {
     orders,
     draws,
     drawExtras,
+    daily,
     filter,
     q,
     storefrontPath,
@@ -406,6 +525,8 @@ export default function CampaignPage() {
           )}
         </s-stack>
       </s-section>
+
+      {daily && <DailySection daily={daily} />}
 
       <DrawsSection draws={draws} extras={drawExtras} />
 

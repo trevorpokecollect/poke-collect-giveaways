@@ -29,6 +29,37 @@ export const campaignSettingsSchema = z.object({
       onlyConsented: z.boolean().default(true),
     })
     .prefault({}),
+  // Daily draw: a different in-stock product is picked and reserved as each day's prize,
+  // and drawn at drawTime from the entries earned that day. See app/lib/daily.server.ts.
+  daily: z
+    .object({
+      enabled: z.boolean().default(false),
+      // "HH:mm" in the campaign timezone.
+      drawTime: z
+        .string()
+        .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+        .default("21:00"),
+      minPrice: z.number().nonnegative().default(70),
+      maxPrice: z.number().nonnegative().default(100),
+      // Which products can be picked: a Shopify product type, optionally limited to
+      // languages (matched against the StorePass "Language_<name>" tag). Blank = any.
+      sources: z
+        .array(
+          z.object({
+            productType: z.string().min(1),
+            languages: z.string().default(""),
+          }),
+        )
+        .default([
+          { productType: "Pokemon Sealed", languages: "" },
+          { productType: "Pokemon Single", languages: "English" },
+        ]),
+      // Don't pick the same product again within this many days.
+      noRepeatDays: z.number().int().nonnegative().default(30),
+      // A daily winner can't win another daily prize within this many days.
+      winCooldownDays: z.number().int().nonnegative().default(30),
+    })
+    .prefault({}),
   webhookUrl: z.string().url().or(z.literal("")).default(""),
   showLeaderboard: z.boolean().default(false),
   showWinners: z.boolean().default(true),
