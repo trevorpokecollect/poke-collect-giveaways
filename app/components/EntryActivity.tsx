@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { publicName } from "../lib/winners";
+import { publicName } from "../lib/names";
 import { flag, TextInput } from "./fields";
 
 export interface ActivityItem {

@@ -47,15 +47,7 @@ export const escapeHtml = (s: string) =>
       })[c]!,
   );
 
-/** Public display name: first name and last initial, e.g. "Ash K." */
-export function publicName(name: string | null, email: string) {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return `${email.charAt(0).toUpperCase()}.`;
-  const first = parts[0];
-  const last =
-    parts.length > 1 ? ` ${parts.at(-1)!.charAt(0).toUpperCase()}.` : "";
-  return `${first}${last}`;
-}
+export { publicName } from "./names";
 
 // ── Claim tokens ────────────────────────────────────────────────────────────
 // Format: "c.<winnerId>.<expires epoch seconds>.<sig>". The "c" prefix and part
