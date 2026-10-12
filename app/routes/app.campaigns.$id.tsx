@@ -32,6 +32,7 @@ import {
 } from "../lib/daily.server";
 import { publicName } from "../lib/winners";
 import {
+  orderPlacedAt,
   ordersCountFrom,
   removePreStartOrderEntries,
 } from "../lib/entries/orders.server";
@@ -159,6 +160,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       }),
     };
   }
+  const when = new Intl.DateTimeFormat("en-US", {
+    timeZone: campaign.timezone,
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
   const totalBy = Object.fromEntries(
     totals.map((t) => [t.entrantId, t._sum.entries ?? 0]),
   );
@@ -167,11 +173,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     filter,
     q,
     storefrontPath: `/apps/giveaways/${campaign.slug}`,
-    startsLabel: new Intl.DateTimeFormat("en-US", {
-      timeZone: campaign.timezone,
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(ordersCountFrom(campaign)),
+    startsLabel: when.format(ordersCountFrom(campaign)),
     campaign: {
       id: campaign.id,
       title: campaign.title,
@@ -205,8 +207,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       id: o.id,
       name: o.orderName,
       email: o.email,
-      status: o.status,
+      status:
+        (o.breakdown as { reason?: string } | null)?.reason ===
+        "placed before the giveaway started"
+          ? "placed before start, entries removed"
+          : o.status.toLowerCase().replaceAll("_", " "),
       entries: o.entries,
+      placed: (() => {
+        const at = orderPlacedAt(o.breakdown);
+        return at ? when.format(at) : null;
+      })(),
     })),
     draws: draws.map((d) => ({
       id: d.id,
@@ -648,6 +658,7 @@ export default function CampaignPage() {
             <s-table>
               <s-table-header-row>
                 <s-table-header listSlot="primary">Order</s-table-header>
+                <s-table-header>Placed</s-table-header>
                 <s-table-header>Customer</s-table-header>
                 <s-table-header listSlot="inline">Result</s-table-header>
                 <s-table-header format="numeric">Entries</s-table-header>
@@ -658,7 +669,7 @@ export default function CampaignPage() {
                     <s-table-cell>{o.name}</s-table-cell>
                     <s-table-cell>{o.email ?? "—"}</s-table-cell>
                     <s-table-cell>
-                      {o.status.toLowerCase().replaceAll("_", " ")}
+                      {o.status}
                     </s-table-cell>
                     <s-table-cell>{o.entries}</s-table-cell>
                   </s-table-row>

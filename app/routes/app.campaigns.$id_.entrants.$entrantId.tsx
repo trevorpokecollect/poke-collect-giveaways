@@ -5,6 +5,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { entriesByMethod } from "../lib/entries/methods.server";
 import { methodLabel } from "../lib/entries/methods";
+import { orderPlacedAt } from "../lib/entries/orders.server";
 import { riskTone, statusTone } from "../lib/ui";
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
 
@@ -30,7 +31,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       where: { entrantId: entrant.id },
       orderBy: { createdAt: "desc" },
       take: 500,
-      include: { orderLog: { select: { orderName: true } } },
+      include: { orderLog: { select: { orderName: true, breakdown: true } } },
     }),
   ]);
   const when = new Intl.DateTimeFormat("en-US", {
@@ -58,7 +59,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       at: when.format(e.createdAt),
       method: methodLabel(e.source, e.actionId, methods.actions),
       entries: e.entries,
-      order: e.orderLog?.orderName ?? null,
+      order: e.orderLog
+        ? [
+            e.orderLog.orderName,
+            orderPlacedAt(e.orderLog.breakdown) &&
+              `placed ${when.format(orderPlacedAt(e.orderLog.breakdown)!)}`,
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : null,
       note: e.note,
     })),
   };
@@ -102,7 +111,7 @@ export default function EntrantEntries() {
           <s-table>
             <s-table-header-row>
               <s-table-header listSlot="primary">Method</s-table-header>
-              <s-table-header>When</s-table-header>
+              <s-table-header>Given</s-table-header>
               <s-table-header format="numeric">Entries</s-table-header>
               <s-table-header>Order</s-table-header>
               <s-table-header>Note</s-table-header>

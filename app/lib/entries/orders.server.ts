@@ -37,6 +37,12 @@ export interface OrderWebhookPayload {
   }[];
 }
 
+/** When the order was placed, as recorded in its order log (older logs don't have it). */
+export function orderPlacedAt(breakdown: unknown) {
+  const v = (breakdown as { placedAt?: unknown } | null)?.placedAt;
+  return typeof v === "string" ? new Date(v) : null;
+}
+
 /** The buyer's name from the order (customer, else billing address), for winner display. */
 export function orderBuyerName(p: OrderWebhookPayload) {
   for (const n of [p.customer, p.billing_address]) {
@@ -228,8 +234,16 @@ export async function processOrder(
         entries: target,
         // Order amounts ride along so analytics can report revenue.
         breakdown: (breakdown
-          ? { ...breakdown, subtotal: order.subtotal, total: order.total }
-          : { reason: "cancelled" }) as object,
+          ? {
+              ...breakdown,
+              subtotal: order.subtotal,
+              total: order.total,
+              placedAt: order.createdAt.toISOString(),
+            }
+          : {
+              reason: "cancelled",
+              placedAt: order.createdAt.toISOString(),
+            }) as object,
         status: cancelled
           ? "ROLLED_BACK_CANCELLED"
           : current > 0 && delta !== 0
@@ -312,7 +326,10 @@ export async function removePreStartOrderEntries(
         data: {
           entries: 0,
           status: "NO_ENTRIES",
-          breakdown: { reason: "placed before the giveaway started" },
+          breakdown: {
+            reason: "placed before the giveaway started",
+            placedAt: at.toISOString(),
+          },
         },
       });
       orders++;
