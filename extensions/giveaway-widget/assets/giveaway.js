@@ -650,7 +650,7 @@
       email,
       el("label", { class: "pcg__label", for: nameId, text: nameRequired ? "First And Last Name" : "Name (Optional)" }),
       name,
-      el("div", { class: "pcg__hp", "aria-hidden": "true" }, [el("label", { text: "Website" }), honeypot]),
+      el("div", { class: "pcg__hp", "aria-hidden": "true" }, [honeypot]),
       el("label", { class: "pcg__check" }, [consent, el("span", {}, [
         "Email me deals, drops and stream alerts.",
         emailRequired ? el("span", { class: "pcg__req", text: " Required To Enter" }) : null,

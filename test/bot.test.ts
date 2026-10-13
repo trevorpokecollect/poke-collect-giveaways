@@ -40,12 +40,17 @@ describe("email hygiene", () => {
 describe("risk scoring", () => {
   it("dedupes signals and caps at 100", () => {
     const r = scoreSignals([
-      { code: "honeypot" },
-      { code: "honeypot" },
+      { code: "turnstile_failed" },
+      { code: "turnstile_failed" },
       { code: "disposable_email" },
     ]);
     expect(r.signals).toHaveLength(2);
     expect(r.score).toBe(100);
+  });
+
+  it("only asks for an email code when the hidden field is the sole signal", () => {
+    const r = scoreSignals([{ code: "honeypot" }]);
+    expect(decide(r.score)).toBe("verify");
   });
 
   it("maps scores to policy decisions", () => {

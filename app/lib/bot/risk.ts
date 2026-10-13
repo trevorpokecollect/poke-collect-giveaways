@@ -26,7 +26,9 @@ export const SIGNAL_WEIGHTS: Record<SignalCode, number> = {
   // No token, or one already used: a real person who submitted before the check finished, or
   // retried after an error. Enough to ask for an email code, not to refuse the entry.
   turnstile_missing: 20,
-  honeypot: 100,
+  // The hidden field filled in. Android autofill (Google, Samsung Pass) fills it for real people
+  // and ignores autocomplete="off", so on its own it only asks for an email code.
+  honeypot: 20,
   disposable_email: 60,
   self_referral: 60,
   device_reuse: 45,
