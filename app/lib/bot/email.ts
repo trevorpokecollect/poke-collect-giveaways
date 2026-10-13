@@ -92,3 +92,52 @@ function envDisposableDomains() {
     .map((d) => d.trim().toLowerCase())
     .filter(Boolean);
 }
+
+// Common misspellings of the big email providers. People who type these never get the
+// verification code or a winner email, so the form asks them to fix it.
+const DOMAIN_TYPOS: Record<string, string> = {
+  "gmail.con": "gmail.com",
+  "gmail.co": "gmail.com",
+  "gmail.cm": "gmail.com",
+  "gmail.om": "gmail.com",
+  "gmail.comm": "gmail.com",
+  "gmial.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gamil.com": "gmail.com",
+  "gnail.com": "gmail.com",
+  "gmaill.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "gmail.cmo": "gmail.com",
+  "yahoo.con": "yahoo.com",
+  "yahoo.co": "yahoo.com",
+  "yaho.com": "yahoo.com",
+  "yahooo.com": "yahoo.com",
+  "yhoo.com": "yahoo.com",
+  "hotmail.con": "hotmail.com",
+  "hotmail.co": "hotmail.com",
+  "hotmial.com": "hotmail.com",
+  "hotmal.com": "hotmail.com",
+  "hotmai.com": "hotmail.com",
+  "outlook.con": "outlook.com",
+  "outlook.co": "outlook.com",
+  "outlok.com": "outlook.com",
+  "icloud.con": "icloud.com",
+  "icloud.co": "icloud.com",
+  "iclould.com": "icloud.com",
+  "icoud.com": "icloud.com",
+  "aol.con": "aol.com",
+  "aol.co": "aol.com",
+  "comcast.con": "comcast.net",
+  "att.con": "att.net",
+};
+
+/** The corrected address when the domain is a known typo (any ".con" becomes ".com"), else null. */
+export function suggestEmail(email: string): string | null {
+  const at = email.lastIndexOf("@");
+  if (at < 1) return null;
+  const domain = email.slice(at + 1).toLowerCase();
+  const fixed =
+    DOMAIN_TYPOS[domain] ??
+    (domain.endsWith(".con") ? `${domain.slice(0, -4)}.com` : null);
+  return fixed ? `${email.slice(0, at)}@${fixed}` : null;
+}

@@ -184,7 +184,7 @@ export default function EntrantEntries() {
                     ? "needs review"
                     : entrant.status.toLowerCase()}
               </s-badge>
-              <s-badge tone={riskTone(entrant.riskScore)}>
+              <s-badge tone={riskTone(entrant.riskScore, entrant.status)}>
                 Risk {entrant.riskScore}
               </s-badge>
             </s-stack>

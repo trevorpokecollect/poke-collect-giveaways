@@ -6,6 +6,7 @@ import {
   isValidEmailSyntax,
   looksGenerated,
   normalizeEmail,
+  suggestEmail,
 } from "../bot/email";
 import { hashId, subnetOf } from "../bot/fingerprint.server";
 import { isLimited } from "../bot/rate-limit.server";
@@ -133,6 +134,13 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
   const email = input.email.trim();
   if (!isValidEmailSyntax(email))
     return { ok: false, error: "Please enter a valid email.", status: 400 };
+  const suggested = suggestEmail(email);
+  if (suggested)
+    return {
+      ok: false,
+      error: `Check your email. Did you mean ${suggested}?`,
+      status: 400,
+    };
   if (parseSettings(campaign.settings).requireName && !hasFullName(input.name))
     return {
       ok: false,
