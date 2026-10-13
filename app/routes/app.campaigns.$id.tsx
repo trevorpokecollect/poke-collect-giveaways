@@ -812,7 +812,7 @@ export default function CampaignPage() {
                       </s-table-cell>
                       <s-table-cell>{e.entries.toLocaleString()}</s-table-cell>
                       <s-table-cell>
-                        <s-badge tone={riskTone(e.riskScore)}>
+                        <s-badge tone={riskTone(e.riskScore, e.status)}>
                           {e.riskScore}
                           {e.signals.length
                             ? ` · ${e.signals.join(", ").replaceAll("_", " ").toLowerCase()}`

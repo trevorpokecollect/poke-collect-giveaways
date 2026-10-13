@@ -55,6 +55,13 @@ note; no receipt email). Inventory BYPASS because the unit is already reserved; 
 Shopify deploy, Trevor approves in each store, add `write_orders` to Railway `SCOPES`. Tests: `prize-order.integration`,
 `address`.
 
+## Entry warnings review (2026-10-13, branch `claude/giveaway-bug-fixes-v8bwqr`, awaiting "deploy", Railway only)
+Trevor's CSV (892 daily entrants): 151 carry a signal (turnstile_missing 88, honeypot 45, generated_email 35, ip_burst 1,
+duplicate_email_alias 1); 147 verified their email code and behave like unflagged entrants (consent, phone, tasks). No
+blocks logged since the honeypot fix (8af9e1e). One entrant HELD at score 55 from three weak signals (Trevor to approve).
+Changes: `riskTone(score, status)` shows weak signals on ACTIVE (verified) entrants in grey; sign-up refuses known
+provider typos (`suggestEmail` in `bot/email.ts`, e.g. gmail.con, any ".con") with "Did you mean …?".
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
