@@ -62,7 +62,7 @@ blocks logged since the honeypot fix (8af9e1e). One entrant HELD at score 55 fro
 Changes: `riskTone(score, status)` shows weak signals on ACTIVE (verified) entrants in grey; sign-up refuses known
 provider typos (`suggestEmail` in `bot/email.ts`, e.g. gmail.con, any ".con") with "Did you mean …?".
 
-## Daily Tasks (branch `claude/daily-tasks`, NOT deployed; plan: `docs/DAILY_TASKS_PLAN.md`)
+## Daily Tasks (live 2026-10-13: Railway `237ae38`, Shopify **poke-collect-giveaways-30**; plan: `docs/DAILY_TASKS_PLAN.md`)
 Trevor's spec 10-13. A "Daily Tasks" section under the follow buttons: locked ("Complete All 4 Social Tasks To Unlock
 Daily Entries!", progress bar) until every one-time follow task is done (Whatnot, Discord, Facebook, Instagram; texts
 never count), then each task is claimable once per task day, with a "Resets In …" countdown and "Done Today. Back In …".
@@ -71,8 +71,8 @@ never count), then each task is claimable once per task day, with a "Resets In �
   5s later, honor system, rules say so), a weekly Central-time window (e.g. Fri 17:00–20:00) shown only while open, a
   "live show button" style (🔴 LIVE ON WHATNOT — JOIN NOW) and a **Turned off** switch for canceled shows.
 - Reset: setting `dailyTasks.resetAt`, default **"draw"** (9pm ET, once per daily drawing; keys = draw day, so the
-  old repeatable Bookmark claims carry over). "midnight" = midnight Central (`ct-YYYY-MM-DD` keys). Trevor asked for
-  midnight; awaiting his choice because midnight lets a task count twice in one draw (8pm–midnight CT).
+  old repeatable Bookmark claims carry over). "midnight" = midnight Central (`ct-YYYY-MM-DD` keys). Trevor chose
+  **draw** (10-13) for a smooth hand-off to the next day's giveaway.
 - Scheduled tasks dedupe per window (`win-YYYY-MM-DD`). Everything is checked on the server; completion records are
   the ledger rows (dedupe key = task + entrant + day/window, unique per giveaway). `award()` now returns false instead
   of erroring when two identical claims race (P2002, outside transactions).
@@ -80,7 +80,7 @@ never count), then each task is claimable once per task day, with a "Resets In �
 - Official Rules generator: daily tasks wording (unlock, once per day/show, not verified) + release of Instagram,
   Facebook, Whatnot.
 - No migration. Tests: `daily-tasks.test.ts`, `daily-tasks.integration.test.ts`, campaign-form (203 total).
-- **After deploy (Railway + Shopify, widget changed)**, in the daily giveaway editor: tick Daily Task on "Bookmark Our
+- **Still to do in the daily giveaway editor** (the section only appears once a task is ticked Daily Task): tick Daily Task on "Bookmark Our
   Next Show" (+20); add Visit A Page "Like & Comment On Instagram" (+5, post link(s), claim button "I Liked &
   Commented"); add Visit A Page "Join Our Live Whatnot Show" (+50, Whatnot link, Daily Task, Only At Set Times Fri
   17:00–20:00, live show button); regenerate the Official Rules.
