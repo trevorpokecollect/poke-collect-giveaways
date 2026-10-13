@@ -10,6 +10,7 @@ import {
 import { publicAction, visibleActions } from "../lib/entries/actions";
 import {
   activate,
+  enterToday,
   findLiveCampaign,
   signup,
 } from "../lib/entries/signup.server";
@@ -191,6 +192,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         },
       );
       return result.ok ? json(result) : json(result, 400);
+    }
+    case "enter-today": {
+      // Daily draws: a returning entrant enters today's draw with one tap.
+      const t = readEntrantToken(request.headers.get("x-entrant-token"));
+      const campaign = await findLiveCampaign(shop, params.slug!);
+      if (!t || !campaign || t.campaignId !== campaign.id)
+        return json({ error: "Please enter your email again." }, 400);
+      return json({ ok: true, awarded: await enterToday(t.entrantId) });
     }
     default:
       return json({ error: "Unknown request." }, 400);

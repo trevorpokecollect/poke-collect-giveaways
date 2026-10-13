@@ -99,7 +99,9 @@
       timer = window.setInterval(updateSub, 30000);
 
       var designMode = window.Shopify && window.Shopify.designMode;
-      var enteredToday = data.daily ? data.daily.yourEntries > 0 : !!data.entrant;
+      // Signing up only counts on the day, so returning players show as not entered until they enter today.
+      var day = data.daily;
+      var enteredToday = day ? (day.enteredToday != null ? day.enteredToday : day.yourEntries > 0) : !!data.entrant;
       pop.classList.toggle("pcg-pop--entered", enteredToday);
       icons.forEach(function (i) { i.classList.toggle("pcg-hicon--entered", enteredToday); });
       setBadgeWording(!!data.entrant || enteredToday);

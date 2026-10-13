@@ -78,6 +78,7 @@ export function previewData(
             ? { ...opts.dailyPrize, value: 0, url: null }
             : null,
           yourEntries: opts.entered ? signup : null,
+          enteredToday: opts.entered ? true : null,
           lastWinner: null,
           upcoming: opts.upcoming ?? [],
           tomorrow: opts.upcoming?.[0]?.date ?? null,

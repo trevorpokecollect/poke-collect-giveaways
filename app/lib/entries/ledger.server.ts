@@ -43,6 +43,18 @@ export async function entrantTotal(entrantId: string, tx: Tx = db) {
   return Math.max(0, _sum.entries ?? 0);
 }
 
+/** Whether the entrant got sign-up entries in the daily period that opened at `opensAt`. */
+export async function enteredToday(entrantId: string, opensAt: Date) {
+  return !!(await db.entryEvent.findFirst({
+    where: {
+      entrantId,
+      dedupeKey: { startsWith: `signup:${entrantId}` },
+      createdAt: { gte: opensAt },
+    },
+    select: { id: true },
+  }));
+}
+
 /**
  * Keeps only entrants who finished entering: every required action done and, when the giveaway
  * requires it, the email opt-in ticked. Until then their entries don't count in a draw.
@@ -79,7 +91,8 @@ export async function onlyFullyEntered<T extends { entrantId: string }>(
       select: { entrantId: true },
     });
     const count = new Map<string, number>();
-    for (const d of done) count.set(d.entrantId, (count.get(d.entrantId) ?? 0) + 1);
+    for (const d of done)
+      count.set(d.entrantId, (count.get(d.entrantId) ?? 0) + 1);
     ok = new Set([...ok].filter((id) => count.get(id) === required.length));
   }
   return tickets.filter((t) => ok.has(t.entrantId));

@@ -21,10 +21,11 @@ import { issueOtp } from "../otp.server";
 import { issueEntrantToken } from "../token.server";
 import { queueKlaviyoSync } from "../klaviyo.server";
 import { emitWebhook } from "../webhook-out.server";
-import { award, entrantTotal } from "./ledger.server";
+import { award, enteredToday, entrantTotal } from "./ledger.server";
 import { slugify } from "../slug";
 import { normalizeUsPhone } from "../phone";
 import { parseSettings } from "../settings";
+import { periodFor } from "../daily";
 import { isArchived } from "./actions";
 import { mirrorEntrant } from "./linked.server";
 
@@ -415,6 +416,33 @@ export async function activate(
   emitWebhook(entrant.campaignId, "entrant.activated", { entrantId });
   // One sign-up enters both linked giveaways.
   if (opts.mirror !== false) await mirrorEntrant(entrantId, activate);
+}
+
+/**
+ * Daily-draw giveaways: enters a returning entrant in today's draw with the sign-up entries,
+ * once per day. Only that day's entries count in a daily draw, so without this anyone who
+ * signed up on an earlier day had no way back in. Returns whether entries were added.
+ */
+export async function enterToday(entrantId: string, now = new Date()) {
+  const entrant = await db.entrant.findUnique({
+    where: { id: entrantId },
+    include: { campaign: { include: { actions: true } } },
+  });
+  if (!entrant || entrant.status !== "ACTIVE") return false;
+  const { campaign } = entrant;
+  const daily = parseSettings(campaign.settings).daily;
+  if (!daily.enabled) return false;
+  const period = periodFor(now, campaign.timezone, daily.drawTime);
+  if (await enteredToday(entrantId, period.opensAt)) return false;
+  const signupAction = campaign.actions.find((a) => a.type === "SIGNUP");
+  return award({
+    campaignId: campaign.id,
+    entrantId,
+    entries: signupAction?.entries ?? 1,
+    source: "ACTION",
+    actionId: signupAction?.id,
+    dedupeKey: `signup:${entrantId}:${period.key}`,
+  });
 }
 
 /** Revokes every referral entry an entrant earned for others (used when disqualifying a bot). */
