@@ -120,6 +120,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           orderBy: { position: "asc" },
           include: { entrant: { select: { email: true, name: true } } },
         },
+        dailyPrize: { select: { id: true } },
       },
     }),
   ]);
@@ -274,6 +275,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         claimedAt: w.claimedAt?.toISOString() ?? null,
         forfeited: w.forfeited,
         claimData: w.claimData as Record<string, string> | null,
+        // Daily product prizes get a $0 Shopify order when claimed.
+        prizeOrder: d.dailyPrize
+          ? {
+              name: w.prizeOrderName,
+              id: w.prizeOrderId?.split("/").pop() ?? null,
+            }
+          : null,
         ...winnerStatus(w, campaign.settings),
       })),
     })),

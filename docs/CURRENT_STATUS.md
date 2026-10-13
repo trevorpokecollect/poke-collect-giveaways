@@ -36,14 +36,24 @@ data or IPs in that table. Report endpoint `GET /stats/follow-clicks?days=14&key
 `?days=7&key=…&shop=poke-collect-al.myshopify.com`. CI `lint` is red on main from the thank-you extension (pre-existing;
 fix proposed on PR #8).
 
-## Daily re-entry fix (branch `claude/giveaway-bug-fixes-v8bwqr`, awaiting "deploy": Railway, then Shopify)
+## Daily re-entry fix (live 2026-10-13: Railway `615ef46`, Shopify deploy run by Trevor)
 Bug (Trevor 10-13): anyone who signed up on an earlier day had no way into today's draw (the sign-up entry only
 counts on the day it was earned; only Bookmark and purchases repeat). Fix: `enterToday()` (`signup.server.ts`) gives the
 sign-up entries once per daily period (dedupe `signup:<entrantId>:<periodKey>`, skipped if any `signup:<id>…` event is
 already in today's window). Called by the new POST intent `enter-today` (widget button **Enter Today's Giveaway**, shown
 when `daily.enteredToday === false`) and after a returning entrant confirms their email code. The popup treats
 `enteredToday` as "entered". Linked monthly is unaffected. Test: `test/daily-reenter.integration.test.ts`.
-Deploy Railway first (the widget only shows the button when the server sends `enteredToday`).
+
+## Winner prize order (branch `claude/giveaway-bug-fixes-v8bwqr`, awaiting "deploy")
+Trevor picked "when they claim" (10-13). When a daily winner submits the claim form, `createPrizeOrder`
+(`app/lib/prize-order.server.ts`) creates a $0 PAID Shopify order for the prize variant (`orderCreate`, tag "Giveaway
+Prize", shipping address from the claim; `app/lib/address.ts` maps typed country/state to codes; full address also in the
+note; no receipt email). Inventory BYPASS because the unit is already reserved; "Mark Sent" still removes it. Saved on
+`Winner.prizeOrderId/prizeOrderName` (migration `20261013190000_winner_prize_order`). Failure never blocks the claim
+(logged `[claim] prize order failed`); the Draws section shows "Order #…" or a **Create Order** button (intent
+`prizeOrder`, also for winners who claimed before this). Monthly winners get no order. Needs scope `write_orders`:
+Shopify deploy, Trevor approves in each store, add `write_orders` to Railway `SCOPES`. Tests: `prize-order.integration`,
+`address`.
 
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
@@ -61,7 +71,7 @@ Deploy Railway first (the widget only shows the button when the server sends `en
 5. Ran "Remove entries from orders placed before the start"? Unverified; order #252736 (placed 07-22) had been scored.
 6. **Staff Guide** not yet updated for giveaways (memory rule says it must be).
 7. Recommend rotating the Turnstile secret (it was pasted in chat on 10-12). Unverified if done.
-8. Promised, not built: $0 draft order when a winner claims (for now ship manually + "Mark Sent"). Trevor reported it missing 10-13.
+8. $0 winner order on claim: built 10-13, see "Winner prize order" above.
 9. Safety-stock prize moves are untested on the live store until the first such pick — check logs that night.
 10. Imports and manual adjustments on a daily giveaway count in the day they're added.
 11. Later/deferred: Discord OAuth join verification; merging giveaway/Collector Coins/chat launchers; Near Mint-only

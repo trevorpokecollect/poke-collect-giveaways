@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+// Claims import the prize-order code, which needs the Shopify app config this test doesn't use.
+vi.mock("../app/shopify.server", () => ({ unauthenticated: {} }));
+
 // Post-draw flow (winner email, claim, forfeit + redraw, public winners,
 // consolation eligibility, Klaviyo and outbound webhooks) against a real Postgres.
 const enabled = !!process.env.DATABASE_URL;

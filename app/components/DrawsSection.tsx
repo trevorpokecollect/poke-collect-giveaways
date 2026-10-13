@@ -15,6 +15,8 @@ export interface DrawWinner {
   claimedAt: string | null;
   forfeited: boolean;
   claimData: Record<string, string> | null;
+  /** Daily prizes only: the $0 Shopify order made when the winner claimed. */
+  prizeOrder: { name: string | null; id: string | null } | null;
   state: ClaimState;
   deadline: string | null;
 }
@@ -236,6 +238,25 @@ function WinnerRow({
           {c.province ? `, ${c.province}` : ""} {c.zip}, {c.country}. Phone{" "}
           {c.phone}
         </s-text>
+      )}
+      {w.prizeOrder && w.claimedAt && !w.forfeited && (
+        <s-stack direction="inline" gap="small-200" alignItems="center">
+          {w.prizeOrder.name ? (
+            <s-link href={`shopify://admin/orders/${w.prizeOrder.id}`}>
+              Order {w.prizeOrder.name}
+            </s-link>
+          ) : (
+            <>
+              <s-text color="subdued">No Shopify order yet.</s-text>
+              <s-button
+                disabled={busy}
+                onClick={() => submit({ intent: "prizeOrder", winnerId: w.id })}
+              >
+                Create Order
+              </s-button>
+            </>
+          )}
+        </s-stack>
       )}
       {open && (
         <s-button-group>

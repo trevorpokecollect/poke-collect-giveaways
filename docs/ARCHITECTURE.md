@@ -18,7 +18,7 @@ Checkout ▶ giveaway-thank-you UI extension ─▶ POST https://app-production-
 - Shopify app: client_id `0e0ba5328cb24247e2b03e9468d5e102`, name "Poke-Collect Giveaways", embedded, URL
   `https://app-production-2322.up.railway.app` (`shopify.app.toml`). Installed on live store `poke-collect-al.myshopify.com`
   (poke-collect.com, Advanced plan) and test store `poke-collect-packs-test.myshopify.com`.
-- Scopes: `read_orders,read_customers,read_products,write_discounts,read_inventory,write_inventory,read_locations`.
+- Scopes: `read_orders,write_orders,read_customers,read_products,write_discounts,read_inventory,write_inventory,read_locations`.
   Changing scopes needs a Shopify deploy + Trevor re-approving in each store's admin.
 - App proxy: `https://<store>/apps/giveaways/*` → `/proxy/*`. Webhooks API version 2026-10: `orders/create|updated|cancelled`
   → `/webhooks/orders`; `app/uninstalled`; `app/scopes_update`; compliance → `/webhooks/compliance`.
