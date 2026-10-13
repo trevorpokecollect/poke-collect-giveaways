@@ -21,6 +21,7 @@ import { mirrorAction } from "./linked.server";
 import { normalizeUsPhone } from "../phone";
 import { queueKlaviyoSync } from "../klaviyo.server";
 import { parseSettings } from "../settings";
+import { latestInstagramPost } from "../instagram.server";
 import {
   dailyUnlocked,
   isDailyTask,
@@ -62,6 +63,8 @@ export function dailyTaskState(
   entrantId: string,
   events: { actionId: string | null; dedupeKey: string | null }[],
   now = new Date(),
+  // The newest Instagram post, for tasks set to always open it.
+  latestInstagram: string | null = null,
 ) {
   const live = campaign.actions.filter((a) => !isArchived(a));
   const daily = live.filter(isDailyTask);
@@ -90,7 +93,8 @@ export function dailyTaskState(
             done:
               st.claimable &&
               keys.has(actionDedupeKey(a.id, entrantId, st.dedupeSuffix)),
-            url: rotatedUrl(c, day.key),
+            url:
+              (c.latestInstagram && latestInstagram) || rotatedUrl(c, day.key),
             closesAt: win?.closesAt ?? null,
             nextAt: c.paused ? null : (next?.opensAt ?? null),
           },
@@ -227,7 +231,17 @@ export async function entrantState(token: string) {
     pollResults,
     quizAttemptsLeft,
     // Null when the giveaway has no Daily Tasks.
-    dailyTasks: dailyTaskState(entrant.campaign, entrant.id, entrant.events),
+    dailyTasks: dailyTaskState(
+      entrant.campaign,
+      entrant.id,
+      entrant.events,
+      new Date(),
+      entrant.campaign.actions.some(
+        (a) => isDailyTask(a) && (a.config as TaskConfig).latestInstagram,
+      )
+        ? await latestInstagramPost()
+        : null,
+    ),
   };
 }
 

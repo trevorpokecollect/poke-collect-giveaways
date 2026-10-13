@@ -84,6 +84,15 @@ never count), then each task is claimable once per task day, with a "Resets In �
   Next Show" (+20); add Visit A Page "Like & Comment On Instagram" (+5, post link(s), claim button "I Liked &
   Commented"); add Visit A Page "Join Our Live Whatnot Show" (+50, Whatnot link, Daily Task, Only At Set Times Fri
   17:00–20:00, live show button); regenerate the Official Rules.
+- **Newest Instagram post** (branch `claude/daily-tasks`, NOT deployed): editor checkbox "Always open our newest
+  Instagram post" (`config.latestInstagram`, VISIT_URL daily tasks). `app/lib/instagram.server.ts` asks the Instagram
+  API (Instagram Login) for `/me/media?limit=1` permalink, cached 10 min (Trevor posts ~10:05am CT), falls back to the
+  task's link. Needs Railway var `INSTAGRAM_ACCESS_TOKEN` (long-lived token for @pokecollectcards, Trevor pastes it;
+  never in chat). The app refreshes it weekly and stores it in the new `AppValue` table (migration
+  `20261013230000_app_value`). Test: `instagram.integration.test.ts`.
+- Live store setup done 10-13: Bookmark Our Next Show (daily, +20), Join Our Live Whatnot Show (+50, Fri 17:00–20:00,
+  live button, Whatnot invite link), Like & Comment On Instagram (+5, profile link, "I Liked & Commented"). Official
+  Rules NOT yet regenerated (the Generate confirm popup can't be accepted from the Claude browser pane; Trevor to do).
 - Not verifiable: Instagram likes (no API), Whatnot live status/attendance (no public API). Possible later: verify
   Instagram comments via the Graph API with the entrant's IG handle.
 

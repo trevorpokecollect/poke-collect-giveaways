@@ -165,6 +165,7 @@ export interface ActionConfigForm {
   schedule?: { days: number[]; start: string; end: string };
   live?: boolean;
   paused?: boolean;
+  latestInstagram?: boolean;
 }
 
 /** Types that can be a Daily Task. */
@@ -533,6 +534,8 @@ export function validateActions(actions: ActionForm[]): Result<ActionData[]> {
       raw.schedule = daily ? c.schedule : undefined;
       raw.live = (daily && !!raw.schedule && c.live) || undefined;
       raw.paused = (daily && !!raw.schedule && c.paused) || undefined;
+      raw.latestInstagram =
+        (daily && a.type === "VISIT_URL" && c.latestInstagram) || undefined;
       const parsed = schema.safeParse(raw);
       if (!parsed.success) {
         const field = String(parsed.error.issues[0]?.path[0] ?? "");

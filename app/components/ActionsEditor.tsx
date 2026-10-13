@@ -352,6 +352,12 @@ function DailyTaskFields({
             value={(c.urls ?? []).join("\n")}
             onChange={(v) => setConfig({ urls: v.split(/\s*\n\s*/) })}
           />
+          <Check
+            label="Always open our newest Instagram post"
+            details="Checks the Poke-Collect Instagram every 10 minutes and opens the newest post, so a new daily post is picked up automatically. Needs INSTAGRAM_ACCESS_TOKEN set in Railway; until then (or if Instagram is down) it opens the page link above."
+            checked={!!c.latestInstagram}
+            onChange={(latestInstagram) => setConfig({ latestInstagram })}
+          />
           <TextInput
             label="Claim button (optional)"
             details={

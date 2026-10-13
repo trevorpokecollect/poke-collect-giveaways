@@ -29,6 +29,7 @@ export interface TaskConfig {
   schedule?: TaskSchedule;
   live?: boolean;
   paused?: boolean;
+  latestInstagram?: boolean;
   archived?: boolean;
 }
 

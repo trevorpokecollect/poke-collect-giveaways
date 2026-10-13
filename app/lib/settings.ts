@@ -154,6 +154,8 @@ const taskFields = {
     .optional(),
   live: z.boolean().optional(),
   paused: z.boolean().optional(),
+  // Open the newest post on our Instagram instead of the link (app/lib/instagram.server.ts).
+  latestInstagram: z.boolean().optional(),
 };
 
 export const actionConfigSchema = {
