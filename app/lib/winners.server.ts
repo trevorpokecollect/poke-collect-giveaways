@@ -5,6 +5,7 @@ import { runDraw } from "./draw.server";
 import { pendingConsolation, sendConsolationCodes } from "./discounts.server";
 import { syncCampaignToKlaviyo } from "./klaviyo.server";
 import { sendMail } from "./mailer.server";
+import { createPrizeOrder } from "./prize-order.server";
 import { parseSettings } from "./settings";
 import { slugify } from "./slug";
 import {
@@ -221,10 +222,16 @@ export async function submitClaim(
     };
   const { winnerId } = readClaimToken(claimSecret(), token)!;
   // Only the first submission counts.
-  await db.winner.updateMany({
+  const first = await db.winner.updateMany({
     where: { id: winnerId, claimedAt: null, forfeited: false },
     data: { claimData: parsed.data, claimedAt: new Date() },
   });
+  // Daily prizes get a $0 order to ship from. A failure doesn't stop the claim; the
+  // admin can retry with Create Order.
+  if (first.count === 1)
+    await createPrizeOrder(winnerId).catch((err) =>
+      console.error(`[claim] prize order failed {winner: ${winnerId}}`, err),
+    );
   return { view: await loadClaim(shop, token) };
 }
 
@@ -278,6 +285,7 @@ export const DRAW_INTENTS = new Set([
   "forfeitRedraw",
   "consolation",
   "klaviyoSync",
+  "prizeOrder",
 ]);
 
 /** Handles the draws-section buttons on app.campaigns.$id. */
@@ -342,6 +350,14 @@ export async function handleDrawIntent(opts: {
               }
             : {}),
         };
+      }
+      case "prizeOrder": {
+        if (!(await ownWinner())) return { error: "Winner not found." };
+        const name = await createPrizeOrder(winnerId, admin);
+        if (!name)
+          return { error: "Only a claimed daily prize can get an order." };
+        await audit("winner.prize_order", { winnerId, order: name });
+        return { ok: true, message: `Order ${name} created.` };
       }
       case "klaviyoSync": {
         const r = await syncCampaignToKlaviyo(campaignId);

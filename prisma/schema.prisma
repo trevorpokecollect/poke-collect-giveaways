@@ -292,17 +292,20 @@ model Draw {
 }
 
 model Winner {
-  id         String    @id @default(cuid())
-  drawId     String
-  draw       Draw      @relation(fields: [drawId], references: [id], onDelete: Cascade)
-  entrantId  String
-  entrant    Entrant   @relation(fields: [entrantId], references: [id], onDelete: Cascade)
-  position   Int
-  notifiedAt DateTime?
-  forfeited  Boolean   @default(false)
+  id             String    @id @default(cuid())
+  drawId         String
+  draw           Draw      @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  entrantId      String
+  entrant        Entrant   @relation(fields: [entrantId], references: [id], onDelete: Cascade)
+  position       Int
+  notifiedAt     DateTime?
+  forfeited      Boolean   @default(false)
   // Prize claim: the winner confirms shipping details through a tokenized link.
-  claimedAt  DateTime?
-  claimData  Json?
+  claimedAt      DateTime?
+  claimData      Json?
+  // Daily prizes: the $0 Shopify order created when the winner claims.
+  prizeOrderId   String?
+  prizeOrderName String?
 }
 
 // Prize images uploaded from the admin, served publicly at /images/<id>.
@@ -389,7 +392,6 @@ model DailyQueueItem {
 
   @@index([campaignId, usedAt, position])
 }
-
 
 // Daily count of clicks on a giveaway's follow/join buttons (Whatnot etc.), for the ad report.
 // Holds no personal data: one row per store, Central Time date, giveaway link name and platform.
