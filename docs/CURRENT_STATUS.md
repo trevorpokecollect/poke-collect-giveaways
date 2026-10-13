@@ -62,6 +62,22 @@ blocks logged since the honeypot fix (8af9e1e). One entrant HELD at score 55 fro
 Changes: `riskTone(score, status)` shows weak signals on ACTIVE (verified) entrants in grey; sign-up refuses known
 provider typos (`suggestEmail` in `bot/email.ts`, e.g. gmail.con, any ".con") with "Did you mean …?".
 
+## Bug check fixes (branch `claude/mac-bug-check-fixes`, NOT deployed yet)
+From the 10-13 Mac bug check (report: project file giveaway-bug-check-2026-10-13.md). Needs Trevor's "deploy" (Railway only;
+no widget or Shopify changes).
+- **Turnstile errors no longer block**: only `invalid-input-response` is `turnstile_failed`; network errors, a missing
+  secret or Cloudflare internal errors are `turnstile_missing` → email code (`turnstileSignal` in `bot/risk.ts`).
+- **Daily Forfeit And Redraw**: replacement drawn from that day's `dayTickets` (minus everyone in the draw and recent
+  winners) and added to the SAME Draw (`redrawDailyWinner`), so the email, claim page and $0 order use the day's
+  product. Claim page now shows the daily prize title/image.
+- **One prize per day**: `ensurePrize` re-checks and creates under `pg_advisory_xact_lock` per campaign+day; a losing
+  racer reserves nothing (scheduler returns the existing prize; Pick/Swap say "Today's prize just changed").
+- **Railway health check**: `railway.json` → `/healthz` (`app/routes/healthz.tsx`), so deploys stop 502ing customers.
+- Tests: `daily-redraw.integration`, `daily-prize-once.integration`, `bot.test` (186 total). Integration tests assume the
+  database session timezone is UTC (Railway's default); set it locally (`ALTER DATABASE … SET timezone='UTC'`).
+- Still open from that report: Release on a DRAWN prize, purchase-entry webhook race, void after rollback, $0 order
+  idempotency, prize value in storefront JSON, `restoreEvent` hard delete, rate-limit pruning.
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.

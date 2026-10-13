@@ -41,6 +41,20 @@ export const SIGNAL_WEIGHTS: Record<SignalCode, number> = {
   generated_email: 15,
 };
 
+/**
+ * Which signal a failed Turnstile check raises. Only a token Cloudflare says is invalid blocks;
+ * everything else (no token, a reused/expired one, or Cloudflare/our config failing) falls back
+ * to the email code, so an outage or a missing secret never turns real people away.
+ */
+export function turnstileSignal(errorCodes: string[]): Signal {
+  return {
+    code: errorCodes.includes("invalid-input-response")
+      ? "turnstile_failed"
+      : "turnstile_missing",
+    detail: errorCodes.join(","),
+  };
+}
+
 export type Decision = "allow" | "verify" | "hold" | "block";
 
 export interface RiskPolicy {
