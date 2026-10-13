@@ -735,6 +735,11 @@ export function generateOfficialRules(values: CampaignFormValues): string {
   ].filter(Boolean);
   const purchases = values.rules.enabled;
   const claimDays = values.settings.winnerEmail.claimDays;
+  // A daily giveaway holds a separate drawing every day from that day's entries only.
+  const daily = values.settings.daily.enabled;
+  const [h, m] = values.settings.daily.drawTime.split(":").map(Number);
+  const drawTime = `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  const zone = tz === "America/New_York" ? "Eastern Time" : tz;
 
   // Signing up on the giveaway page is free, so it is the free method of entry unless the
   // merchant adds separate instructions (e.g. a mail-in address) on an alternate entry action.
@@ -757,7 +762,9 @@ export function generateOfficialRules(values: CampaignFormValues): string {
       : "NO PURCHASE NECESSARY TO ENTER OR WIN. A PURCHASE WILL NOT INCREASE YOUR CHANCES OF WINNING. VOID WHERE PROHIBITED.",
     `1. Sponsor. ${title} (the "Giveaway") is sponsored by ${SPONSOR} (the "Sponsor"). The Giveaway is not sponsored, endorsed or administered by, or associated with, Shopify, Instagram, TikTok, Facebook, X, The Pokémon Company or Nintendo.`,
     `2. Eligibility. Open only to ${eligibility}. Employees of the Sponsor and their immediate family and household members are not eligible. Limit one sign-up per person and email address.`,
-    `3. Entry period. The Giveaway ${period} (Eastern Time). The Sponsor's clock is the official timekeeper.`,
+    daily
+      ? `3. Entry period and daily drawings. The Giveaway ${period} (Eastern Time). It is made up of separate daily drawings. Each daily drawing takes place at ${drawTime} ${zone} and its entry period runs from just after ${drawTime} on the previous day until ${drawTime} on the day of the drawing. Only entries earned during that period count toward that day's drawing; entries do not carry over from one day to the next. The Sponsor's clock is the official timekeeper.`
+      : `3. Entry period. The Giveaway ${period} (Eastern Time). The Sponsor's clock is the official timekeeper.`,
     [
       "4. How to enter.",
       `Free entry: ${freeMethod}`,
@@ -775,9 +782,17 @@ export function generateOfficialRules(values: CampaignFormValues): string {
     ]
       .filter(Boolean)
       .join("\n"),
-    `5. Prize. ${prize}.${values.description.trim() ? ` ${values.description.trim()}` : ""} No substitution, transfer or cash equivalent, except that the Sponsor may substitute a prize of equal or greater value. Winners are responsible for any taxes.`,
-    "6. Odds. Odds of winning depend on the total number of eligible entries received during the entry period.",
-    `7. Winner selection and notification. Winners are selected in a random drawing, weighted by entries, from all eligible entries after the entry period ends. Winners are notified by email and must confirm their details within ${plural(claimDays, "day")}, or the prize may be forfeited and an alternate winner drawn.`,
+    daily
+      ? `5. Prizes. One prize is awarded in each daily drawing: the product shown as that day's prize on the giveaway page.${values.description.trim() ? ` ${values.description.trim()}` : ""} No substitution, transfer or cash equivalent, except that the Sponsor may substitute a prize of equal or greater value. Winners are responsible for any taxes.`
+      : `5. Prize. ${prize}.${values.description.trim() ? ` ${values.description.trim()}` : ""} No substitution, transfer or cash equivalent, except that the Sponsor may substitute a prize of equal or greater value. Winners are responsible for any taxes.`,
+    daily
+      ? "6. Odds. Odds of winning a daily drawing depend on the total number of eligible entries received during that drawing's entry period."
+      : "6. Odds. Odds of winning depend on the total number of eligible entries received during the entry period.",
+    `7. Winner selection and notification. ${
+      daily
+        ? "Each day's winner is selected at the time of that day's drawing in a random drawing, weighted by entries, from the eligible entries earned during that day's entry period."
+        : "Winners are selected in a random drawing, weighted by entries, from all eligible entries after the entry period ends."
+    } Winners are notified by email and must confirm their details within ${plural(claimDays, "day")}, or the prize may be forfeited and an alternate winner drawn.`,
     "8. General. By entering, entrants agree to these rules and the Sponsor's decisions, which are final. The Sponsor may cancel, suspend or modify the Giveaway if fraud, technical failure or any other factor impairs its integrity. Entrants release the Sponsor from liability for any injury, loss or damage arising from participation or from accepting or using a prize.",
     "9. Privacy. Information collected is used to administer the Giveaway and as described in the Sponsor's privacy policy. Entrants who opt in may receive marketing emails and can unsubscribe at any time.",
     `10. Winners list. For the names of winners, contact ${SPONSOR} through its store within 30 days after the entry period ends.`,

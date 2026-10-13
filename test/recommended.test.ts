@@ -114,11 +114,20 @@ describe("applyRecommendedDaily", () => {
 describe("required steps", () => {
   it("daily uses the live monthly's amounts: texts 100, Whatnot 100 required, $10 = 50", () => {
     const v = applyRecommendedDaily(base());
-    expect(v.actions.find((a) => a.type === "SMS_OPTIN")).toMatchObject({ mandatory: false, entries: 100 });
-    const whatnot = v.actions.find((a) => a.type === "SOCIAL_FOLLOW" && a.config.url?.includes("whatnot"));
+    expect(v.actions.find((a) => a.type === "SMS_OPTIN")).toMatchObject({
+      mandatory: false,
+      entries: 100,
+    });
+    const whatnot = v.actions.find(
+      (a) => a.type === "SOCIAL_FOLLOW" && a.config.url?.includes("whatnot"),
+    );
     expect(whatnot).toMatchObject({ mandatory: true, entries: 100 });
     expect(v.actions.some((a) => a.type === "DAILY_CHECKIN")).toBe(false);
-    expect(v.rules.base).toMatchObject({ mode: "per_amount", entries: 50, amount: 10 });
+    expect(v.rules.base).toMatchObject({
+      mode: "per_amount",
+      entries: 50,
+      amount: 10,
+    });
     expect(v.settings.requireEmailConsent).toBe(true);
   });
 
@@ -148,15 +157,29 @@ describe("applyLiveMonthly", () => {
     const v = applyLiveMonthly({ ...base(), actions: [] });
     expect(validateCampaignForm(v).ok).toBe(true);
     const by = Object.fromEntries(v.actions.map((a) => [a.label, a]));
-    expect(by["Get text alerts for drops"]).toMatchObject({ entries: 100, mandatory: false });
-    expect(by["Follow us on Whatnot"]).toMatchObject({ entries: 100, mandatory: true });
+    expect(by["Get text alerts for drops"]).toMatchObject({
+      entries: 100,
+      mandatory: false,
+    });
+    expect(by["Follow us on Whatnot"]).toMatchObject({
+      entries: 100,
+      mandatory: true,
+    });
     expect(by["Join our Discord"].entries).toBe(50);
-    expect(by["Bookmark our next live show"]).toMatchObject({ type: "VISIT_URL", entries: 20, repeatable: true });
+    expect(by["Bookmark our next live show"]).toMatchObject({
+      type: "VISIT_URL",
+      entries: 20,
+      repeatable: true,
+    });
     expect(by["Like us on Facebook"].entries).toBe(10);
     expect(by["Follow us on Instagram"].entries).toBe(10);
     expect(by["Refer a friend"].entries).toBe(25);
     expect(v.actions.map((a) => a.type)).not.toContain("WATCH_VIDEO");
-    expect(v.rules.base).toMatchObject({ mode: "per_amount", entries: 50, amount: 10 });
+    expect(v.rules.base).toMatchObject({
+      mode: "per_amount",
+      entries: 50,
+      amount: 10,
+    });
     expect(v.settings.requireEmailConsent).toBe(true);
   });
 });

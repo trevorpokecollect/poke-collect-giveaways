@@ -31,6 +31,19 @@ export function addDays(ymd: string, days: number) {
 const drawOn = (ymd: string, drawTime: string, timeZone: string) =>
   parseLocalDateTime(`${ymd}T${drawTime}`, timeZone) as Date;
 
+/** The daily period named `key` (the local date of its draw). */
+export function periodForKey(
+  key: string,
+  timeZone: string,
+  drawTime: string,
+): Period {
+  return {
+    key,
+    opensAt: drawOn(addDays(key, -1), drawTime, timeZone),
+    drawAt: drawOn(key, drawTime, timeZone),
+  };
+}
+
 /** The daily period containing `now`. */
 export function periodFor(
   now: Date,

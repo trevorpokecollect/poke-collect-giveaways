@@ -241,4 +241,21 @@ describe("generateOfficialRules", () => {
     expect(text).toContain("1x sealed booster box");
     expect(text).toContain("Refer a friend: 5 entries per verified referral");
   });
+
+  it("describes a separate drawing each day for a daily giveaway", () => {
+    const v = values({ actions: [newAction("SIGNUP")] });
+    v.settings.daily = {
+      ...v.settings.daily,
+      enabled: true,
+      drawTime: "21:00",
+    };
+    const text = generateOfficialRules(v);
+    expect(text).toContain(
+      "Each daily drawing takes place at 9:00 PM Eastern Time",
+    );
+    expect(text).toContain("entries do not carry over");
+    expect(text).toContain("One prize is awarded in each daily drawing");
+    expect(text).toContain("Odds of winning a daily drawing");
+    expect(text).not.toContain("after the entry period ends. Winners");
+  });
 });

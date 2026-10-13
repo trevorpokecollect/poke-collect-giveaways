@@ -3,15 +3,18 @@ import db from "../../db.server";
 import { methodKey, methodRows, type MethodTotals } from "./methods";
 
 /**
- * Entries by method for a giveaway, optionally only those earned since `since`
- * (a daily giveaway's current draw period) or by one entrant.
+ * Entries by method for a giveaway, optionally only those earned in [since, until)
+ * (e.g. one daily draw period) or by one entrant.
  */
 export async function entriesByMethod(
   campaignId: string,
-  opts: { since?: Date; entrantId?: string } = {},
+  opts: { since?: Date; until?: Date; entrantId?: string } = {},
 ) {
   const since = opts.since
     ? Prisma.sql`AND "createdAt" >= ${opts.since}`
+    : Prisma.empty;
+  const until = opts.until
+    ? Prisma.sql`AND "createdAt" < ${opts.until}`
     : Prisma.empty;
   const entrant = opts.entrantId
     ? Prisma.sql`AND "entrantId" = ${opts.entrantId}`
@@ -31,7 +34,7 @@ export async function entriesByMethod(
              count(*) FILTER (WHERE entries > 0) AS times,
              count(DISTINCT "entrantId") FILTER (WHERE entries > 0) AS people
       FROM "EntryEvent"
-      WHERE "campaignId" = ${campaignId} ${since} ${entrant}
+      WHERE "campaignId" = ${campaignId} ${since} ${until} ${entrant}
       GROUP BY source, "actionId"`,
     db.entryAction.findMany({
       where: { campaignId },

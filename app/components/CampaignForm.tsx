@@ -269,7 +269,7 @@ export function CampaignForm(props: {
             />
             <s-stack direction="inline">
               <s-button icon="wand" onClick={generate}>
-                Generate from giveaway details
+                Generate From Giveaway Details
               </s-button>
             </s-stack>
             <TextArea

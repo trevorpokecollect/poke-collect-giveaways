@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { previewData } from "../app/lib/preview";
 import { applyRecommendedDaily } from "../app/lib/recommended";
-import { DEFAULT_TIMEZONE, newAction, rulesToForm } from "../app/lib/campaign-form";
+import {
+  DEFAULT_TIMEZONE,
+  newAction,
+  rulesToForm,
+} from "../app/lib/campaign-form";
 import { purchaseRulesSchema } from "../app/lib/entries/rules";
 import { parseSettings } from "../app/lib/settings";
 
@@ -34,7 +38,10 @@ describe("previewData", () => {
     });
     expect(d.campaign.requireEmailConsent).toBe(true);
     expect(d.campaign.actions.some((a) => a.type === "SIGNUP")).toBe(false);
-    expect(d.campaign.actions[0]).toMatchObject({ mandatory: true, entries: 100 });
+    expect(d.campaign.actions[0]).toMatchObject({
+      mandatory: true,
+      entries: 100,
+    });
     expect(d.daily).toMatchObject({
       drawAt: "2026-10-13T01:00:00.000Z",
       prize: { title: "Storm Emeralda Booster Box" },
@@ -46,7 +53,12 @@ describe("previewData", () => {
   it("shows the shop box with each example's entries", () => {
     const v = daily();
     v.settings.shop.products = [
-      { id: "gid://shopify/Product/1", title: "Booster box", imageUrl: null, price: 98.95 },
+      {
+        id: "gid://shopify/Product/1",
+        title: "Booster box",
+        imageUrl: null,
+        price: 98.95,
+      },
     ];
     const d = previewData(v, { imageUrl: null, entered: false });
     expect(d.shop).toMatchObject({

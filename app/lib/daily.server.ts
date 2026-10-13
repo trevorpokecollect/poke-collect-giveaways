@@ -747,3 +747,51 @@ export async function storefrontDaily(
         : null,
   };
 }
+
+// ── History ─────────────────────────────────────────────────────────────────
+
+/**
+ * Each daily draw, newest first: its prize, the people and entries in it (only that day's
+ * entries count, so the live day shows its total so far) and the winner.
+ */
+export async function drawHistory(campaign: Campaign, limit = 30) {
+  const prizes = await db.dailyPrize.findMany({
+    where: {
+      campaignId: campaign.id,
+      OR: [{ status: { not: "RELEASED" } }, { drawId: { not: null } }],
+    },
+    orderBy: [{ drawAt: "desc" }, { createdAt: "desc" }],
+    take: limit,
+    include: {
+      draw: {
+        include: {
+          winners: {
+            where: { forfeited: false },
+            take: 1,
+            include: { entrant: { select: { name: true, email: true } } },
+          },
+        },
+      },
+    },
+  });
+  const seen = new Set<string>();
+  const rows = [];
+  for (const p of prizes) {
+    if (seen.has(p.periodKey)) continue;
+    seen.add(p.periodKey);
+    const tickets = await dayTickets(p);
+    const w = p.draw?.winners[0];
+    rows.push({
+      key: p.periodKey,
+      title: p.title,
+      status: p.status,
+      drawAt: p.drawAt.toISOString(),
+      entrants: tickets.length,
+      entries: tickets.reduce((s, t) => s + t.entries, 0),
+      winner: w ? publicName(w.entrant.name, w.entrant.email) : null,
+    });
+  }
+  return rows;
+}
+
+export type DrawHistoryRow = Awaited<ReturnType<typeof drawHistory>>[number];

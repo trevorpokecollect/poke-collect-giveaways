@@ -7,16 +7,21 @@ const rules = (r: object) => purchaseRulesSchema.parse(r);
 describe("purchaseRateText", () => {
   it("states the rate from the purchase rules", () => {
     expect(
-      purchaseRateText(rules({ base: { mode: "per_amount", entries: 50, amount: 10 } })),
+      purchaseRateText(
+        rules({ base: { mode: "per_amount", entries: 50, amount: 10 } }),
+      ),
     ).toBe("50 entries for every $10 you spend");
     expect(
       purchaseRateText(
-        rules({ base: { mode: "per_amount", entries: 1, amount: 1 }, minOrderValue: 25 }),
+        rules({
+          base: { mode: "per_amount", entries: 1, amount: 1 },
+          minOrderValue: 25,
+        }),
       ),
     ).toBe("1 entry for every $1 you spend on orders of $25+");
-    expect(purchaseRateText(rules({ base: { mode: "fixed", entries: 5 } }))).toBe(
-      "5 entries for every order",
-    );
+    expect(
+      purchaseRateText(rules({ base: { mode: "fixed", entries: 5 } })),
+    ).toBe("5 entries for every order");
   });
 
   it("hides the box when purchases earn nothing", () => {
@@ -28,9 +33,11 @@ describe("purchaseRateText", () => {
 describe("feedCollection", () => {
   it("uses the Shop now collection, or Popular Picks for /collections/all and other pages", () => {
     expect(feedCollection("/collections/booster-boxes")).toBe("booster-boxes");
-    expect(feedCollection("https://poke-collect.com/collections/popular-picks?sort=x")).toBe(
-      "popular-picks",
-    );
+    expect(
+      feedCollection(
+        "https://poke-collect.com/collections/popular-picks?sort=x",
+      ),
+    ).toBe("popular-picks");
     expect(feedCollection("/collections/all")).toBe("popular-picks");
     expect(feedCollection("/pages/shop")).toBe("popular-picks");
   });

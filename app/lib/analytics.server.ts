@@ -1,4 +1,4 @@
-import type { Campaign } from "@prisma/client";
+import { Prisma, type Campaign } from "@prisma/client";
 import { entriesByMethod } from "./entries/methods.server";
 import db from "../db.server";
 import { normalizeEmail } from "./bot/email";
@@ -110,9 +110,40 @@ export function conversion(
 
 const rate = (n: number, d: number) => (d ? n / d : 0);
 
-export async function campaignAnalytics(campaign: Campaign) {
+/** A half-open time window [start, end); either side open when null. */
+export interface Window {
+  start: Date | null;
+  end: Date | null;
+}
+
+const ALL: Window = { start: null, end: null };
+
+/** A Prisma `createdAt` filter for the window. */
+const createdIn = (w: Window) =>
+  w.start || w.end
+    ? {
+        createdAt: {
+          ...(w.start ? { gte: w.start } : {}),
+          ...(w.end ? { lt: w.end } : {}),
+        },
+      }
+    : {};
+
+/** The same filter as raw SQL, starting with AND. */
+const createdInSql = (w: Window) =>
+  Prisma.sql`${w.start ? Prisma.sql`AND "createdAt" >= ${w.start}` : Prisma.empty} ${
+    w.end ? Prisma.sql`AND "createdAt" < ${w.end}` : Prisma.empty
+  }`;
+
+/**
+ * Analytics for a giveaway, limited to `win`: sign-ups, entrant statuses, referrals, UTMs
+ * and orders count by when they were created; entries by when they were earned.
+ */
+export async function campaignAnalytics(campaign: Campaign, win: Window = ALL) {
   const campaignId = campaign.id;
   const tz = campaign.timezone;
+  const inWin = createdIn(win);
+  const inWinSql = createdInSql(win);
 
   const [
     entrantDays,
@@ -122,39 +153,47 @@ export async function campaignAnalytics(campaign: Campaign) {
     entrants,
     topReferrers,
     orderLogs,
+    activity,
   ] = await Promise.all([
     db.$queryRaw<{ day: string; n: bigint }[]>`
       SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day,
              count(*) AS n
-      FROM "Entrant" WHERE "campaignId" = ${campaignId}
+      FROM "Entrant" WHERE "campaignId" = ${campaignId} ${inWinSql}
       GROUP BY 1`,
     // Gross entries awarded per day; rollbacks are reported by source below.
     db.$queryRaw<{ day: string; n: bigint }[]>`
       SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day,
              coalesce(sum(entries), 0) AS n
-      FROM "EntryEvent" WHERE "campaignId" = ${campaignId} AND entries > 0
+      FROM "EntryEvent" WHERE "campaignId" = ${campaignId} AND entries > 0 ${inWinSql}
       GROUP BY 1`,
     db.entrant.groupBy({
       by: ["status"],
-      where: { campaignId },
+      where: { campaignId, ...inWin },
       _count: true,
     }),
-    db.entrant.count({ where: { campaignId, verifiedAt: { not: null } } }),
+    db.entrant.count({
+      where: { campaignId, verifiedAt: { not: null }, ...inWin },
+    }),
     db.entrant.findMany({
-      where: { campaignId },
+      where: { campaignId, ...inWin },
       select: { emailNormalized: true, utm: true, ipHash: true },
     }),
     db.entrant.groupBy({
       by: ["referredById"],
-      where: { campaignId, referredById: { not: null } },
+      where: { campaignId, referredById: { not: null }, ...inWin },
       _count: true,
       orderBy: { _count: { referredById: "desc" } },
       take: 10,
     }),
     db.orderLog.findMany({
-      where: { campaignId },
+      where: { campaignId, ...inWin },
       select: { status: true, email: true, breakdown: true },
     }),
+    // Everyone who earned entries in the window, new or returning, and the net entries.
+    db.$queryRaw<{ people: bigint; entries: bigint | null }[]>`
+      SELECT count(DISTINCT "entrantId") FILTER (WHERE entries > 0) AS people,
+             sum(entries) AS entries
+      FROM "EntryEvent" WHERE "campaignId" = ${campaignId} ${inWinSql}`,
   ]);
 
   const referrerIds = topReferrers.map((r) => r.referredById!);
@@ -181,7 +220,16 @@ export async function campaignAnalytics(campaign: Campaign) {
       ...entrantDays.map((r) => ({ day: r.day, entrants: Number(r.n) })),
       ...entryDays.map((r) => ({ day: r.day, entries: Number(r.n) })),
     ]),
-    methods: (await entriesByMethod(campaignId)).rows,
+    methods: (
+      await entriesByMethod(campaignId, {
+        since: win.start ?? undefined,
+        until: win.end ?? undefined,
+      })
+    ).rows,
+    activity: {
+      people: Number(activity[0]?.people ?? 0),
+      entries: Math.max(0, Number(activity[0]?.entries ?? 0)),
+    },
     topReferrers: topReferrers.map((r) => ({
       id: r.referredById!,
       email: referrerById.get(r.referredById!)?.email ?? "(deleted)",

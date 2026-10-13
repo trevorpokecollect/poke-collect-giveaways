@@ -8,11 +8,15 @@ describe.skipIf(!enabled)("linked giveaways", async () => {
   const { completeAction, verifyEntrant } =
     await import("../app/lib/entries/actions.server");
   const { signup, activate } = await import("../app/lib/entries/signup.server");
-  const { entrantFromLinked } = await import("../app/lib/entries/linked.server");
+  const { entrantFromLinked } =
+    await import("../app/lib/entries/linked.server");
   const { entrantTotal } = await import("../app/lib/entries/ledger.server");
 
   const shop = `linked-${Date.now()}.myshopify.com`;
-  const ids: Record<string, Record<string, string>> = { monthly: {}, daily: {} };
+  const ids: Record<string, Record<string, string>> = {
+    monthly: {},
+    daily: {},
+  };
   let monthlyId = "";
   let dailyId = "";
   const codes: string[] = [];
@@ -96,7 +100,12 @@ describe.skipIf(!enabled)("linked giveaways", async () => {
       marketingConsent: true,
     });
     expect(res).toMatchObject({ ok: true, state: "verify" });
-    const v = await verifyEntrant(shop, "monthly", "misty@example.com", codes.at(-1)!);
+    const v = await verifyEntrant(
+      shop,
+      "monthly",
+      "misty@example.com",
+      codes.at(-1)!,
+    );
     expect(v).toMatchObject({ ok: true, state: "active", entries: 2 + 5 });
 
     const partner = await find(dailyId, "misty@example.com");
@@ -117,7 +126,9 @@ describe.skipIf(!enabled)("linked giveaways", async () => {
     expect(
       await completeAction(token, ids.daily["Join Discord"], {}),
     ).toMatchObject({ ok: true, awarded: true });
-    expect(await completeAction(token, ids.daily["Check in"], {})).toMatchObject({
+    expect(
+      await completeAction(token, ids.daily["Check in"], {}),
+    ).toMatchObject({
       ok: true,
       awarded: true,
     });
@@ -157,9 +168,13 @@ describe.skipIf(!enabled)("linked giveaways", async () => {
     );
     expect(await find(monthlyId, "brock@example.com")).toBeNull();
 
-    const monthly = await db.campaign.findUniqueOrThrow({ where: { id: monthlyId } });
+    const monthly = await db.campaign.findUniqueOrThrow({
+      where: { id: monthlyId },
+    });
     // A token from some other giveaway doesn't count.
-    expect(await entrantFromLinked(monthly, d.id, monthlyId, activate)).toBeNull();
+    expect(
+      await entrantFromLinked(monthly, d.id, monthlyId, activate),
+    ).toBeNull();
     const here = await entrantFromLinked(monthly, d.id, dailyId, activate);
     expect(here).toMatchObject({ status: "ACTIVE", campaignId: monthlyId });
     expect(await entrantTotal(here!.id)).toBe(2 + 3);
@@ -170,7 +185,10 @@ describe.skipIf(!enabled)("linked giveaways", async () => {
   });
 
   it("stops mirroring once the link is removed", async () => {
-    await db.campaign.update({ where: { id: dailyId }, data: { settings: {} } });
+    await db.campaign.update({
+      where: { id: dailyId },
+      data: { settings: {} },
+    });
     const res = await signup({
       shop,
       campaignSlug: "daily",
