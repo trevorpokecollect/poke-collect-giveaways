@@ -106,6 +106,7 @@ Daily sources default: "Pokemon Sealed" (any language) + "Pokemon Single" with l
 SHOPIFY_API_KEY, SHOPIFY_API_SECRET, SHOPIFY_APP_URL, SCOPES, DATABASE_URL, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY,
 RESEND_API_KEY, MAIL_FROM (default "Poke-Collect Giveaways <giveaways@poke-collect.com>"), KLAVIYO_PRIVATE_KEY,
 ENTRANT_TOKEN_SECRET (falls back to SHOPIFY_API_SECRET), FINGERPRINT_SECRET, OUTBOUND_WEBHOOK_SECRET, CRON_SECRET,
+FOLLOW_STATS_KEY (unset = /stats/follow-clicks answers 401),
 DAILY_SCHEDULER, DISPOSABLE_EMAIL_DOMAINS, SHOP_CUSTOM_DOMAIN. Confirmed set by Trevor: Turnstile pair, RESEND_API_KEY,
 KLAVIYO_PRIVATE_KEY. **Unverified** which of the others are set (Railway variable reads are blocked for the Mac session).
 Turnstile site key (public): `0x4AAAAAAFUH08Ib9QEPgkz4`. Trevor sets Railway variables himself — never ask him to paste secrets. Resend domain poke-collect.com verified (DNS at GoDaddy).

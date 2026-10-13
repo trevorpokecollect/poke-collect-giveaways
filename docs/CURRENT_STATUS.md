@@ -23,6 +23,17 @@ giveaway page tabs have just a "Current draw / All time" toggle for Entries By M
 Turnstile/honeypot false-block fixes; pre-start order cleanup; entries-by-method, activity feed, disqualify entry/entrant;
 new-vs-existing sign-ups; tabs UI; mobile sheet/header icon; Title Case; theme `.pcg` collision fixes.
 
+## Built, not deployed: follow button click counts (branch `claude/whatnot-follow-clicks-xc05pv`)
+Trevor's weekly ad report uses "Follow On Whatnot" clicks as a stand-in for Whatnot sign-ups. The widget sends a
+fire-and-forget beacon (`navigator.sendBeacon`, fetch keepalive fallback) to `/apps/giveaways/follow-click` after the
+link opens, once per button per browser per day. `proxy.follow-click.tsx` → `recordFollowClick` (`app/lib/follow-clicks*.ts`)
+works out the platform from the action's own URL on the server, rate-limits 10/hour per hashed IP per giveaway+platform
+(RateLimitHit), and upserts `FollowClickDay` {shop, date (America/Chicago), giveaway slug, platform, clicks}. No personal
+data or IPs in that table. Report endpoint `GET /stats/follow-clicks?days=14&key=<FOLLOW_STATS_KEY>[&shop=][&giveaway=]`
+(no Shopify login) returns `[{date, giveaway, platform, clicks, shop}]`, newest first. Admin Analytics page shows a
+"Follow Button Clicks (Last 14 Days)" table. Clicks before sign-up don't count (the button doesn't open the link then).
+Needs: Railway deploy (migration runs on start) + `FOLLOW_STATS_KEY` variable + Shopify deploy (widget).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.

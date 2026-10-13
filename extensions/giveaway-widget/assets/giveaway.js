@@ -129,7 +129,8 @@
     this.root = root;
     // A blank link name means the newest open giveaway.
     this.slug = (root.getAttribute("data-slug") || "").trim() || "latest";
-    this.base = (root.getAttribute("data-proxy") || "/apps/giveaways") + "/" + encodeURIComponent(this.slug);
+    this.proxy = root.getAttribute("data-proxy") || "/apps/giveaways";
+    this.base = this.proxy + "/" + encodeURIComponent(this.slug);
     this.tokenKey = TOKEN_KEY + this.slug;
     this.ref = new URLSearchParams(window.location.search).get("ref") || "";
     this.renderedAt = Date.now();
@@ -476,6 +477,26 @@
     ]);
   };
 
+  // Counts a follow-button click for the daily click report (Whatnot follows stand in for
+  // Whatnot sign-ups in the ad report). Fire-and-forget, once per button per browser per day;
+  // runs after the link has opened and never throws.
+  Widget.prototype.followClick = function (a) {
+    try {
+      if (!platformOf(a)) return;
+      var key = "pcg:fc:" + this.slug + ":" + a.id;
+      var today = new Date().toDateString();
+      if (store(key) === today) return;
+      store(key, today);
+      var url = this.proxy + "/follow-click";
+      var body = JSON.stringify({ giveaway: this.slug, action: a.id });
+      var sent = false;
+      if (navigator.sendBeacon) sent = navigator.sendBeacon(url, new Blob([body], { type: "text/plain" }));
+      if (!sent && window.fetch) {
+        fetch(url, { method: "POST", body: body, keepalive: true, credentials: "same-origin", headers: { "Content-Type": "text/plain" } }).catch(function () {});
+      }
+    } catch (e) { /* never get in the way of the link */ }
+  };
+
   Widget.prototype.smsAction = function () {
     return this.data.campaign.actions.filter(function (a) { return a.type === "SMS_OPTIN"; })[0] || null;
   };
@@ -499,7 +520,7 @@
         onclick: function () {
           var url = (a.config && a.config.url) || a.url;
           if (!entrant) { self.focusEmail("Enter your email first, then tap to earn " + entriesText(a.entries) + "."); return; }
-          if (url) window.open(url, "_blank", "noopener");
+          if (url) { window.open(url, "_blank", "noopener"); self.followClick(a); }
           if (finished) return;
           if (isLocked) { error.textContent = "Complete the required step first to unlock this one."; return; }
           self.submitAction(a, {}, { error: error, button: btn }).catch(function () {});
@@ -1084,7 +1105,7 @@
         // VISIT_URL, SOCIAL_FOLLOW, DAILY_CHECKIN, CUSTOM.
         var url = cfg.url || a.url;
         var b = btn(a.type === "DAILY_CHECKIN" ? "Check In" : a.type === "SOCIAL_FOLLOW" ? "Follow" : url ? "Visit" : "Done", function () {
-          if (url) window.open(url, "_blank", "noopener");
+          if (url) { window.open(url, "_blank", "noopener"); self.followClick(a); }
           self.submitAction(a, {}, ctx).catch(function () {});
         });
         ctx.button = b;

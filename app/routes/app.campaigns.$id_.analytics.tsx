@@ -11,6 +11,12 @@ import { Select } from "../components/fields";
 import { resolveRange, type RangePreset } from "../lib/analytics-range";
 import { drawHistory } from "../lib/daily.server";
 import { parseSettings } from "../lib/settings";
+import {
+  PLATFORM_LABELS,
+  followClickTable,
+  recentDates,
+} from "../lib/follow-clicks";
+import { followClickStats } from "../lib/follow-clicks.server";
 
 // Named with "$id_" so it renders as its own page instead of nesting inside
 // the campaign page (which has no <Outlet />). URL: /app/campaigns/:id/analytics.
@@ -26,9 +32,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     timeZone: campaign.timezone,
     drawTime: daily.enabled ? daily.drawTime : null,
   });
-  const [stats, draws] = await Promise.all([
+  const [stats, draws, clicks] = await Promise.all([
     campaignAnalytics(campaign, range),
     daily.enabled ? drawHistory(campaign) : Promise.resolve([]),
+    followClickStats({ days: 14, shop: session.shop, giveaway: campaign.slug }),
   ]);
   return {
     campaign: { id: campaign.id, title: campaign.title },
@@ -44,6 +51,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     },
     draws,
     stats,
+    followClicks: followClickTable(clicks, recentDates(14)),
   };
 };
 
@@ -70,7 +78,7 @@ const shortDay = (ymd: string) =>
   }).format(new Date(`${ymd}T12:00:00Z`));
 
 export default function CampaignAnalytics() {
-  const { campaign, stats, range, draws, daily, timezone } =
+  const { campaign, stats, range, draws, daily, timezone, followClicks } =
     useLoaderData<typeof loader>();
   const { totals, revenue, conversion } = stats;
   const navigate = useNavigate();
@@ -296,6 +304,47 @@ export default function CampaignAnalytics() {
         <BarChart days={stats.days} field="entries" />
       </s-section>
 
+      <s-section heading="Follow Button Clicks (Last 14 Days)">
+        <s-stack gap="base">
+          <s-text color="subdued">
+            Taps on the follow and join buttons that opened the link, counted
+            once per browser per day. Days are in Central Time.
+          </s-text>
+          <s-table>
+            <s-table-header-row>
+              <s-table-header listSlot="primary">Day</s-table-header>
+              {followClicks.platforms.map((p) => (
+                <s-table-header key={p} format="numeric">
+                  {PLATFORM_LABELS[p]}
+                </s-table-header>
+              ))}
+            </s-table-header-row>
+            <s-table-body>
+              {followClicks.days.map((d) => (
+                <s-table-row key={d.date}>
+                  <s-table-cell>{shortDay(d.date)}</s-table-cell>
+                  {d.counts.map((n, i) => (
+                    <s-table-cell key={followClicks.platforms[i]}>
+                      {n.toLocaleString()}
+                    </s-table-cell>
+                  ))}
+                </s-table-row>
+              ))}
+              <s-table-row>
+                <s-table-cell>
+                  <s-text type="strong">Total</s-text>
+                </s-table-cell>
+                {followClicks.totals.map((n, i) => (
+                  <s-table-cell key={followClicks.platforms[i]}>
+                    <s-text type="strong">{n.toLocaleString()}</s-text>
+                  </s-table-cell>
+                ))}
+              </s-table-row>
+            </s-table-body>
+          </s-table>
+        </s-stack>
+      </s-section>
+
       <s-section heading="Entries By Method">
         <EntriesByMethodTable rows={stats.methods} />
       </s-section>
@@ -348,11 +397,10 @@ export default function CampaignAnalytics() {
           Days use the giveaway&apos;s timezone. A daily draw runs from the
           previous draw to this one (e.g. 9pm to 9pm), and only entries earned
           in it count toward that draw. New sign-ups, statuses, referrals,
-          traffic sources and orders count by when they were created; entries
-          by when they were earned. Revenue is the subtotal of orders that
-          earned entries. &quot;Entrants Who Bought&quot; counts people who
-          signed up through the giveaway form and also have an order in the
-          log.
+          traffic sources and orders count by when they were created; entries by
+          when they were earned. Revenue is the subtotal of orders that earned
+          entries. &quot;Entrants Who Bought&quot; counts people who signed up
+          through the giveaway form and also have an order in the log.
         </s-paragraph>
       </s-section>
     </s-page>
