@@ -23,7 +23,7 @@ giveaway page tabs have just a "Current draw / All time" toggle for Entries By M
 Turnstile/honeypot false-block fixes; pre-start order cleanup; entries-by-method, activity feed, disqualify entry/entrant;
 new-vs-existing sign-ups; tabs UI; mobile sheet/header icon; Title Case; theme `.pcg` collision fixes.
 
-## Built, not deployed: follow button click counts (branch `claude/whatnot-follow-clicks-xc05pv`)
+## Follow button click counts (live 2026-10-13: Railway `7dc1a48`, Shopify **poke-collect-giveaway-27**)
 Trevor's weekly ad report uses "Follow On Whatnot" clicks as a stand-in for Whatnot sign-ups. The widget sends a
 fire-and-forget beacon (`navigator.sendBeacon`, fetch keepalive fallback) to `/apps/giveaways/follow-click` after the
 link opens, once per button per browser per day. `proxy.follow-click.tsx` → `recordFollowClick` (`app/lib/follow-clicks*.ts`)
@@ -32,7 +32,9 @@ works out the platform from the action's own URL on the server, rate-limits 10/h
 data or IPs in that table. Report endpoint `GET /stats/follow-clicks?days=14&key=<FOLLOW_STATS_KEY>[&shop=][&giveaway=]`
 (no Shopify login) returns `[{date, giveaway, platform, clicks, shop}]`, newest first. Admin Analytics page shows a
 "Follow Button Clicks (Last 14 Days)" table. Clicks before sign-up don't count (the button doesn't open the link then).
-Needs: Railway deploy (migration runs on start) + `FOLLOW_STATS_KEY` variable + Shopify deploy (widget).
+`FOLLOW_STATS_KEY` is set in Railway (random; Trevor reads it there, never paste it in chat). Trevor's weekly report uses
+`?days=7&key=…&shop=poke-collect-al.myshopify.com`. CI `lint` is red on main from the thank-you extension (pre-existing;
+fix proposed on PR #8).
 
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
