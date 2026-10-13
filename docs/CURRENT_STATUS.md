@@ -1,6 +1,6 @@
 # CURRENT_STATUS — snapshot (update after every session)
 
-_Last updated: 2026-10-13 ~15:10Z · code @ `8af9e1e` (docs @ `ec24403`+) · Shopify app version **poke-collect-giveaways-26** · Railway
+_Last updated: 2026-10-13 ~18:40Z · code @ `3bfd44f` (docs @ `ec24403`+) · Shopify app version **poke-collect-giveaways-26** · Railway
 deployed `8af9e1e` (SUCCESS)._
 
 ## Live now (poke-collect.com)
@@ -44,7 +44,7 @@ already in today's window). Called by the new POST intent `enter-today` (widget 
 when `daily.enteredToday === false`) and after a returning entrant confirms their email code. The popup treats
 `enteredToday` as "entered". Linked monthly is unaffected. Test: `test/daily-reenter.integration.test.ts`.
 
-## Winner prize order (branch `claude/giveaway-bug-fixes-v8bwqr`, awaiting "deploy")
+## Winner prize order (live 2026-10-13: Railway `3bfd44f` with SCOPES += write_orders; Shopify deploy + store approvals done by Trevor)
 Trevor picked "when they claim" (10-13). When a daily winner submits the claim form, `createPrizeOrder`
 (`app/lib/prize-order.server.ts`) creates a $0 PAID Shopify order for the prize variant (`orderCreate`, tag "Giveaway
 Prize", shipping address from the claim; `app/lib/address.ts` maps typed country/state to codes; full address also in the
