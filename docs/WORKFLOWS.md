@@ -100,5 +100,6 @@ change redeployed from `main` and silently undid a CLI-only deploy — assume th
 ## Coordination with other Claude sessions
 Cloud project thread (claude.ai project "Shopify giveaway app", session `session_01APxGeHdNAUAe7RTMNEHESi`) writes all
 code, pushes `main`, deploys Railway. The Mac session (Remote Control) runs `shopify app deploy`, store checks and
-listings unless assigned a build. Never use GitHub create-repository or account-wide search tools; Trevor creates repos. Before editing code, send a coordination note via `send_message` (`sent_to_shared_agent`) and
-`git pull`; if `origin/main` moved with an overlapping change, keep theirs and drop yours.
+listings unless assigned a build. Never use GitHub create-repository or account-wide search tools; Trevor creates repos. Messaging is one-way: the Mac can `send_message` the cloud thread, but the cloud thread can't message the Mac (it only
+takes Trevor's own messages). To hand the Mac something, push a file and ask Trevor to tell the Mac to pull it. Always
+`git pull` before editing; if `origin/main` moved with an overlapping change, keep theirs and drop yours.

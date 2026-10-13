@@ -1,6 +1,6 @@
 # CURRENT_STATUS — snapshot (update after every session)
 
-_Last updated: 2026-10-13 ~15:00Z · `main` @ `8af9e1e` · Shopify app version **poke-collect-giveaways-26** · Railway
+_Last updated: 2026-10-13 ~15:10Z · code @ `8af9e1e` (docs @ `ec24403`+) · Shopify app version **poke-collect-giveaways-26** · Railway
 deployed `8af9e1e` (SUCCESS)._
 
 ## Live now (poke-collect.com)
