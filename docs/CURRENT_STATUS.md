@@ -96,6 +96,10 @@ never count), then each task is claimable once per task day, with a "Resets In â
   "I Liked & Commented"). Meta app "Poke-Collect Giveaways" (936934886163446), Instagram API use case, @pokecollectcards
   is its Instagram Tester. Lookup failures log `[instagram] newest post lookup failed`. Official
   Rules NOT yet regenerated (the Generate confirm popup can't be accepted from the Claude browser pane; Trevor to do).
+- **iPhone outside links** (branch `claude/daily-tasks`, NOT deployed): on iOS, follow/daily-task/share links open in
+  the same tab (`openExternal` in giveaway.js) because a new tab was left as about:blank when the app (Instagram,
+  Whatnot, Discord) took over (Trevor, iPhone Chrome, 10-13). Claim requests use `keepalive` so they finish. Desktop
+  and Android unchanged (new tab).
 - Not verifiable: Instagram likes (no API), Whatnot live status/attendance (no public API). Possible later: verify
   Instagram comments via the Graph API with the entrant's IG handle.
 

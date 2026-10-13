@@ -112,6 +112,14 @@
     for (var i = 0; i < PLATFORMS.length; i++) if (PLATFORMS[i][1].test(host)) return PLATFORMS[i][0];
     return a.type === "SOCIAL_FOLLOW" ? "other" : null;
   }
+  // iPhone/iPad: a new tab for Instagram, Whatnot or Discord is left blank (about:blank) when the
+  // phone hands the link to the app, and getting back to the giveaway is awkward. There we open
+  // the link in this tab instead: the app opens and the giveaway stays put, or Back returns to it.
+  var IOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  function openExternal(url, features) {
+    if (IOS) { window.setTimeout(function () { window.location.href = url; }, 50); return; }
+    window.open(url, "_blank", features || "noopener");
+  }
   function entriesText(n) { return "+" + n + plural(n, " entry", " entries"); }
 
   function otherTokens(own) {
@@ -156,6 +164,8 @@
       method: method,
       headers: headers,
       credentials: "same-origin",
+      // Finishes even if the page moves on to the link the shopper tapped (iPhone, see openExternal).
+      keepalive: method === "POST",
       body: body ? JSON.stringify(body) : undefined,
     }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
@@ -520,7 +530,7 @@
         onclick: function () {
           var url = (a.config && a.config.url) || a.url;
           if (!entrant) { self.focusEmail("Enter your email first, then tap to earn " + entriesText(a.entries) + "."); return; }
-          if (url) { window.open(url, "_blank", "noopener"); self.followClick(a); }
+          if (url) { openExternal(url); self.followClick(a); }
           if (finished) return;
           if (isLocked) { error.textContent = "Complete the required step first to unlock this one."; return; }
           self.submitAction(a, {}, { error: error, button: btn }).catch(function () {});
@@ -826,7 +836,7 @@
             );
             return;
           }
-          window.open(n.url(link, text), "_blank", "noopener,width=600,height=540");
+          openExternal(n.url(link, text), "noopener,width=600,height=540");
           if (onShare) onShare(n.id);
         },
       });
@@ -972,7 +982,7 @@
       onclick: function () {
         if (st.done || locked) return;
         // Open the link inside the click so popup blockers allow it.
-        if (st.url && !started) window.open(st.url, "_blank", "noopener");
+        if (st.url && !started) openExternal(st.url);
         if (st.url && !started) self.followClick(a);
         if (cfg.confirm && !started) {
           // Step 1 opened the link; step 2 ("I Liked & Commented") claims a few seconds later.
@@ -1254,7 +1264,7 @@
         // VISIT_URL, SOCIAL_FOLLOW, DAILY_CHECKIN, CUSTOM.
         var url = cfg.url || a.url;
         var b = btn(a.type === "DAILY_CHECKIN" ? "Check In" : a.type === "SOCIAL_FOLLOW" ? "Follow" : url ? "Visit" : "Done", function () {
-          if (url) { window.open(url, "_blank", "noopener"); self.followClick(a); }
+          if (url) { openExternal(url); self.followClick(a); }
           self.submitAction(a, {}, ctx).catch(function () {});
         });
         ctx.button = b;
