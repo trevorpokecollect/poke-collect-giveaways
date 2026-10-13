@@ -390,3 +390,20 @@ model DailyQueueItem {
   @@index([campaignId, usedAt, position])
 }
 
+
+// Daily count of clicks on a giveaway's follow/join buttons (Whatnot etc.), for the ad report.
+// Holds no personal data: one row per store, Central Time date, giveaway link name and platform.
+model FollowClickDay {
+  id        String   @id @default(cuid())
+  shop      String
+  // YYYY-MM-DD in America/Chicago.
+  date      String
+  // The giveaway's link name (Campaign.slug) when the click was counted.
+  giveaway  String
+  platform  String
+  clicks    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([shop, date, giveaway, platform])
+  @@index([date])
+}
