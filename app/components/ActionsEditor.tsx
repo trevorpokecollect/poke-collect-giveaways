@@ -3,6 +3,7 @@ import type { ActionType } from "@prisma/client";
 import {
   ACTION_META,
   ADDABLE_ACTION_TYPES,
+  DAILY_TASK_TYPES,
   newAction,
   type ActionConfigForm,
   type ActionForm,
@@ -135,6 +136,9 @@ function ActionRow(props: {
         />
       </s-grid>
       <ConfigFields action={a} setConfig={setConfig} />
+      {DAILY_TASK_TYPES.includes(a.type) && (
+        <DailyTaskFields action={a} setConfig={setConfig} />
+      )}
       <s-stack direction="inline" gap="large">
         <Check
           label="Required"
@@ -147,7 +151,7 @@ function ActionRow(props: {
           disabled={a.type === "SIGNUP"}
           onChange={(mandatory) => onChange({ mandatory })}
         />
-        {meta.repeatable && (
+        {meta.repeatable && !a.config.daily && (
           <Check
             label="Repeatable daily"
             details="Earn the entries again each day."
@@ -315,4 +319,116 @@ function ConfigFields({
     default:
       return null;
   }
+}
+
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Daily Tasks: shown in their own section once the follow tasks are done, claimable once per
+// day. Optional extras: rotating links, a "tap after you do it" button, a weekly window.
+function DailyTaskFields({
+  action: a,
+  setConfig,
+}: {
+  action: ActionForm;
+  setConfig: (patch: Partial<ActionConfigForm>) => void;
+}) {
+  const c = a.config;
+  const schedule = c.schedule;
+  const hasUrl = a.type === "VISIT_URL";
+  return (
+    <s-stack gap="small-200">
+      <Check
+        label="Daily Task"
+        details="Shows under Daily Tasks, unlocks after all the follow tasks are done, and can be claimed once per day."
+        checked={!!c.daily}
+        onChange={(daily) => setConfig({ daily })}
+      />
+      {c.daily && hasUrl && (
+        <>
+          <TextArea
+            label="More links to rotate (optional)"
+            rows={2}
+            details="One link per line. Each day shows the next link in turn, starting with the page link above. Use it to feature a different Instagram post every day."
+            value={(c.urls ?? []).join("\n")}
+            onChange={(v) => setConfig({ urls: v.split(/\s*\n\s*/) })}
+          />
+          <TextInput
+            label="Claim button (optional)"
+            details={
+              'Set this (e.g. "I Liked & Commented") for tasks done off the site: the button opens the link first, then claims after a few seconds. This is on the honor system, not verified.'
+            }
+            value={c.confirm ?? ""}
+            onChange={(confirm) => setConfig({ confirm })}
+          />
+        </>
+      )}
+      {c.daily && (
+        <Check
+          label="Only at set times"
+          details="Shown and claimable only in a weekly window, in Central Time (e.g. Fridays 5–8pm while the Whatnot show is live). Once per window."
+          checked={!!schedule}
+          onChange={(on) =>
+            setConfig({
+              schedule: on
+                ? { days: [5], start: "17:00", end: "20:00" }
+                : undefined,
+              live: on ? c.live : undefined,
+              paused: on ? c.paused : undefined,
+            })
+          }
+        />
+      )}
+      {c.daily && schedule && (
+        <>
+          <s-stack direction="inline" gap="base">
+            {DAYS.map((d, i) => (
+              <Check
+                key={d}
+                label={d}
+                checked={schedule.days.includes(i)}
+                onChange={(on) =>
+                  setConfig({
+                    schedule: {
+                      ...schedule,
+                      days: on
+                        ? [...schedule.days, i].sort()
+                        : schedule.days.filter((x) => x !== i),
+                    },
+                  })
+                }
+              />
+            ))}
+          </s-stack>
+          <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+            <TextInput
+              label="Starts (Central, 24h)"
+              placeholder="17:00"
+              value={schedule.start}
+              onChange={(start) =>
+                setConfig({ schedule: { ...schedule, start } })
+              }
+            />
+            <TextInput
+              label="Ends (Central, 24h)"
+              placeholder="20:00"
+              value={schedule.end}
+              onChange={(end) => setConfig({ schedule: { ...schedule, end } })}
+            />
+          </s-grid>
+          <Check
+            label="Show as a live show button"
+            details="Red 🔴 LIVE ON WHATNOT — JOIN NOW button while it's open. Whatnot can't tell us if the show is really live, so turn the task off below if a show is canceled."
+            checked={!!c.live}
+            onChange={(live) => setConfig({ live })}
+          />
+          <Check
+            label="Turned off (show canceled or ended early)"
+            details="Hides the task and stops claims until you untick this and save."
+            checked={!!c.paused}
+            onChange={(paused) => setConfig({ paused })}
+          />
+        </>
+      )}
+    </s-stack>
+  );
 }

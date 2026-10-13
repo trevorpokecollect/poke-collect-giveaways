@@ -4,6 +4,7 @@ import { parseLocalDateTime } from "./time";
 import { estimateEntries } from "./entries/estimate";
 import { purchaseRateText } from "./shop-promo";
 import { isArchived, publicAction, visibleActions } from "./entries/actions";
+import { isDailyTask, rotatedUrl, taskDay, unlockTasks } from "./daily-tasks";
 
 // What the storefront widget would get from /apps/giveaways/<slug>, built from the editor's
 // unsaved values, so the admin preview renders the real widget without a live giveaway.
@@ -65,6 +66,7 @@ export function previewData(
           answers: {},
           pollResults: {},
           quizAttemptsLeft: {},
+          dailyTasks: previewDailyTasks(v, now),
         }
       : null,
     daily: daily.enabled
@@ -108,5 +110,40 @@ function shopPreview(v: CampaignFormValues) {
         { productId: p.id, quantity: 1, price: Math.round(p.price * 100) },
       ]),
     })),
+  };
+}
+
+/** Daily Tasks as a new entrant sees them (still locked); scheduled ones shown as open. */
+function previewDailyTasks(v: CampaignFormValues, now: Date) {
+  const live = v.actions
+    .filter((a) => !isArchived(a))
+    .map((a) => ({ ...a, id: a.id ?? a.key }));
+  const daily = live.filter(isDailyTask);
+  if (!daily.length) return null;
+  const need = unlockTasks(live);
+  const day = taskDay(
+    now,
+    v.settings.dailyTasks.resetAt,
+    v.settings.daily.enabled
+      ? { timeZone: v.timezone, drawTime: v.settings.daily.drawTime }
+      : null,
+  );
+  return {
+    unlocked: need.length === 0,
+    needed: need.map((a) => a.label),
+    needCount: need.length,
+    resetsAt: day.resetsAt.toISOString(),
+    tasks: Object.fromEntries(
+      daily.map((a) => [
+        a.id,
+        {
+          open: !a.config.paused,
+          done: false,
+          url: rotatedUrl(a.config, day.key),
+          closesAt: null,
+          nextAt: null,
+        },
+      ]),
+    ),
   };
 }

@@ -83,6 +83,14 @@ export const campaignSettingsSchema = z.object({
         .default([]),
     })
     .prefault({}),
+  // Daily Tasks (actions with config.daily): when they reset. "draw" = at the daily draw, so
+  // each task pays once per draw; "midnight" = midnight Central. Giveaways without a daily
+  // draw always use midnight Central. See app/lib/daily-tasks.ts.
+  dailyTasks: z
+    .object({
+      resetAt: z.enum(["draw", "midnight"]).default("draw"),
+    })
+    .prefault({}),
   webhookUrl: z.string().url().or(z.literal("")).default(""),
   showLeaderboard: z.boolean().default(false),
   showWinners: z.boolean().default(true),
@@ -119,22 +127,48 @@ export const parseSettings = (raw: unknown): CampaignSettings =>
  * SMS_OPTIN: { disclosure? }  (consent wording next to the checkbox; blank = DEFAULT_SMS_DISCLOSURE)
  * DAILY_CHECKIN, SIGNUP, REFERRAL: none
  *
+ * VISIT_URL, SOCIAL_FOLLOW, WATCH_VIDEO, SECRET_CODE and DAILY_CHECKIN may also carry the
+ * Daily Task fields (`taskFields` below): daily, urls (extra links rotated by day), confirm
+ * (claim button text after opening the link), schedule (weekly Central window), live, paused.
+ *
  * Any type may also carry `archived: true`. The editor sets it (with entries 0)
  * instead of deleting an action that already has EntryEvents, so the ledger
  * keeps its actionId. Archived actions must not be shown on the storefront or
  * awarded again; use isArchivedAction().
  */
+const hm = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "use a time like 17:00");
+
+const taskFields = {
+  daily: z.boolean().optional(),
+  urls: z.array(z.string().url()).max(31).optional(),
+  confirm: z.string().max(60).optional(),
+  schedule: z
+    .object({
+      days: z.array(z.number().int().min(0).max(6)).min(1),
+      start: hm,
+      end: hm,
+    })
+    .refine((s) => s.start < s.end, "the end time must be after the start")
+    .optional(),
+  live: z.boolean().optional(),
+  paused: z.boolean().optional(),
+};
+
 export const actionConfigSchema = {
-  SOCIAL_FOLLOW: z.object({ url: z.string().url() }),
-  VISIT_URL: z.object({ url: z.string().url() }),
+  SOCIAL_FOLLOW: z.object({ url: z.string().url(), ...taskFields }),
+  VISIT_URL: z.object({ url: z.string().url(), ...taskFields }),
+  DAILY_CHECKIN: z.object(taskFields),
   WATCH_VIDEO: z.object({
     url: z.string().url(),
     seconds: z.number().int().nonnegative().optional(),
+    ...taskFields,
   }),
   SOCIAL_SHARE: z.object({
     network: z.enum(["x", "facebook", "any"]).default("any"),
   }),
-  SECRET_CODE: z.object({ code: z.string().min(1) }),
+  SECRET_CODE: z.object({ code: z.string().min(1), ...taskFields }),
   POLL: z.object({
     question: z.string().min(1),
     options: z.array(z.string().min(1)).min(2).max(10),

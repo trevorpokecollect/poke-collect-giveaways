@@ -158,7 +158,22 @@ export interface ActionConfigForm {
   answer?: string;
   instructions?: string;
   disclosure?: string;
+  // Daily Tasks (see app/lib/daily-tasks.ts).
+  daily?: boolean;
+  urls?: string[];
+  confirm?: string;
+  schedule?: { days: number[]; start: string; end: string };
+  live?: boolean;
+  paused?: boolean;
 }
+
+/** Types that can be a Daily Task. */
+export const DAILY_TASK_TYPES: ActionType[] = [
+  "VISIT_URL",
+  "DAILY_CHECKIN",
+  "WATCH_VIDEO",
+  "SECRET_CODE",
+];
 
 export interface ActionForm {
   key: string;
@@ -508,6 +523,16 @@ export function validateActions(actions: ActionForm[]): Result<ActionData[]> {
         options: c.options?.map((o) => o.trim()).filter(Boolean),
         seconds: c.seconds || undefined,
       };
+      // Daily Task fields only on daily tasks; schedule/live/paused only with a schedule.
+      const daily = DAILY_TASK_TYPES.includes(a.type) && c.daily === true;
+      raw.daily = daily || undefined;
+      raw.urls = daily
+        ? c.urls?.map((u) => u.trim()).filter(Boolean) || undefined
+        : undefined;
+      raw.confirm = (daily && c.confirm?.trim()) || undefined;
+      raw.schedule = daily ? c.schedule : undefined;
+      raw.live = (daily && !!raw.schedule && c.live) || undefined;
+      raw.paused = (daily && !!raw.schedule && c.paused) || undefined;
       const parsed = schema.safeParse(raw);
       if (!parsed.success) {
         const field = String(parsed.error.issues[0]?.path[0] ?? "");
@@ -525,7 +550,9 @@ export function validateActions(actions: ActionForm[]): Result<ActionData[]> {
       entries: a.entries,
       mandatory: a.type === "SIGNUP" ? true : a.mandatory,
       repeatable:
-        a.type === "DAILY_CHECKIN" ? true : meta.repeatable && a.repeatable,
+        a.type === "DAILY_CHECKIN" || config?.daily === true
+          ? true
+          : meta.repeatable && a.repeatable,
       config,
     });
   }
@@ -539,6 +566,8 @@ function configHint(field: string) {
     question: "enter the question.",
     options: "add between 2 and 10 answer options.",
     seconds: "seconds must be a whole number.",
+    urls: "enter full links starting with https://, one per line.",
+    schedule: "pick at least one day and an end time after the start time.",
   }[field];
 }
 
@@ -717,9 +746,14 @@ export function generateOfficialRules(values: CampaignFormValues): string {
     .map(
       (a) =>
         `- ${a.label.trim() || ACTION_META[a.type].name}: ${entriesWord(a.entries)}${
-          a.type === "DAILY_CHECKIN" || a.repeatable ? " per day" : ""
+          a.config.daily && a.config.schedule
+            ? " per scheduled live show window"
+            : a.type === "DAILY_CHECKIN" || a.repeatable || a.config.daily
+              ? " per day"
+              : ""
         }${a.type === "REFERRAL" ? " per verified referral" : ""}`,
     );
+  const dailyTasks = actions.some((a) => a.config.daily);
   // Free steps every entrant must also complete before their entries count in a drawing.
   const steps = [
     values.settings.requireEmailConsent
@@ -775,6 +809,9 @@ export function generateOfficialRules(values: CampaignFormValues): string {
         ? `To complete an entry, entrants must also ${steps.join(" and ")}. These steps are free. Entries count in a drawing only once they are done.`
         : "",
       ways.length ? `Bonus entries are available for:\n${ways.join("\n")}` : "",
+      dailyTasks
+        ? `Daily tasks become available after an entrant completes the one-time social follow tasks, and each can be completed once per ${values.settings.daily.enabled && values.settings.dailyTasks.resetAt === "draw" ? "daily drawing period" : "day (days reset at midnight Central Time)"}. Tasks that ask entrants to engage with social media content are completed on the entrant's word; the Sponsor does not verify likes, comments or live-show attendance and may disqualify anyone who claims them falsely.`
+        : "",
       purchases
         ? "Purchases from the Sponsor's store during the entry period may earn bonus entries as described on the giveaway page. Cancelled or edited orders lose the entries they earned."
         : "",
@@ -793,7 +830,7 @@ export function generateOfficialRules(values: CampaignFormValues): string {
         ? "Each day's winner is selected at the time of that day's drawing in a random drawing, weighted by entries, from the eligible entries earned during that day's entry period."
         : "Winners are selected in a random drawing, weighted by entries, from all eligible entries after the entry period ends."
     } Winners are notified by email and must confirm their details within ${plural(claimDays, "day")}, or the prize may be forfeited and an alternate winner drawn.`,
-    "8. General. By entering, entrants agree to these rules and the Sponsor's decisions, which are final. The Sponsor may cancel, suspend or modify the Giveaway if fraud, technical failure or any other factor impairs its integrity. Entrants release the Sponsor from liability for any injury, loss or damage arising from participation or from accepting or using a prize.",
+    "8. General. By entering, entrants agree to these rules and the Sponsor's decisions, which are final. The Sponsor may cancel, suspend or modify the Giveaway if fraud, technical failure or any other factor impairs its integrity. Entrants release the Sponsor, and Instagram, Facebook, Whatnot and any other social platform used in the Giveaway, from liability for any injury, loss or damage arising from participation or from accepting or using a prize.",
     "9. Privacy. Information collected is used to administer the Giveaway and as described in the Sponsor's privacy policy. Entrants who opt in may receive marketing emails and can unsubscribe at any time.",
     `10. Winners list. For the names of winners, contact ${SPONSOR} through its store within 30 days after the entry period ends.`,
   ];

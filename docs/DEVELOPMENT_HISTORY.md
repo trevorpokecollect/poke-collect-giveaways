@@ -38,6 +38,10 @@ This file keeps what git doesn't: why, what failed, and Trevor's corrections.
 
 ## Decisions (with reasons)
 - **Ledger, not counters**: auditable, rollbacks for edits/cancels/fraud, per-day windows possible.
+- **Daily Tasks = action config + ledger, no new table** (10-13): the ledger row with its unique dedupe key already is
+  the completion record (giveaway, entrant, task, day/window) and makes claims idempotent. Reset defaults to the daily
+  draw, not midnight Central, so a task can't count twice in one drawing. Instagram likes and Whatnot attendance can't
+  be verified, so those tasks are labeled honor-system rather than "verified".
 - **Inventory reservation via `inventoryMoveQuantities`** (available/safety_stock → reserved), copied from the Mystery
   Packs app (`poke-collect-mystery-packs/app/lib/inventory.server.ts`) so prizes can't sell; "Mark Sent" removes the unit.
 - **In-process scheduler** (`setInterval` 60s, single Railway replica) + `/jobs/daily` (CRON_SECRET) instead of a
