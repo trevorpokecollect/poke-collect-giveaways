@@ -36,6 +36,15 @@ data or IPs in that table. Report endpoint `GET /stats/follow-clicks?days=14&key
 `?days=7&key=…&shop=poke-collect-al.myshopify.com`. CI `lint` is red on main from the thank-you extension (pre-existing;
 fix proposed on PR #8).
 
+## Daily re-entry fix (branch `claude/giveaway-bug-fixes-v8bwqr`, awaiting "deploy": Railway, then Shopify)
+Bug (Trevor 10-13): anyone who signed up on an earlier day had no way into today's draw (the sign-up entry only
+counts on the day it was earned; only Bookmark and purchases repeat). Fix: `enterToday()` (`signup.server.ts`) gives the
+sign-up entries once per daily period (dedupe `signup:<entrantId>:<periodKey>`, skipped if any `signup:<id>…` event is
+already in today's window). Called by the new POST intent `enter-today` (widget button **Enter Today's Giveaway**, shown
+when `daily.enteredToday === false`) and after a returning entrant confirms their email code. The popup treats
+`enteredToday` as "entered". Linked monthly is unaffected. Test: `test/daily-reenter.integration.test.ts`.
+Deploy Railway first (the widget only shows the button when the server sends `enteredToday`).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
@@ -52,7 +61,7 @@ fix proposed on PR #8).
 5. Ran "Remove entries from orders placed before the start"? Unverified; order #252736 (placed 07-22) had been scored.
 6. **Staff Guide** not yet updated for giveaways (memory rule says it must be).
 7. Recommend rotating the Turnstile secret (it was pasted in chat on 10-12). Unverified if done.
-8. Promised, not built: $0 draft order when a winner claims (for now ship manually + "Mark Sent").
+8. Promised, not built: $0 draft order when a winner claims (for now ship manually + "Mark Sent"). Trevor reported it missing 10-13.
 9. Safety-stock prize moves are untested on the live store until the first such pick — check logs that night.
 10. Imports and manual adjustments on a daily giveaway count in the day they're added.
 11. Later/deferred: Discord OAuth join verification; merging giveaway/Collector Coins/chat launchers; Near Mint-only

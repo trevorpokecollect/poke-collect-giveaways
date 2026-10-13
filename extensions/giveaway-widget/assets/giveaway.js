@@ -848,9 +848,7 @@
         el("span", { text: this.data.daily ? "Your Entries Today" : plural(entrant.entries, "Your Entry", "Your Entries") }),
         el("b", { text: String(this.data.daily && this.data.daily.yourEntries !== null ? this.data.daily.yourEntries : entrant.entries) }),
       ]),
-      this.data.daily && this.data.daily.yourEntries === 0
-        ? el("p", { class: "pcg__note pcg__note--nudge", text: "You have no entries in today's draw yet. Check in or complete a task below to get in." })
-        : null,
+      this.enterTodayBox(),
       this.breakdown(entrant),
       this.linkedNote(),
     ]);
@@ -876,6 +874,31 @@
     } else if (refBox) nodes.push(refBox);
 
     this.show(nodes.concat(this.extras()));
+  };
+
+  // Daily draws only count the day's entries, so returning players enter again each day.
+  Widget.prototype.enterTodayBox = function () {
+    var self = this;
+    var d = this.data.daily;
+    if (!d || d.enteredToday !== false) return null;
+    var error = el("p", { class: "pcg__error", role: "alert" });
+    var btn = el("button", {
+      type: "button",
+      class: "pcg__btn pcg__btn--block",
+      text: "Enter Today's Giveaway",
+      onclick: function () {
+        btn.disabled = true;
+        error.textContent = "";
+        self.request("POST", { intent: "enter-today" })
+          .then(function () { self.load(); })
+          .catch(function (e) { error.textContent = e.message; btn.disabled = false; });
+      },
+    });
+    return el("div", { class: "pcg__enter-today" }, [
+      el("p", { class: "pcg__note pcg__note--nudge", text: "You're not in today's draw yet. Tap below to enter. It's a new draw every day." }),
+      btn,
+      error,
+    ]);
   };
 
   // "Shop & earn": the purchase-entry rate, a Shop now link and example products with the

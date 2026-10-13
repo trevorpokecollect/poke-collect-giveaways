@@ -14,7 +14,7 @@ import {
 } from "./daily";
 import { queueFor, upcomingPlan } from "./daily-queue.server";
 import { drawWinners, newSeed, snapshotHash } from "./draw";
-import { onlyFullyEntered } from "./entries/ledger.server";
+import { enteredToday, onlyFullyEntered } from "./entries/ledger.server";
 import { parseSettings } from "./settings";
 import { emitWebhook } from "./webhook-out.server";
 import { emailDrawWinners, storefrontUrl } from "./winners.server";
@@ -736,6 +736,10 @@ export async function storefrontDaily(
       : null,
     yourEntries: entrantId
       ? await entrantDayEntries(entrantId, period.opensAt)
+      : null,
+    // Whether the entrant has entered today's draw (signing up only counts on the day).
+    enteredToday: entrantId
+      ? await enteredToday(entrantId, period.opensAt)
       : null,
     lastWinner:
       last && lastWinner && parseSettings(campaign.settings).showWinners

@@ -14,7 +14,7 @@ import {
   requiredActions,
   visibleActions,
 } from "./actions";
-import { activate, findLiveCampaign } from "./signup.server";
+import { activate, enterToday, findLiveCampaign } from "./signup.server";
 import { actionDedupeKey, repeatSuffix } from "./repeat";
 import { mirrorAction } from "./linked.server";
 import { normalizeUsPhone } from "../phone";
@@ -44,6 +44,8 @@ export async function verifyEntrant(
     };
   }
   if (entrant.status === "PENDING_VERIFICATION") await activate(entrant.id);
+  // A returning entrant who confirmed their email is entering again: put them in today's draw.
+  else await enterToday(entrant.id);
   const fresh = await db.entrant.findUniqueOrThrow({
     where: { id: entrant.id },
   });
