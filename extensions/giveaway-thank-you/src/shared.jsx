@@ -37,6 +37,7 @@ async function fetchEntries(surface, orderId) {
  * "You earned N entries in <giveaway>". While the order webhook is still on its way the app
  * returns an estimate (status "pending"), and this polls until the real entries land.
  */
+// eslint-disable-next-line react/prop-types -- Preact extension component, no PropTypes
 export function GiveawayEntries({surface, orderId}) {
   const [result, setResult] = useState(/** @type {{status: string, giveaways?: {title: string, entries: number}[]}} */ ({status: 'loading'}));
   const [slow, setSlow] = useState(false);
