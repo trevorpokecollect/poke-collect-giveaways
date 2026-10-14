@@ -62,7 +62,7 @@ blocks logged since the honeypot fix (8af9e1e). One entrant HELD at score 55 fro
 Changes: `riskTone(score, status)` shows weak signals on ACTIVE (verified) entrants in grey; sign-up refuses known
 provider typos (`suggestEmail` in `bot/email.ts`, e.g. gmail.con, any ".con") with "Did you mean …?".
 
-## Bug check fixes (branch `claude/mac-bug-check-fixes`, NOT deployed yet)
+## Bug check fixes (live 2026-10-14 03:16Z: Railway `2ab2615`, PR #13)
 From the 10-13 Mac bug check (report: project file giveaway-bug-check-2026-10-13.md). Needs Trevor's "deploy" (Railway only;
 no widget or Shopify changes).
 - **Turnstile errors no longer block**: only `invalid-input-response` is `turnstile_failed`; network errors, a missing
@@ -118,7 +118,7 @@ never count), then each task is claimable once per task day, with a "Resets In �
 - Not verifiable: Instagram likes (no API), Whatnot live status/attendance (no public API). Possible later: verify
   Instagram comments via the Graph API with the entrant's IG handle.
 
-## Shared-connection holds (branch `claude/shared-ip-holds`, NOT deployed yet)
+## Shared-connection holds (live 2026-10-14 03:16Z: Railway `2ab2615`, PR #14)
 10-13 ~7:38–8:02pm CT (pre-draw rush): 25 entrants HELD, almost all "ip burst, subnet burst" (35+20=55 ≥ hold 50).
 They look like real people (varied real-looking emails, a phone number). Likely shared addresses (carrier NAT, iCloud
 Private Relay); inferred, the production DB wasn't queried. Change: `ip_burst` 35→25 and `scoreSignals` drops
