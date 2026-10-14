@@ -153,8 +153,8 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
   winners" on. Names are `publicName()` ("Steven I."); forfeited and disqualified winners are left out; no emails,
   addresses or prize values. Cached 60s. Test: `winners-feed.test.ts`. Branch `claude/winners-feed`.
 - Theme: draft "Storepass - Giveaway Winners Page (draft)" (155481276599): `sections/pc-giveaway-winners.liquid`,
-  `templates/page.giveaway-winners.json`, `assets/pc-giveaway-winners.{css,js}` (new files only). Earlier Monthly Winners
-  (Jul 2023–Feb 2024, shortened to first name + initial) are a textarea setting in the section. Preview:
+  `templates/page.giveaway-winners.json`, `assets/pc-giveaway-winners.{css,js}` (new files only). No GiveawayNinja-era
+  winners (Trevor removed the archive 10-14); the imported monthly's winner shows once it's drawn in the app. Preview:
   `/pages/giveaway-info-winners?view=giveaway-winners&preview_theme_id=155481276599` (shows "Couldn't Load" until the
   Railway deploy). Source: `~/Documents/poke-collect-theme/giveaway-winners/new`.
 - To go live: deploy Railway; publish the draft; point a page at the `giveaway-winners` template (Trevor to choose: swap the
