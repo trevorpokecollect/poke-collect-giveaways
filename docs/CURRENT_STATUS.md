@@ -152,13 +152,13 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
   monthly:[{drawnAt, title, prize, imageUrl, winners}]}` for every draw of ACTIVE/SCHEDULED/ENDED giveaways with "Show
   winners" on. Names are `publicName()` ("Steven I."); forfeited and disqualified winners are left out; no emails,
   addresses or prize values. Cached 60s. Test: `winners-feed.test.ts`. Branch `claude/winners-feed`.
-- Theme: draft "Storepass - Giveaway Winners Page (draft)" (155481276599): `sections/pc-giveaway-winners.liquid`,
+- Theme: draft "Storepass - Giveaway Winners Page v2 (draft)" (155481931959, fresh copy of live 155480752311 at 16:28Z, after
+  the monthly widget swap; the older draft 155481276599 is stale, don't publish it): `sections/pc-giveaway-winners.liquid`,
   `templates/page.giveaway-winners.json`, `assets/pc-giveaway-winners.{css,js}` (new files only). No GiveawayNinja-era
   winners (Trevor removed the archive 10-14); the imported monthly's winner shows once it's drawn in the app. Preview:
-  `/pages/giveaway-info-winners?view=giveaway-winners&preview_theme_id=155481276599` (shows "Couldn't Load" until the
+  `/pages/giveaway-info-winners?view=giveaway-winners&preview_theme_id=155481931959` (shows "Couldn't Load" until the
   Railway deploy). Source: `~/Documents/poke-collect-theme/giveaway-winners/new`.
-- To go live: deploy Railway; DON'T publish draft 155481276599 as-is (it predates Trevor's 10-14 monthly widget swap on
-  live and would bring GiveawayNinja back): duplicate the current MAIN and push only the 4 pc-giveaway-winners files, then publish; point a page at the `giveaway-winners` template (Trevor to choose: swap the
+- To go live: deploy Railway; re-check MAIN hasn't changed since 16:28Z (else re-copy), then publish v2; point a page at the `giveaway-winners` template (Trevor to choose: swap the
   old page's template, keeping its URL and menu links, or a new page + menu change).
 
 ## Open items / next steps
