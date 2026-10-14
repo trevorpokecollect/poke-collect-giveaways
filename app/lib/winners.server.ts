@@ -5,7 +5,7 @@ import { runDraw } from "./draw.server";
 import { pendingConsolation, sendConsolationCodes } from "./discounts.server";
 import { syncCampaignToKlaviyo } from "./klaviyo.server";
 import { sendMail } from "./mailer.server";
-import { createPrizeOrder } from "./prize-order.server";
+import { createPrizeOrder, replacePrizeOrder } from "./prize-order.server";
 import { parseSettings } from "./settings";
 import { slugify } from "./slug";
 import {
@@ -301,6 +301,7 @@ export const DRAW_INTENTS = new Set([
   "consolation",
   "klaviyoSync",
   "prizeOrder",
+  "redoPrizeOrder",
 ]);
 
 /** Handles the draws-section buttons on app.campaigns.$id. */
@@ -373,6 +374,17 @@ export async function handleDrawIntent(opts: {
           return { error: "Only a claimed daily prize can get an order." };
         await audit("winner.prize_order", { winnerId, order: name });
         return { ok: true, message: `Order ${name} created.` };
+      }
+      case "redoPrizeOrder": {
+        if (!(await ownWinner())) return { error: "Winner not found." };
+        const name = await replacePrizeOrder(winnerId, admin);
+        if (!name)
+          return { error: "Only a claimed daily prize can get an order." };
+        await audit("winner.prize_order_redo", { winnerId, order: name });
+        return {
+          ok: true,
+          message: `Order ${name} created; the old order was cancelled.`,
+        };
       }
       case "klaviyoSync": {
         const r = await syncCampaignToKlaviyo(campaignId);

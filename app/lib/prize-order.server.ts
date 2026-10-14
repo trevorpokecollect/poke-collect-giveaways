@@ -17,6 +17,13 @@ const ORDER_CREATE = `#graphql
     }
   }`;
 
+const ORDER_CANCEL = `#graphql
+  mutation CancelPrizeOrder($orderId: ID!, $staffNote: String) {
+    orderCancel(orderId: $orderId, reason: OTHER, restock: false, notifyCustomer: false, staffNote: $staffNote) {
+      orderCancelUserErrors { field message }
+    }
+  }`;
+
 const SHOP_CURRENCY = `#graphql
   query { shop { currencyCode } }`;
 
@@ -88,6 +95,7 @@ export function prizeOrderInput(opts: {
 export async function createPrizeOrder(
   winnerId: string,
   admin?: AdminApiContext,
+  opts: { replace?: boolean } = {},
 ) {
   const winner = await db.winner.findUnique({
     where: { id: winnerId },
@@ -98,7 +106,7 @@ export async function createPrizeOrder(
   });
   const prize = winner?.draw.dailyPrize;
   if (!winner || !prize || winner.forfeited || !winner.claimedAt) return null;
-  if (winner.prizeOrderName) return winner.prizeOrderName;
+  if (winner.prizeOrderName && !opts.replace) return winner.prizeOrderName;
   const claim = winner.claimData as ClaimData | null;
   if (!claim) return null;
 
@@ -144,4 +152,42 @@ export async function createPrizeOrder(
     data: { prizeOrderId: out.order.id, prizeOrderName: out.order.name },
   });
   return out.order.name;
+}
+
+/**
+ * Makes a fresh $0 order for a winner who already has one, then quietly cancels the old one
+ * (no restock: the order bypassed inventory; no email). Used when an order was made wrong,
+ * e.g. the ones from before prize orders required shipping.
+ */
+export async function replacePrizeOrder(
+  winnerId: string,
+  admin: AdminApiContext,
+) {
+  const old = await db.winner.findUnique({
+    where: { id: winnerId },
+    select: { prizeOrderId: true, prizeOrderName: true },
+  });
+  if (!old?.prizeOrderId) return createPrizeOrder(winnerId, admin);
+  const name = await createPrizeOrder(winnerId, admin, { replace: true });
+  if (!name) return null;
+  const res = await admin.graphql(ORDER_CANCEL, {
+    variables: {
+      orderId: old.prizeOrderId,
+      staffNote: `Replaced by prize order ${name}`,
+    },
+  });
+  const json = (await res.json()) as {
+    data?: {
+      orderCancel?: { orderCancelUserErrors: { message: string }[] };
+    };
+    errors?: unknown;
+  };
+  const errors = json.data?.orderCancel?.orderCancelUserErrors ?? [];
+  if (json.errors || errors.length)
+    throw new Error(
+      `Order ${name} created, but ${old.prizeOrderName} couldn't be cancelled: ${
+        errors.map((e) => e.message).join("; ") || JSON.stringify(json.errors)
+      }. Cancel it in Shopify (no restock).`,
+    );
+  return name;
 }

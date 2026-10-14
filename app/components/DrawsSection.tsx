@@ -242,9 +242,25 @@ function WinnerRow({
       {w.prizeOrder && w.claimedAt && !w.forfeited && (
         <s-stack direction="inline" gap="small-200" alignItems="center">
           {w.prizeOrder.name ? (
-            <s-link href={`shopify://admin/orders/${w.prizeOrder.id}`}>
-              Order {w.prizeOrder.name}
-            </s-link>
+            <>
+              <s-link href={`shopify://admin/orders/${w.prizeOrder.id}`}>
+                Order {w.prizeOrder.name}
+              </s-link>
+              <s-button
+                variant="tertiary"
+                disabled={busy}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Make a new $0 order for this prize and cancel ${w.prizeOrder?.name}? Only do this if that order hasn't shipped.`,
+                    )
+                  )
+                    submit({ intent: "redoPrizeOrder", winnerId: w.id });
+                }}
+              >
+                Redo Order
+              </s-button>
+            </>
           ) : (
             <>
               <s-text color="subdued">No Shopify order yet.</s-text>
