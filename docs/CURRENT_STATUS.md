@@ -145,7 +145,7 @@ Shopify MCP connector lacks `write_orders` (and orderCreate needs an offline tok
 Redo Order now confirms inline (PR #18, Railway `41d5943`). 10-14 14:51Z: Ryne #258275 → #258315, Steven #258279 → #258316
 (new ones require shipping with a SHIPPING delivery method; old ones cancelled, no restock).
 
-## Giveaway Winners page (built 2026-10-14, NOT live: needs Trevor's "deploy" (Railway) + "publish")
+## Giveaway Winners page (feed + button live 2026-10-14 16:47Z: Railway `a84bc7b`, Shopify **poke-collect-giveaways-32**, PR #21; theme NOT published)
 Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, full names, YouTube winners from 2023).
 - App: `GET /apps/giveaways/winners` (`proxy.winners.tsx` → `winnersFeed()` in `winners.server.ts` → pure
   `buildWinnersFeed()` in `app/lib/winners-feed.ts`) returns `{daily:[{date, prize, imageUrl, productHandle, winners}],
@@ -162,7 +162,7 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
   the Last Winner box, or on its own above the rules when nobody has won yet. URL = `campaign.winnersPage` from setting
   `winnersPageUrl` (default `/pages/giveaway-info-winners`; no editor field yet), hidden when Show winners is off. Needs a
   Shopify deploy + Railway deploy.
-- To go live: deploy Railway + `shopify app deploy`; re-check MAIN hasn't changed since 16:28Z (else re-copy), then publish v2; point a page at the `giveaway-winners` template (Trevor to choose: swap the
+- Done: Railway + `shopify app deploy`. Still to do: re-check MAIN hasn't changed since 16:28Z (else re-copy), then publish v2; point a page at the `giveaway-winners` template (Trevor to choose: swap the
   old page's template, keeping its URL and menu links, or a new page + menu change).
 
 ## Open items / next steps
