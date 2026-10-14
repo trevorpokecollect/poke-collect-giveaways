@@ -150,10 +150,9 @@ export function CampaignForm(props: {
                 value={v.settings.imageBackdrop}
                 options={[
                   { value: "light", label: "Light" },
-                  { value: "gold", label: "Gold Spotlight (dark)" },
-                  { value: "red", label: "Red Spotlight (dark)" },
+                  { value: "rain", label: "Red Matrix Rain (like the daily)" },
                 ]}
-                details="What shows around the prize image. The spotlights suit dark, flashy artwork; change it each month to match."
+                details="What shows around the prize image. Red Matrix Rain puts it on the daily prize's dark stage with the glow; images with a transparent background look best."
                 onChange={(imageBackdrop) =>
                   set({ settings: { ...v.settings, imageBackdrop } })
                 }

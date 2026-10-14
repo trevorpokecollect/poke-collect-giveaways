@@ -274,16 +274,6 @@
     return stage;
   }
 
-  // The giveaway's own image on a dark stage with a gold or red spotlight and slow twinkles
-  // (setting imageBackdrop), for dark artwork that looks washed out on the light box.
-  function imageStage(src, alt, tone) {
-    return el("div", { class: "pcg__image pcg__backdrop pcg__backdrop--" + tone }, [
-      el("span", { class: "pcg__backdrop-glow", "aria-hidden": "true" }),
-      el("span", { class: "pcg__backdrop-sparkle", "aria-hidden": "true" }),
-      el("img", { class: "pcg__backdrop-img", src: src, alt: alt, loading: "lazy" }),
-    ]);
-  }
-
   var GLYPHS = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン0123456789POKECOLLECT";
   function matrixRain(canvas, stage, opts) {
     var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -369,8 +359,9 @@
       if (c.description) nodes.push(el("p", { class: "pcg__meta", text: c.description }));
       return head(nodes);
     }
-    if (c.imageUrl) nodes.push(c.imageBackdrop === "gold" || c.imageBackdrop === "red"
-      ? imageStage(c.imageUrl, c.prize || c.title, c.imageBackdrop)
+    // "rain": the same stage as the daily prize (red digital rain, glow, floating image).
+    if (c.imageUrl) nodes.push(c.imageBackdrop === "rain"
+      ? prizeStage({ imageUrl: c.imageUrl, title: c.prize || c.title })
       : el("img", { class: "pcg__image", src: c.imageUrl, alt: c.prize || c.title, loading: "lazy" }));
     nodes.push(el("div", { class: "pcg__hero" }, [
       el("span", { class: "pcg__badge", text: "Giveaway" }),

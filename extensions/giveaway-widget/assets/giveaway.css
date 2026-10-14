@@ -70,7 +70,6 @@
   .pcg-pop__dialog .pcg__side .pcg__image { max-height: none; }
   /* The prize stage stops growing, so the title and clock stay in view beside a long task list. */
   .pcg__side .pcg__image.pcg__stage, .pcg-pop__dialog .pcg__side .pcg__image.pcg__stage { max-height: 440px; }
-  .pcg__side .pcg__image.pcg__backdrop { max-height: 520px; }
   .pcg__side .pcg__title { font-size: clamp(24px, 3.2cqi, 32px); }
   .pcg__main, .pcg__tasks { border-left: 1px solid var(--pcg-line); }
   .pcg__main { padding: 8px 0 0; }
@@ -110,46 +109,6 @@
   filter: drop-shadow(0 0 14px rgba(226, 47, 57, 0.75)) drop-shadow(0 10px 22px rgba(0, 0, 0, 0.55));
   animation: pcg-float 5s ease-in-out infinite, pcg-glow 3.2s ease-in-out infinite;
 }
-/* The giveaway's own image on a dark spotlight stage (imageStage in giveaway.js). */
-.pcg__backdrop {
-  position: relative; display: flex; align-items: center; justify-content: center;
-  height: 300px; padding: 0; overflow: hidden; isolation: isolate;
-  background: radial-gradient(120% 90% at 50% 100%, #1a1206 0%, #07050a 60%, #030205 100%);
-}
-.pcg__backdrop--red { background: radial-gradient(120% 90% at 50% 100%, #1d0607 0%, #08030a 60%, #030205 100%); }
-.pcg__backdrop-glow {
-  position: absolute; inset: -10%; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(45% 50% at 50% 48%, rgba(250, 204, 21, 0.38) 0%, rgba(250, 204, 21, 0.1) 45%, transparent 70%),
-    conic-gradient(from 200deg at 50% 110%, transparent 0deg, rgba(255, 220, 120, 0.16) 14deg, transparent 28deg, transparent 52deg, rgba(255, 220, 120, 0.12) 64deg, transparent 78deg, transparent 102deg, rgba(255, 220, 120, 0.16) 116deg, transparent 130deg);
-  animation: pcg-glow-breathe 6s ease-in-out infinite;
-}
-.pcg__backdrop--red .pcg__backdrop-glow {
-  background:
-    radial-gradient(45% 50% at 50% 48%, rgba(226, 47, 57, 0.42) 0%, rgba(226, 47, 57, 0.12) 45%, transparent 70%),
-    conic-gradient(from 200deg at 50% 110%, transparent 0deg, rgba(255, 120, 120, 0.14) 14deg, transparent 28deg, transparent 52deg, rgba(255, 120, 120, 0.1) 64deg, transparent 78deg, transparent 102deg, rgba(255, 120, 120, 0.14) 116deg, transparent 130deg);
-}
-.pcg__backdrop-sparkle {
-  position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.8;
-  background-image:
-    radial-gradient(1.5px 1.5px at 12% 22%, #ffe9a8 50%, transparent 51%),
-    radial-gradient(1px 1px at 28% 78%, #fff 50%, transparent 51%),
-    radial-gradient(2px 2px at 84% 18%, #ffd65a 50%, transparent 51%),
-    radial-gradient(1px 1px at 70% 84%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 92% 60%, #ffe9a8 50%, transparent 51%),
-    radial-gradient(1px 1px at 6% 62%, #ffd65a 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 46% 8%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 58% 92%, #ffe9a8 50%, transparent 51%);
-  animation: pcg-twinkle 3.6s ease-in-out infinite alternate;
-}
-.pcg__backdrop-img {
-  position: relative; z-index: 2; width: 90%; height: 86%; object-fit: contain;
-  filter: drop-shadow(0 0 18px rgba(250, 204, 21, 0.45)) drop-shadow(0 12px 24px rgba(0, 0, 0, 0.6));
-  animation: pcg-float 5s ease-in-out infinite;
-}
-.pcg__backdrop--red .pcg__backdrop-img { filter: drop-shadow(0 0 18px rgba(226, 47, 57, 0.55)) drop-shadow(0 12px 24px rgba(0, 0, 0, 0.6)); }
-@keyframes pcg-glow-breathe { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
-@keyframes pcg-twinkle { 0% { opacity: 0.35; } 100% { opacity: 0.9; } }
 @keyframes pcg-float {
   0%, 100% { transform: translateY(0) rotate(-1.5deg); }
   50% { transform: translateY(-9px) rotate(1.5deg); }
@@ -461,7 +420,6 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
   .pcg__badge::before { animation: none; }
   .pcg-pop__launcher, .pcg-pop__thumb:not([hidden]) { animation: none; }
   .pcg__stage-img { animation: none; }
-  .pcg__backdrop-img, .pcg__backdrop-glow, .pcg__backdrop-sparkle { animation: none; }
   .pcg__btn, .pcg__soc { transition: none; }
 }
 

@@ -78,11 +78,11 @@ describe("image background", () => {
   it("defaults to light and passes the chosen backdrop to the widget", () => {
     expect(parseSettings(null).imageBackdrop).toBe("light");
     const v = daily();
-    v.settings = { ...v.settings, imageBackdrop: "gold" };
+    v.settings = { ...v.settings, imageBackdrop: "rain" };
     expect(
       previewData(v, { imageUrl: "x.png", entered: false }).campaign
         .imageBackdrop,
-    ).toBe("gold");
+    ).toBe("rain");
     expect(parseSettings({ imageBackdrop: "neon" }).imageBackdrop).toBe(
       "light",
     );
