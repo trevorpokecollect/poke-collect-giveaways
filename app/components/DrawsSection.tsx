@@ -217,6 +217,8 @@ function WinnerRow({
 }) {
   const badge = STATE_BADGE[w.state];
   const open = !w.forfeited && !w.claimedAt;
+  // Redo Order asks on the page (not a browser pop-up) so it works everywhere.
+  const [confirmRedo, setConfirmRedo] = useState(false);
   const c = w.claimData;
   return (
     <s-stack gap="small-200">
@@ -246,20 +248,38 @@ function WinnerRow({
               <s-link href={`shopify://admin/orders/${w.prizeOrder.id}`}>
                 Order {w.prizeOrder.name}
               </s-link>
-              <s-button
-                variant="tertiary"
-                disabled={busy}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Make a new $0 order for this prize and cancel ${w.prizeOrder?.name}? Only do this if that order hasn't shipped.`,
-                    )
-                  )
-                    submit({ intent: "redoPrizeOrder", winnerId: w.id });
-                }}
-              >
-                Redo Order
-              </s-button>
+              {confirmRedo ? (
+                <>
+                  <s-text>
+                    Cancel {w.prizeOrder.name} and make a new $0 order? Only if
+                    it hasn&apos;t shipped.
+                  </s-text>
+                  <s-button
+                    tone="critical"
+                    disabled={busy}
+                    onClick={() => {
+                      setConfirmRedo(false);
+                      submit({ intent: "redoPrizeOrder", winnerId: w.id });
+                    }}
+                  >
+                    Yes, Redo Order
+                  </s-button>
+                  <s-button
+                    variant="tertiary"
+                    onClick={() => setConfirmRedo(false)}
+                  >
+                    Keep It
+                  </s-button>
+                </>
+              ) : (
+                <s-button
+                  variant="tertiary"
+                  disabled={busy}
+                  onClick={() => setConfirmRedo(true)}
+                >
+                  Redo Order
+                </s-button>
+              )}
             </>
           ) : (
             <>
