@@ -172,8 +172,13 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
   A Different Email". Intent `customer-signup` reads email/name/consent from the Admin API (`customer.server.ts`, cached
   60s) and calls `signup({signedInCustomer})`, which skips Turnstile/honeypot/fill-time. Untested while signed in; Trevor to try.
 - `.pcg__winners-link` width auto (ran off the right on iPhone); `.pcg--wide` max-width 1120 → 1400px.
-- Theme draft "Storepass - Monthly Giveaway Two Columns (draft)" 155482456247 (copy of live 155481931959): only
-  `templates/page.giveaway.json` block layout three → wide. Waiting on Trevor's "publish".
+- Theme "Storepass - Monthly Giveaway Two Columns (draft)" 155482456247 (copy of 155481931959; only
+  `templates/page.giveaway.json` block layout three → wide) **published 2026-10-14 ~17:20Z on Trevor's "publish"** — now MAIN.
+
+## Image Background (live 2026-10-14 ~17:20Z: Railway `1d3c496`, Shopify **poke-collect-giveaways-34**, PR #23)
+Setting `imageBackdrop` ("light" | "rain", invalid → light) under the prize image in the editor. "rain" renders the
+giveaway's own image with `prizeStage()` (the daily's red digital rain, glow, float). Monthly set to Red Matrix Rain
+(10-14). Trevor is redoing the monthly image (transparent PNG suggested); November may want its own look.
 
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
