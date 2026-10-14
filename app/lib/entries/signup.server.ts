@@ -57,6 +57,12 @@ export interface SignupInput {
   userAgent?: string;
   /** Set when the visitor is signed in to a Shopify customer account (verified via app proxy). */
   shopifyCustomerId?: string;
+  /**
+   * The one-tap entry for a signed-in customer: Shopify vouches for the account (signed proxy
+   * request) and the email comes from it, so the form checks (Turnstile, hidden field, fill
+   * time) don't apply.
+   */
+  signedInCustomer?: boolean;
   marketingConsent?: boolean;
   /** Optional mobile number from the sign-up form; only kept when smsConsent is true. */
   phone?: string;
@@ -191,11 +197,13 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
   if (existing) return returning(campaign, existing, email);
 
   const signals: Signal[] = [];
-  const turnstile = await verifyTurnstile(input.turnstileToken, input.ip);
-  if (!turnstile.success) signals.push(turnstileSignal(turnstile.errorCodes));
-  if (input.honeypot) signals.push({ code: "honeypot" });
-  if (input.elapsedMs !== undefined && input.elapsedMs < MIN_FILL_MS) {
-    signals.push({ code: "too_fast", detail: `${input.elapsedMs}ms` });
+  if (!input.signedInCustomer) {
+    const turnstile = await verifyTurnstile(input.turnstileToken, input.ip);
+    if (!turnstile.success) signals.push(turnstileSignal(turnstile.errorCodes));
+    if (input.honeypot) signals.push({ code: "honeypot" });
+    if (input.elapsedMs !== undefined && input.elapsedMs < MIN_FILL_MS) {
+      signals.push({ code: "too_fast", detail: `${input.elapsedMs}ms` });
+    }
   }
   if (isDisposableEmail(email)) signals.push({ code: "disposable_email" });
   if (looksGenerated(email)) signals.push({ code: "generated_email" });

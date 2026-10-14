@@ -37,7 +37,7 @@
    .pcg whatever order the stylesheets load in. Don't add rules on a bare .pcg. */
 .pcg[data-pcg] { display: block; position: relative; isolation: isolate; line-height: 1.45; }
 .pcg[data-pcg] *, .pcg[data-pcg] *::before, .pcg[data-pcg] *::after { box-sizing: border-box; }
-.pcg[data-pcg].pcg--wide { max-width: 1120px; }
+.pcg[data-pcg].pcg--wide { max-width: 1400px; }
 .pcg[data-pcg].pcg--three { max-width: none; }
 /* Edge to edge: as wide as the screen, whatever the theme section's width (--pcg-sbw is the
    scrollbar, measured in giveaway.js). */
@@ -50,6 +50,7 @@
 .pcg[data-pcg] > .pcg__wrap > .pcg__main > :last-child, .pcg[data-pcg] > .pcg__wrap > .pcg__tasks > :last-child { margin-bottom: 22px; }
 .pcg__wrap--single .pcg__main { padding-top: 4px; }
 .pcg__last-winner--side { display: none; }
+.pcg__signed-in { margin: 0 0 10px; font-weight: 700; color: var(--pcg-soft); }
 
 /* Wide box (the desktop popup, the two-column block): header on the left, entry and tasks on the
    right, so it reads as a banner instead of a tall column. */
@@ -366,7 +367,9 @@ textarea.pcg__input { height: auto; padding: 12px 16px; }
 .pcg__winner-prize { color: var(--pcg-yellow); font-size: 13.5px; font-weight: 700; }
 .pcg__last-winner { margin: 0 0 12px; padding: 10px 14px; border-radius: 14px; background: rgba(250, 204, 21, 0.1); border: 1px solid rgba(250, 204, 21, 0.25); font-size: 13.5px; }
 .pcg__last-winner b { color: var(--pcg-yellow); }
-.pcg__winners-link { display: flex; width: 100%; margin: 0 0 12px; }
+/* Block-level flex fills the row by itself; width: 100% plus the column's side margins ran off
+   the right edge on phones. */
+.pcg__winners-link { display: flex; width: auto; margin: 0 0 12px; }
 .pcg__last-winner .pcg__winners-link { margin: 10px 0 0; border-color: rgba(250, 204, 21, 0.45); }
 .pcg__linked { margin: 0 0 12px; padding: 10px 14px; border-radius: 14px; background: rgba(226, 47, 57, 0.1); border: 1px solid rgba(226, 47, 57, 0.3); font-size: 13.5px; }
 .pcg__linked a { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }

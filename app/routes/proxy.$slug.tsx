@@ -34,6 +34,12 @@ import {
 import { shopPromo } from "../lib/storefront/shop-promo.server";
 import { burstCache } from "../lib/storefront/burst-cache";
 import { liveCampaignShared } from "../lib/storefront/live-campaign.server";
+import {
+  customerGid,
+  fullName,
+  shopCustomer,
+  tokenForCustomer,
+} from "../lib/storefront/customer.server";
 
 // Storefront API, reached through the Shopify app proxy at /apps/giveaways/<slug>.
 // Shopify signs every proxied request, and authenticate.public.appProxy checks it.
@@ -141,6 +147,35 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       break;
     }
   }
+  // Signed in to their store account: hand back their entry if they have one, else offer
+  // the one-tap entry (no email or name to type).
+  const customerId = customerGid(
+    new URL(request.url).searchParams.get("logged_in_customer_id"),
+  );
+  let customer: {
+    firstName: string | null;
+    needsName: boolean;
+    needsConsent: boolean;
+  } | null = null;
+  if (!entrantId && customerId) {
+    const shop = shopFrom(request);
+    const lookup = () => shopCustomer(shop, customerId).catch(() => null);
+    const found = await tokenForCustomer(campaign.id, customerId, lookup);
+    const t2 = found && readEntrantToken(found);
+    if (found && t2) {
+      linkedToken = token = found;
+      entrantId = t2.entrantId;
+    } else {
+      const c = await lookup();
+      const settings = parseSettings(campaign.settings);
+      if (c?.email)
+        customer = {
+          firstName: c.firstName,
+          needsName: settings.requireName && fullName(c).split(" ").length < 2,
+          needsConsent: settings.requireEmailConsent && !c.emailSubscribed,
+        };
+    }
+  }
   const pub = await publicState(campaign);
   const mine = entrantId
     ? await storefrontDailyEntrant(campaign, entrantId)
@@ -150,6 +185,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     linked: pub.linked,
     campaign: pub.campaign,
     turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? null,
+    customer,
     entrant: token ? await entrantState(token) : null,
     daily: pub.daily && mine ? { ...pub.daily, ...mine } : pub.daily,
     shop: pub.shop,
@@ -188,6 +224,42 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           ? `gid://shopify/Customer/${url.searchParams.get("logged_in_customer_id")}`
           : undefined,
         marketingConsent: body.consent === true,
+        phone: str("phone"),
+        smsConsent: body.smsConsent === true,
+        utm:
+          typeof body.utm === "object" && body.utm
+            ? (body.utm as Record<string, string>)
+            : undefined,
+      });
+      return result.ok
+        ? json(result)
+        : json({ error: result.error }, result.status);
+    }
+    case "customer-signup": {
+      // One-tap entry for a signed-in customer: email and name come from their account.
+      const customerId = customerGid(
+        url.searchParams.get("logged_in_customer_id"),
+      );
+      const c = customerId
+        ? await shopCustomer(shop, customerId).catch(() => null)
+        : null;
+      if (!customerId || !c?.email)
+        return json(
+          { error: "Please sign in again, or enter with your email." },
+          400,
+        );
+      const result = await signup({
+        shop,
+        campaignSlug: params.slug!,
+        email: c.email,
+        name: str("name") || fullName(c),
+        referralCode: str("ref"),
+        deviceId: str("deviceId"),
+        ip: clientIp(request),
+        userAgent: request.headers.get("user-agent") ?? undefined,
+        shopifyCustomerId: customerId,
+        signedInCustomer: true,
+        marketingConsent: body.consent === true || c.emailSubscribed,
         phone: str("phone"),
         smsConsent: body.smsConsent === true,
         utm:
