@@ -127,13 +127,21 @@ describe.skipIf(!process.env.DATABASE_URL)(
       const create = calls.find((c) => c.query.includes("orderCreate"))!;
       const order = create.variables!.order as {
         lineItems: unknown[];
+        shippingLines: unknown[];
         shippingAddress: unknown;
       };
       expect(order.lineItems[0]).toMatchObject({
         variantId: "gid://shopify/ProductVariant/2",
         quantity: 1,
+        // Without this Shopify marks the order "Shipping not required" (no labels).
+        requiresShipping: true,
         priceSet: { shopMoney: { amount: "0.00", currencyCode: "USD" } },
       });
+      expect(order.shippingLines).toEqual([
+        expect.objectContaining({
+          priceSet: { shopMoney: { amount: "0.00", currencyCode: "USD" } },
+        }),
+      ]);
       expect(order.shippingAddress).toMatchObject({
         firstName: "Ash",
         lastName: "Ketchum",

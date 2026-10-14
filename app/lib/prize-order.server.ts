@@ -52,6 +52,17 @@ export function prizeOrderInput(opts: {
       {
         variantId: opts.variantId,
         quantity: 1,
+        // orderCreate defaults this to false, which makes the order "Shipping not required"
+        // and blocks shipping labels.
+        requiresShipping: true,
+        priceSet: {
+          shopMoney: { amount: "0.00", currencyCode: opts.currencyCode },
+        },
+      },
+    ],
+    shippingLines: [
+      {
+        title: "Giveaway Prize Shipping",
         priceSet: {
           shopMoney: { amount: "0.00", currencyCode: opts.currencyCode },
         },
