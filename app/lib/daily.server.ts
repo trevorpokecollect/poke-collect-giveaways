@@ -234,13 +234,15 @@ async function moveOne(
             from: {
               locationId: prize.locationId,
               name: from,
-              ledgerDocumentUri: from === "reserved" ? ledger : null,
+              // Shopify wants a ledger document for every quantity name except "available"
+              // (reserved and safety_stock both need one).
+              ledgerDocumentUri: from === "available" ? null : ledger,
               changeFromQuantity: null,
             },
             to: {
               locationId: prize.locationId,
               name: to,
-              ledgerDocumentUri: to === "reserved" ? ledger : null,
+              ledgerDocumentUri: to === "available" ? null : ledger,
               changeFromQuantity: null,
             },
           },
@@ -273,6 +275,8 @@ async function removeOne(admin: Admin, prize: DailyPrize) {
             delta: -1,
             inventoryItemId: prize.inventoryItemId,
             locationId: prize.locationId,
+            ledgerDocumentUri:
+              prize.reservedFrom === "available" ? null : ledgerFor(prize),
             changeFromQuantity: null,
           },
         ],
