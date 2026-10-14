@@ -169,7 +169,13 @@ Redo Order now confirms inline (PR #18, Railway `41d5943`). 10-14 14:51Z: Ryne #
    `onlyFullyEntered` treats an entrant with an IMPORT event as having done every required action (email opt-in still
    needed, so the 536 who didn't opt in at GN only count once they tick it). Imports land in the monthly only; the
    daily never sees them. Trevor's export: `~/Downloads/export-2026-10-14-15-34-34.csv` (5,842 rows, 3,590 importable).
-   Next: Trevor's "deploy" (Railway only) → create monthly from preset as DRAFT → preview → import.
+   **Done 10-14 ~16:05Z:** deployed (Railway `dfabddb`, also shipped PR #19), monthly created from the preset as
+   **DRAFT** (id `cmv8atisw002dlf3an41bpa95`, slug `monthly-giveaway`, ends 10-31 23:59 ET) and the CSV imported:
+   3,589 entrants, 974,970 entries across 2,928 people (661 had 0). 2,253 rows skipped (2,252 removed emails + 1
+   malformed row with 0 entries). Created/imported via the Claude browser pane (Claude in Chrome can't interact
+   with the embedded admin iframe). Still to do, each with Trevor's OK: review the draft's settings (claim days,
+   Klaviyo list, rules), swap the widget on /pages/monthly-giveaway, Go live, final top-up import from a fresh GN
+   export (only deltas are added), link daily↔monthly (`linkedSlug`), turn off GN before its 11/1 charge.
 4. **Debug checks**: cloud routine "Giveaway Debug Check" (8:54am ET daily, through 10-19, self-deletes) is the main one.
    The Mac task `giveaway-daily-debug-check` (~9:38pm ET) got stuck on permission prompts; recommended Trevor delete it
    (his decision pending).
