@@ -359,7 +359,10 @@
       if (c.description) nodes.push(el("p", { class: "pcg__meta", text: c.description }));
       return head(nodes);
     }
-    if (c.imageUrl) nodes.push(el("img", { class: "pcg__image", src: c.imageUrl, alt: c.prize || c.title, loading: "lazy" }));
+    // "rain": the same stage as the daily prize (red digital rain, glow, floating image).
+    if (c.imageUrl) nodes.push(c.imageBackdrop === "rain"
+      ? prizeStage({ imageUrl: c.imageUrl, title: c.prize || c.title })
+      : el("img", { class: "pcg__image", src: c.imageUrl, alt: c.prize || c.title, loading: "lazy" }));
     nodes.push(el("div", { class: "pcg__hero" }, [
       el("span", { class: "pcg__badge", text: "Giveaway" }),
       el("h2", { class: "pcg__title", text: c.title }),

@@ -11,7 +11,7 @@ import { applyRecommended, applyRecommendedDaily } from "../lib/recommended";
 import { ActionsEditor } from "./ActionsEditor";
 import { PurchaseRulesEditor } from "./PurchaseRulesEditor";
 import { SettingsEditor } from "./SettingsEditor";
-import { Check, DateTimeInput, TextArea, TextInput } from "./fields";
+import { Check, DateTimeInput, Select, TextArea, TextInput } from "./fields";
 import { GiveawayPreview } from "./GiveawayPreview";
 import { ShopPromoEditor } from "./ShopPromoEditor";
 import type { PreviewPrize } from "../lib/preview";
@@ -145,6 +145,18 @@ export function CampaignForm(props: {
                   onChange={(removeImage) => set({ removeImage })}
                 />
               )}
+              <Select
+                label="Image Background"
+                value={v.settings.imageBackdrop}
+                options={[
+                  { value: "light", label: "Light" },
+                  { value: "rain", label: "Red Matrix Rain (like the daily)" },
+                ]}
+                details="What shows around the prize image. Red Matrix Rain puts it on the daily prize's dark stage with the glow; images with a transparent background look best."
+                onChange={(imageBackdrop) =>
+                  set({ settings: { ...v.settings, imageBackdrop } })
+                }
+              />
               <s-text color="subdued">
                 PNG, JPG, WebP or GIF, up to 5 MB.
                 {v.imageUrl

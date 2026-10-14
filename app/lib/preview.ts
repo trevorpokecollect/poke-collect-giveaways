@@ -47,6 +47,7 @@ export function previewData(
       rulesText: v.rulesText,
       requireEmailConsent: v.settings.requireEmailConsent,
       requireName: v.settings.requireName,
+      imageBackdrop: v.settings.imageBackdrop,
       actions,
     },
     turnstileSiteKey: null,
