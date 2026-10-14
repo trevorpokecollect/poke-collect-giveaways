@@ -552,7 +552,7 @@ export default function CampaignPage() {
   const base = `/app/campaigns/${campaign.id}`;
 
   const methodSwitch = daily && (
-    <s-button-group>
+    <s-stack direction="inline" gap="small-200">
       {(
         [
           ["today", "Current Draw"],
@@ -561,14 +561,13 @@ export default function CampaignPage() {
       ).map(([value, label]) => (
         <s-button
           key={value}
-          slot="secondary-actions"
           variant={methods.period === value ? "primary" : "secondary"}
           onClick={() => setParams({ methods: value === "all" ? "all" : null })}
         >
           {label}
         </s-button>
       ))}
-    </s-button-group>
+    </s-stack>
   );
 
   return (
@@ -635,18 +634,17 @@ export default function CampaignPage() {
             <Stat label="Needs Review" value={counts.HELD ?? 0} />
             <Stat label="Disqualified" value={counts.DISQUALIFIED ?? 0} />
           </s-grid>
-          <s-button-group>
+          <s-stack direction="inline" gap="small-200">
             {TABS.map(([t, label]) => (
               <s-button
                 key={t}
-                slot="secondary-actions"
                 variant={t === tab ? "primary" : "secondary"}
                 onClick={() => setParams({ tab: t === "overview" ? null : t })}
               >
                 {label}
               </s-button>
             ))}
-          </s-button-group>
+          </s-stack>
         </s-stack>
       </s-section>
 
@@ -760,11 +758,10 @@ export default function CampaignPage() {
                   defaultValue={q}
                 />
               </Form>
-              <s-button-group>
+              <s-stack direction="inline" gap="small-200">
                 {FILTERS.map((f) => (
                   <s-button
                     key={f}
-                    slot="secondary-actions"
                     variant={f === filter ? "primary" : "secondary"}
                     onClick={() =>
                       setParams({ status: f === "ALL" ? null : f })
@@ -777,7 +774,7 @@ export default function CampaignPage() {
                         : f[0] + f.slice(1).toLowerCase()}
                   </s-button>
                 ))}
-              </s-button-group>
+              </s-stack>
             </s-stack>
             {entrants.length === 0 ? (
               <s-paragraph>No entrants here yet.</s-paragraph>
@@ -820,7 +817,7 @@ export default function CampaignPage() {
                         </s-badge>
                       </s-table-cell>
                       <s-table-cell>
-                        <s-button-group>
+                        <s-stack direction="inline" gap="small-200">
                           {e.status !== "ACTIVE" &&
                             e.status !== "DISQUALIFIED" && (
                               <s-button
@@ -844,7 +841,7 @@ export default function CampaignPage() {
                               Disqualify
                             </s-button>
                           )}
-                        </s-button-group>
+                        </s-stack>
                       </s-table-cell>
                     </s-table-row>
                   ))}

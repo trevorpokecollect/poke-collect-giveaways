@@ -221,6 +221,15 @@ export default function EntrantEntries() {
                   value={reason}
                   onChange={setReason}
                 />
+                {entrant.status !== "ACTIVE" && (
+                  <s-button
+                    variant="primary"
+                    disabled={flag(busy)}
+                    onClick={() => submit({ intent: "reinstate" })}
+                  >
+                    Approve Entrant
+                  </s-button>
+                )}
                 <s-button
                   tone="critical"
                   disabled={flag(busy)}

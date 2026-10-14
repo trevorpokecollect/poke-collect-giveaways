@@ -259,10 +259,9 @@ function WinnerRow({
         </s-stack>
       )}
       {open && (
-        <s-button-group>
+        <s-stack direction="inline" gap="small-200">
           {emailEnabled && (
             <s-button
-              slot="secondary-actions"
               disabled={busy}
               onClick={() => submit({ intent: "emailWinner", winnerId: w.id })}
             >
@@ -270,7 +269,6 @@ function WinnerRow({
             </s-button>
           )}
           <s-button
-            slot="secondary-actions"
             tone="critical"
             variant={w.state === "expired" ? "primary" : "secondary"}
             disabled={busy}
@@ -285,7 +283,7 @@ function WinnerRow({
           >
             Forfeit and redraw
           </s-button>
-        </s-button-group>
+        </s-stack>
       )}
     </s-stack>
   );
