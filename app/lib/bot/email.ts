@@ -44,7 +44,11 @@ const DISPOSABLE_DOMAINS = new Set([
   "1secmail.com",
 ]);
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Strict enough that Resend accepts every address that passes (it 422s on odd ones, which used to
+// surface as a 500 at sign-up): plain ASCII local part without leading, trailing or double dots, and
+// a domain of letter/digit/hyphen labels ending in a letters-only TLD.
+const EMAIL_RE =
+  /^(?!\.)(?!.*\.\.)[A-Za-z0-9._%+'-]+(?<!\.)@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
 
 export function isValidEmailSyntax(email: string) {
   return EMAIL_RE.test(email.trim());

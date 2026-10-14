@@ -8,6 +8,10 @@ export interface Mail {
   text: string;
 }
 
+// Resend refused the address itself (422), as opposed to an outage. Callers can show a friendly
+// "check your email" message instead of a 500.
+export class MailAddressRejected extends Error {}
+
 export async function sendMail(mail: Mail) {
   const key = process.env.RESEND_API_KEY;
   const from =
@@ -27,6 +31,9 @@ export async function sendMail(mail: Mail) {
     },
     body: JSON.stringify({ from, ...mail }),
   });
-  if (!res.ok)
-    throw new Error(`Email send failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const message = `Email send failed: ${res.status} ${await res.text()}`;
+    if (res.status === 422) throw new MailAddressRejected(message);
+    throw new Error(message);
+  }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { suggestEmail } from "../app/lib/bot/email";
+import { isValidEmailSyntax, suggestEmail } from "../app/lib/bot/email";
 import { riskTone } from "../app/lib/ui";
 
 describe("email typo check", () => {
@@ -31,5 +31,34 @@ describe("risk badge color", () => {
     expect(riskTone(20, "PENDING_VERIFICATION")).toBe("caution");
     expect(riskTone(55, "ACTIVE")).toBe("warning");
     expect(riskTone(100, "ACTIVE")).toBe("critical");
+  });
+});
+
+describe("isValidEmailSyntax", () => {
+  it("accepts ordinary addresses", () => {
+    for (const e of [
+      "ash@gmail.com",
+      "ash.ketchum+pc@yahoo.co.uk",
+      "o'brien@mail-host.io",
+      " Misty_99@Outlook.com ",
+    ])
+      expect(isValidEmailSyntax(e), e).toBe(true);
+  });
+
+  it("rejects addresses the mail provider refuses", () => {
+    for (const e of [
+      "ash@gmail.com.",
+      "ash..k@gmail.com",
+      ".ash@gmail.com",
+      "ash.@gmail.com",
+      "ash,k@gmail.com",
+      "ash@gmail..com",
+      "ash@-gmail.com",
+      "ash@gmail.c0m",
+      "josé@gmail.com",
+      "ash@gmail.com,misty@gmail.com",
+      "ash<ash@gmail.com>",
+    ])
+      expect(isValidEmailSyntax(e), e).toBe(false);
   });
 });

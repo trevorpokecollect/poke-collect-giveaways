@@ -19,6 +19,7 @@ import {
   type Signal,
 } from "../bot/risk";
 import { verifyTurnstile } from "../bot/turnstile.server";
+import { MailAddressRejected } from "../mailer.server";
 import { issueOtp } from "../otp.server";
 import { issueEntrantToken } from "../token.server";
 import { queueKlaviyoSync } from "../klaviyo.server";
@@ -302,8 +303,10 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
     status,
   });
   if (status === "ACTIVE") await activate(entrant.id);
-  if (status === "PENDING_VERIFICATION")
-    await issueOtp(entrant, campaign.title);
+  if (status === "PENDING_VERIFICATION") {
+    const failed = await sendCode(entrant, campaign.title);
+    if (failed) return failed;
+  }
 
   return {
     ok: true,
@@ -313,6 +316,27 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
     referralCode: entrant.referralCode,
     entries: await entrantTotal(entrant.id),
   };
+}
+
+// Sends the email code; an address the mail provider refuses gets a "check your email" error
+// instead of a 500.
+async function sendCode(
+  entrant: { id: string; email: string },
+  campaignTitle: string,
+): Promise<SignupResult | null> {
+  try {
+    await issueOtp(entrant, campaignTitle);
+    return null;
+  } catch (err) {
+    if (!(err instanceof MailAddressRejected)) throw err;
+    console.warn("[signup] email code rejected", { entrantId: entrant.id });
+    return {
+      ok: false,
+      error:
+        "We couldn't send a code to that email. Please check it and try again.",
+      status: 400,
+    };
+  }
 }
 
 const phoneTaken = async (campaignId: string, phone: string) =>
@@ -340,7 +364,8 @@ async function returning(
     });
   }
   // Returning visitors must prove they own the inbox before getting a token back.
-  await issueOtp(entrant, campaign.title);
+  const failed = await sendCode(entrant, campaign.title);
+  if (failed) return failed;
   return {
     ok: true,
     state: entrant.status === "HELD" ? "held" : "verify",

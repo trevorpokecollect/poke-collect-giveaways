@@ -130,6 +130,13 @@ two other warning signs still hold. Already-held entrants need Approve in the En
 `secondary-actions` (selected tab/filter, expired winner's Forfeit and redraw). Replaced with inline `s-stack`; entrant
 page has Approve Entrant for held/unverified. Used it to approve all 25 held entrants (Needs Review now 0).
 
+## Bad email addresses no longer 500 (pushed 2026-10-14, NOT deployed: needs Trevor's "deploy", Railway only)
+10-14 debug check: three sign-ups from one iPhone (10-13 22:19Z) got a 500 because Resend refused the address (422
+"Invalid `to` field") after it passed our loose syntax check. `isValidEmailSyntax` (`bot/email.ts`) is now strict
+(ASCII local part, no leading/trailing/double dots, letter/digit/hyphen domain labels, letters-only TLD), and a Resend
+422 (`MailAddressRejected` in `mailer.server.ts`) returns "We couldn't send a code to that email. Please check it and
+try again." (400) from sign-up instead of a 500. Tests in `email-typos.test.ts`.
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
