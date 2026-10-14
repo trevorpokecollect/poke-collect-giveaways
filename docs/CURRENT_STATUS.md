@@ -175,6 +175,14 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
 - Theme "Storepass - Monthly Giveaway Two Columns (draft)" 155482456247 (copy of 155481931959; only
   `templates/page.giveaway.json` block layout three → wide) **published 2026-10-14 ~17:20Z on Trevor's "publish"** — now MAIN.
 
+## Email countdown timer (2026-10-14, Railway deploy requested by Trevor)
+- `GET /countdown.gif` (public, never cached): a 60-second animated GIF counting down to the next daily draw, drawn
+  like the widget's daily timer (Hours / Mins / Secs boxes on #111114). Optional `?slug=` (default `daily-giveaway`)
+  reads that giveaway's timezone and draw time. Used in Klaviyo newsletters as
+  `<img src="https://app-production-2322.up.railway.app/countdown.gif">`. Code: `app/lib/countdown.ts`,
+  `app/lib/gif.ts` (tiny GIF encoder), glyphs in `app/lib/countdown-glyphs.ts` (regenerate with
+  `scripts/countdown-glyphs.py`). No DB writes; the only read is the campaign's timezone/settings.
+
 ## Image Background (live 2026-10-14 ~17:20Z: Railway `1d3c496`, Shopify **poke-collect-giveaways-34**, PR #23)
 Setting `imageBackdrop` ("light" | "rain", invalid → light) under the prize image in the editor. "rain" renders the
 giveaway's own image with `prizeStage()` (the daily's red digital rain, glow, float). Monthly set to Red Matrix Rain
