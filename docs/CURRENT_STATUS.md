@@ -103,6 +103,13 @@ never count), then each task is claimable once per task day, with a "Resets In �
 - Not verifiable: Instagram likes (no API), Whatnot live status/attendance (no public API). Possible later: verify
   Instagram comments via the Graph API with the entrant's IG handle.
 
+## Shared-connection holds (branch `claude/shared-ip-holds`, NOT deployed yet)
+10-13 ~7:38–8:02pm CT (pre-draw rush): 25 entrants HELD, almost all "ip burst, subnet burst" (35+20=55 ≥ hold 50).
+They look like real people (varied real-looking emails, a phone number). Likely shared addresses (carrier NAT, iCloud
+Private Relay); inferred, the production DB wasn't queried. Change: `ip_burst` 35→25 and `scoreSignals` drops
+`subnet_burst` when `ip_burst` is present, so a busy connection alone (or with one weak signal) asks for an email code;
+two other warning signs still hold. Already-held entrants need Approve in the Entrants tab (Needs Review filter).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.

@@ -53,6 +53,36 @@ describe("risk scoring", () => {
     expect(decide(r.score)).toBe("verify");
   });
 
+  it("asks real people on a shared connection for an email code, not a review", () => {
+    // Oct 13 pre-draw rush: real entrants held for "ip burst, subnet burst".
+    const shared = scoreSignals([
+      { code: "ip_burst" },
+      { code: "subnet_burst" },
+    ]);
+    expect(shared.signals.map((s) => s.code)).toEqual(["ip_burst"]);
+    expect(decide(shared.score)).toBe("verify");
+    for (const extra of ["honeypot", "turnstile_missing"] as const)
+      expect(
+        decide(
+          scoreSignals([
+            { code: "ip_burst" },
+            { code: "subnet_burst" },
+            { code: extra },
+          ]).score,
+        ),
+      ).toBe("verify");
+    // Two other warning signs on top still hold for review.
+    expect(
+      decide(
+        scoreSignals([
+          { code: "ip_burst" },
+          { code: "honeypot" },
+          { code: "turnstile_missing" },
+        ]).score,
+      ),
+    ).toBe("hold");
+  });
+
   it("maps scores to policy decisions", () => {
     const lenient = { ...DEFAULT_RISK_POLICY, alwaysVerifyEmail: false };
     expect(decide(0, lenient)).toBe("allow");
