@@ -251,6 +251,11 @@ export async function leaderboard(
   token?: string | null,
   limit = 10,
 ) {
+  return markYou(await leaderboardRows(campaignId, limit), token);
+}
+
+/** The top entrants, the same for every shopper (cacheable); `markYou` adds the "you" flag. */
+export async function leaderboardRows(campaignId: string, limit = 10) {
   const rows = await db.entryEvent.groupBy({
     by: ["entrantId"],
     where: { campaignId, entrant: { status: "ACTIVE" } },
@@ -263,18 +268,25 @@ export async function leaderboard(
     select: { id: true, name: true, email: true },
   });
   const byId = new Map(people.map((p) => [p.id, p]));
-  const me = readEntrantToken(token)?.entrantId;
   return rows
     .filter((r) => (r._sum.entries ?? 0) > 0 && byId.has(r.entrantId))
     .map((r, i) => {
       const p = byId.get(r.entrantId)!;
       return {
+        entrantId: r.entrantId,
         rank: i + 1,
         name: leaderboardName(p.name, p.email),
         entries: r._sum.entries ?? 0,
-        you: r.entrantId === me,
       };
     });
+}
+
+export function markYou(
+  rows: Awaited<ReturnType<typeof leaderboardRows>>,
+  token?: string | null,
+) {
+  const me = readEntrantToken(token)?.entrantId;
+  return rows.map(({ entrantId, ...r }) => ({ ...r, you: entrantId === me }));
 }
 
 // WATCH_VIDEO: "start" hands back a signed start time, and completing checks that enough
