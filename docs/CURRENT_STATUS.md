@@ -163,7 +163,7 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
   `winnersPageUrl` (default `/pages/giveaway-info-winners`; no editor field yet), hidden when Show winners is off. Needs a
   Shopify deploy + Railway deploy.
 - Live: page "Giveaway Winners" (handle still `giveaway-info-winners`, template `giveaway-winners`; old body kept on the page,
-  unused). Footer Help menu label still says "Giveaway Info & Winners" (menu edit needs Trevor's OK). Staff Guide not updated.
+  unused). Footer Help menu item renamed "Giveaway Winners" (16:52Z, Trevor OK). Staff Guide not updated.
 
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
