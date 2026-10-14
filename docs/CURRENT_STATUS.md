@@ -157,7 +157,8 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
   winners (Trevor removed the archive 10-14); the imported monthly's winner shows once it's drawn in the app. Preview:
   `/pages/giveaway-info-winners?view=giveaway-winners&preview_theme_id=155481276599` (shows "Couldn't Load" until the
   Railway deploy). Source: `~/Documents/poke-collect-theme/giveaway-winners/new`.
-- To go live: deploy Railway; publish the draft; point a page at the `giveaway-winners` template (Trevor to choose: swap the
+- To go live: deploy Railway; DON'T publish draft 155481276599 as-is (it predates Trevor's 10-14 monthly widget swap on
+  live and would bring GiveawayNinja back): duplicate the current MAIN and push only the 4 pc-giveaway-winners files, then publish; point a page at the `giveaway-winners` template (Trevor to choose: swap the
   old page's template, keeping its URL and menu links, or a new page + menu change).
 
 ## Open items / next steps
