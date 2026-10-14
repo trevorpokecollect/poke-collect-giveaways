@@ -34,6 +34,7 @@ const HEADER_ALIASES = {
     "consent",
     "subscribed",
     "opted in",
+    "optinnewsletter", // GiveawayNinja export header "OptinNewsletter"
   ],
 } as const;
 

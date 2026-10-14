@@ -1,7 +1,7 @@
 import db from "../../db.server";
 import { estimateEntries, type EstimateLine } from "./estimate";
 import { purchaseRulesSchema } from "./rules";
-import { findLiveCampaign } from "./signup.server";
+import { liveCampaignShared } from "../storefront/live-campaign.server";
 
 /** Open giveaways that award purchase entries, newest first. */
 export async function livePurchaseCampaigns(shop: string, now = new Date()) {
@@ -34,7 +34,7 @@ export async function estimateForShop(
   let target: Awaited<ReturnType<typeof livePurchaseCampaigns>>[number] | null =
     null;
   if (slug?.trim() && slug.trim() !== "latest") {
-    const campaign = await findLiveCampaign(shop, slug);
+    const campaign = await liveCampaignShared(shop, slug);
     const parsed = purchaseRulesSchema.safeParse(
       campaign?.purchaseRules ?? undefined,
     );

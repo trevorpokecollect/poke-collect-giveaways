@@ -121,4 +121,34 @@ describe.skipIf(!enabled)("required steps to enter", async () => {
       { entrantId: ids.ash, entries: 3 },
     ]);
   });
+
+  it("counts people imported from GiveawayNinja as done, if they opted in", async () => {
+    for (const [name, consent] of [
+      ["dawn", true],
+      ["gary", false],
+    ] as const) {
+      const e = await db.entrant.create({
+        data: {
+          campaignId,
+          email: `${name}@example.com`,
+          emailNormalized: `${name}@example.com`,
+          status: "ACTIVE",
+          marketingConsent: consent,
+          referralCode: `${name}-${Date.now()}`,
+        },
+      });
+      ids[name] = e.id;
+      await award({
+        campaignId,
+        entrantId: e.id,
+        entries: 150,
+        source: "IMPORT",
+        dedupeKey: `import:${name}@example.com:150`,
+      });
+    }
+    const tickets = await eligibleTickets(campaignId);
+    expect(tickets).toContainEqual({ entrantId: ids.dawn, entries: 150 });
+    expect(tickets.map((t) => t.entrantId)).not.toContain(ids.gary);
+    expect(tickets.map((t) => t.entrantId)).not.toContain(ids.misty);
+  });
 });

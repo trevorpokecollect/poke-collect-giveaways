@@ -810,6 +810,24 @@ export async function storefrontDaily(
   };
 }
 
+/**
+ * The entrant's own part of `storefrontDaily` (entries today, entered today), so the shared
+ * part can be cached for everyone. Null when the daily draw is off.
+ */
+export async function storefrontDailyEntrant(
+  campaign: Campaign,
+  entrantId: string,
+  now = new Date(),
+) {
+  const cfg = dailySettings(campaign);
+  if (!cfg.enabled) return null;
+  const period = periodFor(now, campaign.timezone, cfg.drawTime);
+  return {
+    yourEntries: await entrantDayEntries(entrantId, period.opensAt),
+    enteredToday: await enteredToday(entrantId, period.opensAt),
+  };
+}
+
 // ── History ─────────────────────────────────────────────────────────────────
 
 /**

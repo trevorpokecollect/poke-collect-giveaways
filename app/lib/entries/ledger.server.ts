@@ -71,6 +71,8 @@ export async function enteredToday(entrantId: string, opensAt: Date) {
 /**
  * Keeps only entrants who finished entering: every required action done and, when the giveaway
  * requires it, the email opt-in ticked. Until then their entries don't count in a draw.
+ * People imported from GiveawayNinja did its required steps there, so an IMPORT event counts
+ * as every required action done (they still need the email opt-in).
  */
 export async function onlyFullyEntered<T extends { entrantId: string }>(
   campaignId: string,
@@ -103,10 +105,20 @@ export async function onlyFullyEntered<T extends { entrantId: string }>(
       distinct: ["entrantId", "actionId"],
       select: { entrantId: true },
     });
+    const imported = await tx.entryEvent.findMany({
+      where: { campaignId, entrantId: { in: [...ok] }, source: "IMPORT" },
+      distinct: ["entrantId"],
+      select: { entrantId: true },
+    });
+    const wasImported = new Set(imported.map((e) => e.entrantId));
     const count = new Map<string, number>();
     for (const d of done)
       count.set(d.entrantId, (count.get(d.entrantId) ?? 0) + 1);
-    ok = new Set([...ok].filter((id) => count.get(id) === required.length));
+    ok = new Set(
+      [...ok].filter(
+        (id) => wasImported.has(id) || count.get(id) === required.length,
+      ),
+    );
   }
   return tickets.filter((t) => ok.has(t.entrantId));
 }

@@ -90,6 +90,28 @@ describe("import parsing", () => {
     ]);
   });
 
+  it("reads a GiveawayNinja export, skipping emails it removed", () => {
+    const parsed = parseImport(
+      [
+        "Date,Email,Name,Phone,Confirmed,OptinNewsletter,OptinSMS,Entries,ReferralId",
+        "10/14/2026 3:20:20 PM,ash@example.com,Ash Ketchum,+15550001,False,True,True,150,AB12CD",
+        "10/2/2026 1:00:00 PM,(removed on Shopify request),Misty,+15550002,False,True,True,200,EF34GH",
+        "10/3/2026 1:00:00 PM,brock@example.com,Brock,,False,False,False,0,IJ56KL",
+      ].join("\n"),
+    );
+    expect(parsed.columns).toMatchObject({
+      email: 1,
+      name: 2,
+      entries: 7,
+      consent: 5,
+    });
+    expect(parsed.errors.map((e) => e.line)).toEqual([3]);
+    expect(parsed.rows.map((r) => [r.email, r.entries, r.consent])).toEqual([
+      ["ash@example.com", 150, true],
+      ["brock@example.com", 0, false],
+    ]);
+  });
+
   it("requires an email column", () => {
     expect(parseImport("Name,Points\nAsh,3").errors[0].message).toMatch(
       /Email/,

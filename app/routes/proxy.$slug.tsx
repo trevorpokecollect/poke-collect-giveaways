@@ -4,7 +4,8 @@ import { clientIp } from "../lib/bot/fingerprint.server";
 import {
   completeAction,
   entrantState,
-  leaderboard,
+  leaderboardRows,
+  markYou,
   verifyEntrant,
 } from "../lib/entries/actions.server";
 import { publicAction, visibleActions } from "../lib/entries/actions";
@@ -19,7 +20,11 @@ import {
   linkedCampaign,
 } from "../lib/entries/linked.server";
 import { publicWinners } from "../lib/winners.server";
-import { currentPrize, storefrontDaily } from "../lib/daily.server";
+import {
+  currentPrize,
+  storefrontDaily,
+  storefrontDailyEntrant,
+} from "../lib/daily.server";
 import { issueEntrantToken, readEntrantToken } from "../lib/token.server";
 import { campaignSettingsSchema, parseSettings } from "../lib/settings";
 import {
@@ -27,6 +32,8 @@ import {
   wantsLandingPage,
 } from "../lib/storefront/landing.server";
 import { shopPromo } from "../lib/storefront/shop-promo.server";
+import { burstCache } from "../lib/storefront/burst-cache";
+import { liveCampaignShared } from "../lib/storefront/live-campaign.server";
 
 // Storefront API, reached through the Shopify app proxy at /apps/giveaways/<slug>.
 // Shopify signs every proxied request, and authenticate.public.appProxy checks it.
@@ -44,9 +51,52 @@ function shopFrom(request: Request) {
   return new URL(request.url).searchParams.get("shop") ?? "";
 }
 
+// The parts of the popup's data that are the same for every shopper, shared for a few
+// seconds so a text or email blast doesn't run every lookup once per page load.
+const shared = burstCache(10_000);
+
+type LiveCampaign = NonNullable<Awaited<ReturnType<typeof findLiveCampaign>>>;
+
+const publicState = (campaign: LiveCampaign) =>
+  shared.get(`public:${campaign.id}`, async () => {
+    const linked = await linkedCampaign(campaign);
+    const linkedDaily = linked && (await currentPrize(linked));
+    const settings = parseSettings(campaign.settings);
+    return {
+      // The giveaway this one is linked to (one sign-up enters both), for the "you're also in" note.
+      linked: linked
+        ? {
+            title: linked.title,
+            slug: linked.slug,
+            daily: !!linkedDaily,
+            prize: linkedDaily?.prize?.title ?? null,
+          }
+        : null,
+      campaign: {
+        title: campaign.title,
+        description: campaign.description,
+        prize: campaign.prize,
+        imageUrl: campaign.imageUrl,
+        endsAt: campaign.endsAt,
+        rulesText: campaign.rulesText,
+        requireEmailConsent: settings.requireEmailConsent,
+        requireName: settings.requireName,
+        actions: visibleActions(campaign.actions).map(publicAction),
+      },
+      // Set for giveaways with the daily draw on: today's prize, when it's drawn, the last winner.
+      daily: await storefrontDaily(campaign, null),
+      // "Shop & earn" under the bonus entries; null when purchases don't earn entries.
+      shop: await shopPromo(campaign),
+      leaderboard: campaignSettingsSchema.safeParse(campaign.settings ?? {})
+        .data?.showLeaderboard
+        ? await leaderboardRows(campaign.id)
+        : null,
+    };
+  });
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   await authenticate.public.appProxy(request);
-  const campaign = await findLiveCampaign(shopFrom(request), params.slug!);
+  const campaign = await liveCampaignShared(shopFrom(request), params.slug!);
   // Opened directly in the browser: a full page in the store's theme that mounts the widget.
   if (wantsLandingPage(request)) {
     return landingPage({
@@ -89,40 +139,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       break;
     }
   }
-  const linked = await linkedCampaign(campaign);
-  const linkedDaily = linked && (await currentPrize(linked));
+  const pub = await publicState(campaign);
+  const mine = entrantId
+    ? await storefrontDailyEntrant(campaign, entrantId)
+    : null;
   return json({
     linkedToken,
-    // The giveaway this one is linked to (one sign-up enters both), for the "you're also in" note.
-    linked: linked
-      ? {
-          title: linked.title,
-          slug: linked.slug,
-          daily: !!linkedDaily,
-          prize: linkedDaily?.prize?.title ?? null,
-        }
-      : null,
-    campaign: {
-      title: campaign.title,
-      description: campaign.description,
-      prize: campaign.prize,
-      imageUrl: campaign.imageUrl,
-      endsAt: campaign.endsAt,
-      rulesText: campaign.rulesText,
-      requireEmailConsent: parseSettings(campaign.settings).requireEmailConsent,
-      requireName: parseSettings(campaign.settings).requireName,
-      actions: visibleActions(campaign.actions).map(publicAction),
-    },
+    linked: pub.linked,
+    campaign: pub.campaign,
     turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? null,
     entrant: token ? await entrantState(token) : null,
-    // Set for giveaways with the daily draw on: today's prize, when it's drawn, the last winner.
-    daily: await storefrontDaily(campaign, entrantId),
-    // "Shop & earn" under the bonus entries; null when purchases don't earn entries.
-    shop: await shopPromo(campaign),
-    leaderboard: campaignSettingsSchema.safeParse(campaign.settings ?? {}).data
-      ?.showLeaderboard
-      ? await leaderboard(campaign.id, token)
-      : null,
+    daily: pub.daily && mine ? { ...pub.daily, ...mine } : pub.daily,
+    shop: pub.shop,
+    leaderboard: pub.leaderboard && markYou(pub.leaderboard, token),
   });
 };
 

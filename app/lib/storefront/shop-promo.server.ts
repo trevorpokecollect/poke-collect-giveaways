@@ -4,6 +4,7 @@ import { estimateEntries } from "../entries/estimate";
 import { purchaseRulesSchema } from "../entries/rules";
 import { parseSettings } from "../settings";
 import { feedCollection, purchaseRateText } from "../shop-promo";
+import { burstCache } from "./burst-cache";
 
 // The widget's "Shop & earn" box: the purchase-entry rate, a Shop now link, and the
 // example products the merchant picked, with live prices and the entries each one earns.
@@ -27,8 +28,9 @@ interface Product {
 }
 
 const TTL_MS = 10 * 60 * 1000;
-// Product lookups per shop and product list, so popup views don't each call the Admin API.
-const cache = new Map<string, { at: number; products: Product[] }>();
+// Product lookups per shop and product list, so popup views don't each call the Admin API
+// (and a burst of views after a cache expiry makes one call, not hundreds).
+const cache = burstCache(TTL_MS);
 
 const PRODUCT_FIELDS = `
   id
@@ -56,8 +58,13 @@ async function loadProducts(
   source: { ids: string[] } | { collection: string },
 ) {
   const key = `${shop}|${"ids" in source ? source.ids.join(",") : `collection:${source.collection}`}`;
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.products;
+  return cache.get(key, () => fetchProducts(shop, source));
+}
+
+async function fetchProducts(
+  shop: string,
+  source: { ids: string[] } | { collection: string },
+): Promise<Product[]> {
   const { admin } = await unauthenticated.admin(shop);
   let nodes: (Record<string, unknown> | null)[];
   if ("ids" in source) {
@@ -102,7 +109,6 @@ async function loadProducts(
       },
     ];
   });
-  cache.set(key, { at: Date.now(), products });
   return products;
 }
 
