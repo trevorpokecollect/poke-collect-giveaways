@@ -190,6 +190,7 @@
         var entrant = data.entrant;
         if (entrant && entrant.state === "active") self.renderEntrant(entrant);
         else if (entrant && entrant.state === "held") self.renderHeld();
+        else if (data.customer && !self.useEmailForm) self.renderCustomerEntry();
         else self.renderSignup();
       })
       .catch(function (err) {
@@ -592,6 +593,66 @@
       deviceId: deviceId(),
       utm: utm(),
     }).then(function (res) { self.handleResult(res); });
+  };
+
+  // Signed in to a store account: one button instead of the email and name form (the server
+  // takes both from the account). Asks for a name or the email opt-in only if the account lacks them.
+  Widget.prototype.renderCustomerEntry = function (error) {
+    var self = this;
+    var c = this.data.customer;
+    var nameId = nextId("name");
+    var name = c.needsName ? el("input", { class: "pcg__input", id: nameId, type: "text", name: "name", autocomplete: "name", placeholder: "Ash Ketchum", required: true, maxlength: "80" }) : null;
+    var consent = c.needsConsent ? el("input", { type: "checkbox", name: "consent", required: true }) : null;
+    var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
+    var compact = this.compact();
+    var formId = nextId("form");
+    var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", form: formId, text: this.data.daily ? "Enter Today's Giveaway" : "Enter Giveaway" });
+    var form = el("form", {
+      class: "pcg__form",
+      id: formId,
+      novalidate: true,
+      onsubmit: function (e) {
+        e.preventDefault();
+        if (name && name.value.trim().split(/\s+/).filter(function (w) { return /[^\s\d\W_]/.test(w); }).length < 2) { err.textContent = "Enter your first and last name."; name.focus(); return; }
+        if (consent && !consent.checked) { err.textContent = "Tick the email box to enter."; consent.focus(); return; }
+        button.disabled = true;
+        self.request("POST", {
+          intent: "customer-signup",
+          name: name ? name.value : undefined,
+          consent: consent ? consent.checked : undefined,
+          ref: self.ref,
+          deviceId: deviceId(),
+          utm: utm(),
+        })
+          .then(function (res) { self.handleResult(res); })
+          .catch(function (e2) { err.textContent = e2.message; button.disabled = false; });
+      },
+    }, [
+      el("p", { class: "pcg__signed-in", text: c.firstName ? "Signed In As " + c.firstName : "You're Signed In" }),
+      name ? el("label", { class: "pcg__label", for: nameId, text: "First And Last Name" }) : null,
+      name,
+      consent ? el("label", { class: "pcg__check" }, [consent, el("span", {}, [
+        "Email me deals, drops and stream alerts.",
+        el("span", { class: "pcg__req", text: " Required To Enter" }),
+      ])]) : null,
+      err,
+      compact ? null : button,
+      el("button", {
+        class: "pcg__more", type: "button", text: "Use A Different Email",
+        onclick: function () { self.useEmailForm = true; self.renderSignup(); },
+      }),
+    ]);
+
+    var socials = this.data.campaign.actions.filter(function (a) { return platformOf(a) && !(a.config && a.config.daily); });
+    var shop = this.shopBox();
+    var preview = !compact && (socials.length || shop) ? tasks([
+      el("h3", { class: "pcg__subheading", text: "Then Earn Bonus Entries" }),
+      socials.length ? this.socialGrid(socials, null, {}, true) : null,
+      shop,
+    ]) : [];
+
+    this.show(this.header().concat([el("div", { class: "pcg__box" }, [form])], preview, this.extras(true)));
+    if (compact) this.setCta(button);
   };
 
   Widget.prototype.renderSignup = function (error) {
