@@ -145,6 +145,21 @@ Shopify MCP connector lacks `write_orders` (and orderCreate needs an offline tok
 Redo Order now confirms inline (PR #18, Railway `41d5943`). 10-14 14:51Z: Ryne #258275 → #258315, Steven #258279 → #258316
 (new ones require shipping with a SHIPPING delivery method; old ones cancelled, no restock).
 
+## Giveaway Winners page (built 2026-10-14, NOT live: needs Trevor's "deploy" (Railway) + "publish")
+Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, full names, YouTube winners from 2023).
+- App: `GET /apps/giveaways/winners` (`proxy.winners.tsx` → `winnersFeed()` in `winners.server.ts` → pure
+  `buildWinnersFeed()` in `app/lib/winners-feed.ts`) returns `{daily:[{date, prize, imageUrl, productHandle, winners}],
+  monthly:[{drawnAt, title, prize, imageUrl, winners}]}` for every draw of ACTIVE/SCHEDULED/ENDED giveaways with "Show
+  winners" on. Names are `publicName()` ("Steven I."); forfeited and disqualified winners are left out; no emails,
+  addresses or prize values. Cached 60s. Test: `winners-feed.test.ts`. Branch `claude/winners-feed`.
+- Theme: draft "Storepass - Giveaway Winners Page (draft)" (155481276599): `sections/pc-giveaway-winners.liquid`,
+  `templates/page.giveaway-winners.json`, `assets/pc-giveaway-winners.{css,js}` (new files only). Earlier Monthly Winners
+  (Jul 2023–Feb 2024, shortened to first name + initial) are a textarea setting in the section. Preview:
+  `/pages/giveaway-info-winners?view=giveaway-winners&preview_theme_id=155481276599` (shows "Couldn't Load" until the
+  Railway deploy). Source: `~/Documents/poke-collect-theme/giveaway-winners/new`.
+- To go live: deploy Railway; publish the draft; point a page at the `giveaway-winners` template (Trevor to choose: swap the
+  old page's template, keeping its URL and menu links, or a new page + menu change).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
