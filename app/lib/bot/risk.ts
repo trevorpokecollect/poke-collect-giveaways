@@ -33,7 +33,10 @@ export const SIGNAL_WEIGHTS: Record<SignalCode, number> = {
   self_referral: 60,
   device_reuse: 45,
   referral_ring: 45,
-  ip_burst: 35,
+  // Several sign-ups from one connection in an hour. Phone carriers, iCloud Private Relay and
+  // shared Wi-Fi put many real people behind one address, so on its own it only asks for an
+  // email code; with a second warning sign it holds for review.
+  ip_burst: 25,
   datacenter_ip: 30,
   too_fast: 30,
   duplicate_email_alias: 25,
@@ -63,6 +66,8 @@ export const DEFAULT_RISK_POLICY: RiskPolicy = {
 
 export function scoreSignals(signals: Signal[]) {
   const unique = new Map(signals.map((s) => [s.code, s]));
+  // A busy address is also a busy subnet: count the same crowd once.
+  if (unique.has("ip_burst")) unique.delete("subnet_burst");
   const score = Math.min(
     100,
     [...unique.keys()].reduce((sum, code) => sum + SIGNAL_WEIGHTS[code], 0),
