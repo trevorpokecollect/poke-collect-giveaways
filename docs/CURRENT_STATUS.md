@@ -137,6 +137,13 @@ page has Approve Entrant for held/unverified. Used it to approve all 25 held ent
 422 (`MailAddressRejected` in `mailer.server.ts`) returns "We couldn't send a code to that email. Please check it and
 try again." (400) from sign-up instead of a 500. Tests in `email-typos.test.ts`.
 
+## Prize orders require shipping + Redo Order (live 2026-10-14 ~12:50Z: Railway `866ed31`, PR #16, #17)
+`orderCreate` defaults line-item `requiresShipping` to false, so #258275 (Ryne) and #258279 (Steven) said "Shipping not
+required" (no labels). New prize orders set `requiresShipping: true` + a $0 "Giveaway Prize Shipping" line. Draws tab has
+**Redo Order** (`replacePrizeOrder`): new $0 order, then `orderCancel` of the old one (no restock, no email). The
+Shopify MCP connector lacks `write_orders`, so orders can only be made through the app. Trevor to click Redo Order for
+both winners (the browser pane can't accept the confirm dialog).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
