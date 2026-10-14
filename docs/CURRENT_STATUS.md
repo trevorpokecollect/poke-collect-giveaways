@@ -155,6 +155,21 @@ Redo Order now confirms inline (PR #18, Railway `41d5943`). 10-14 14:51Z: Ryne #
    deltas) → swap the widget on the page → go live → final top-up import → link daily↔monthly (`linkedSlug`).
    **Don't backfill pre-switch orders.** Don't touch the live page or theme without Trevor's OK. GN script still loads
    site-wide. (Cloud project memory "live-cutover-monthly" has the plan.)
+   **GN export findings (Mac session, 2026-10-14 ~15:30Z, nothing imported or created yet):** GN Users › Export ›
+   "Current filter" calls `exportPrecheck` then `window.open('/users/export?…')`, which Chrome blocks when driven by
+   Claude (no file saved; Trevor can click it himself). CSV columns: `Date,Email,Name,Phone,Confirmed,OptinNewsletter,
+   OptinSMS,Entries,ReferralId,ReferrerId,Coupon,Country,SaleValue,…UTM…,Source` (rows have 20 cells vs 21 headers;
+   Email/Name/Entries line up). 5,836 rows, 1,415,390 entries. **2,252 rows (442,680 entries, all signed up 10-01→10-08)
+   have Email = "(removed on Shopify request)"**, so they can't be imported by email (the importer skips them as invalid).
+   Leaves 3,584 importable emails, 972,710 entries. No eligibility/"Missing Mandatory" column; `Confirmed` is False for all.
+   Importer gaps: `OptinNewsletter` isn't a consent alias (everyone would import with consent=false), and imported
+   entrants have no Whatnot-follow event, so with the preset's `requireEmailConsent` + mandatory Whatnot follow
+   `onlyFullyEntered` would make every imported entrant ineligible until they opt in and follow again in the new widget.
+   Trevor chose to import (10-14). Fix on branch `claude/import-gn-eligibility`: `OptinNewsletter` → consent alias, and
+   `onlyFullyEntered` treats an entrant with an IMPORT event as having done every required action (email opt-in still
+   needed, so the 536 who didn't opt in at GN only count once they tick it). Imports land in the monthly only; the
+   daily never sees them. Trevor's export: `~/Downloads/export-2026-10-14-15-34-34.csv` (5,842 rows, 3,590 importable).
+   Next: Trevor's "deploy" (Railway only) → create monthly from preset as DRAFT → preview → import.
 4. **Debug checks**: cloud routine "Giveaway Debug Check" (8:54am ET daily, through 10-19, self-deletes) is the main one.
    The Mac task `giveaway-daily-debug-check` (~9:38pm ET) got stuck on permission prompts; recommended Trevor delete it
    (his decision pending).
