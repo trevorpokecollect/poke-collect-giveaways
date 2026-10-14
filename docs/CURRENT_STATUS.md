@@ -188,6 +188,12 @@ Setting `imageBackdrop` ("light" | "rain", invalid → light) under the prize im
 giveaway's own image with `prizeStage()` (the daily's red digital rain, glow, float). Monthly set to Red Matrix Rain
 (10-14). Trevor is redoing the monthly image (transparent PNG suggested); November may want its own look.
 
+## Safety stock prize fix (live 2026-10-14 ~23:05Z: Railway `5ef4f6c`, PR #24)
+Choosing a prize only in safety stock failed: "A ledger document URI is required except when adjusting available".
+Shopify needs `ledgerDocumentUri` for every quantity name except `available`; `moveOne` and `removeOne` now send it for
+safety_stock too. The failed choose had released the day's prize; the scheduler picked the next queue item (Booster
+Bundle) for 10-14. Test: `daily-safety-stock.integration`.
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
