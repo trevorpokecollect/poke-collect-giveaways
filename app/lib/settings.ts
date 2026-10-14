@@ -94,6 +94,8 @@ export const campaignSettingsSchema = z.object({
   webhookUrl: z.string().url().or(z.literal("")).default(""),
   showLeaderboard: z.boolean().default(false),
   showWinners: z.boolean().default(true),
+  // The storefront "Giveaway Winners" page the widget's "See All Winners" button opens.
+  winnersPageUrl: z.string().default("/pages/giveaway-info-winners"),
   // Link name of a partner giveaway (e.g. the daily for a monthly). Signing up for one
   // enters both, and texts, follows and check-ins count in both. Set on either side.
   // See app/lib/entries/linked.server.ts.

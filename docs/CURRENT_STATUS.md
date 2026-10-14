@@ -145,6 +145,26 @@ Shopify MCP connector lacks `write_orders` (and orderCreate needs an offline tok
 Redo Order now confirms inline (PR #18, Railway `41d5943`). 10-14 14:51Z: Ryne #258275 → #258315, Steven #258279 → #258316
 (new ones require shipping with a SHIPPING delivery method; old ones cancelled, no restock).
 
+## Giveaway Winners page (built 2026-10-14, NOT live: needs Trevor's "deploy" (Railway) + "publish")
+Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, full names, YouTube winners from 2023).
+- App: `GET /apps/giveaways/winners` (`proxy.winners.tsx` → `winnersFeed()` in `winners.server.ts` → pure
+  `buildWinnersFeed()` in `app/lib/winners-feed.ts`) returns `{daily:[{date, prize, imageUrl, productHandle, winners}],
+  monthly:[{drawnAt, title, prize, imageUrl, winners}]}` for every draw of ACTIVE/SCHEDULED/ENDED giveaways with "Show
+  winners" on. Names are `publicName()` ("Steven I."); forfeited and disqualified winners are left out; no emails,
+  addresses or prize values. Cached 60s. Test: `winners-feed.test.ts`. Branch `claude/winners-feed`.
+- Theme: draft "Storepass - Giveaway Winners Page v2 (draft)" (155481931959, fresh copy of live 155480752311 at 16:28Z, after
+  the monthly widget swap; the older draft 155481276599 is stale, don't publish it): `sections/pc-giveaway-winners.liquid`,
+  `templates/page.giveaway-winners.json`, `assets/pc-giveaway-winners.{css,js}` (new files only). No GiveawayNinja-era
+  winners (Trevor removed the archive 10-14); the imported monthly's winner shows once it's drawn in the app. Preview:
+  `/pages/giveaway-info-winners?view=giveaway-winners&preview_theme_id=155481931959` (shows "Couldn't Load" until the
+  Railway deploy). Source: `~/Documents/poke-collect-theme/giveaway-winners/new`.
+- **See All Winners button** on the giveaway panels (popup, theme block, hosted page): `winnersLink()` in giveaway.js, inside
+  the Last Winner box, or on its own above the rules when nobody has won yet. URL = `campaign.winnersPage` from setting
+  `winnersPageUrl` (default `/pages/giveaway-info-winners`; no editor field yet), hidden when Show winners is off. Needs a
+  Shopify deploy + Railway deploy.
+- To go live: deploy Railway + `shopify app deploy`; re-check MAIN hasn't changed since 16:28Z (else re-copy), then publish v2; point a page at the `giveaway-winners` template (Trevor to choose: swap the
+  old page's template, keeping its URL and menu links, or a new page + menu change).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
@@ -169,7 +189,13 @@ Redo Order now confirms inline (PR #18, Railway `41d5943`). 10-14 14:51Z: Ryne #
    `onlyFullyEntered` treats an entrant with an IMPORT event as having done every required action (email opt-in still
    needed, so the 536 who didn't opt in at GN only count once they tick it). Imports land in the monthly only; the
    daily never sees them. Trevor's export: `~/Downloads/export-2026-10-14-15-34-34.csv` (5,842 rows, 3,590 importable).
-   Next: Trevor's "deploy" (Railway only) → create monthly from preset as DRAFT → preview → import.
+   **Done 10-14 ~16:05Z:** deployed (Railway `dfabddb`, also shipped PR #19), monthly created from the preset as
+   **DRAFT** (id `cmv8atisw002dlf3an41bpa95`, slug `monthly-giveaway`, ends 10-31 23:59 ET) and the CSV imported:
+   3,589 entrants, 974,970 entries across 2,928 people (661 had 0). 2,253 rows skipped (2,252 removed emails + 1
+   malformed row with 0 entries). Created/imported via the Claude browser pane (Claude in Chrome can't interact
+   with the embedded admin iframe). Still to do, each with Trevor's OK: review the draft's settings (claim days,
+   Klaviyo list, rules), swap the widget on /pages/monthly-giveaway, Go live, final top-up import from a fresh GN
+   export (only deltas are added), link daily↔monthly (`linkedSlug`), turn off GN before its 11/1 charge.
 4. **Debug checks**: cloud routine "Giveaway Debug Check" (8:54am ET daily, through 10-19, self-deletes) is the main one.
    The Mac task `giveaway-daily-debug-check` (~9:38pm ET) got stuck on permission prompts; recommended Trevor delete it
    (his decision pending).
