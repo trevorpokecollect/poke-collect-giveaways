@@ -44,9 +44,9 @@ export function CampaignForm(props: {
   const [preview, setPreview] = useState<string | null>(null);
   // The chosen image as a data URL, which the sandboxed preview frame can load.
   const [imageData, setImageData] = useState<string | null>(null);
-  const [chosen, setChosen] = useState<(PreviewPrize & { id: string }) | null>(
-    null,
-  );
+  const [chosen, setChosen] = useState<
+    (PreviewPrize & { id: string }) | null
+  >(null);
   // Bumped to remount the rules text area when it is filled programmatically.
   const [rulesKey, setRulesKey] = useState(0);
   const set = (patch: Partial<CampaignFormValues>) =>
@@ -85,259 +85,256 @@ export function CampaignForm(props: {
       <input type="hidden" name="dailyProductId" value={chosen?.id ?? ""} />
       <style>{LAYOUT_CSS}</style>
       <div className="pcg-editor">
-        <s-stack gap="base">
-          {props.error && <s-banner tone="critical">{props.error}</s-banner>}
-          <s-banner tone="info">
-            <s-stack direction="inline" gap="base" alignItems="center">
-              <s-text>{recommendText}</s-text>
-              <s-button onClick={recommend}>Use recommended settings</s-button>
-            </s-stack>
-          </s-banner>
+      <s-stack gap="base">
+        {props.error && <s-banner tone="critical">{props.error}</s-banner>}
+        <s-banner tone="info">
+          <s-stack direction="inline" gap="base" alignItems="center">
+            <s-text>{recommendText}</s-text>
+            <s-button onClick={recommend}>Use recommended settings</s-button>
+          </s-stack>
+        </s-banner>
 
-          <s-section heading="Basics">
-            <s-stack gap="base">
-              <TextInput
-                label="Title"
-                placeholder="Win a Prismatic Evolutions Booster Box"
-                required
-                value={v.title}
-                onChange={(title) => set({ title })}
-              />
-              <TextInput
-                label="Prize"
-                placeholder="1x sealed booster box"
-                value={v.prize}
-                onChange={(prize) => set({ prize })}
-              />
-              <TextArea
-                label="Description"
-                value={v.description}
-                onChange={(description) => set({ description })}
-              />
-              <s-stack gap="small-200">
-                <s-text>Prize image</s-text>
-                {preview || (v.imageUrl && !v.removeImage) ? (
-                  <img
-                    src={preview ?? v.imageUrl!}
-                    alt="Prize"
-                    style={{ maxWidth: 240, borderRadius: 8 }}
-                  />
-                ) : null}
-                <input
-                  type="file"
-                  name="image"
-                  accept={IMAGE_TYPES.join(",")}
-                  onChange={(e) => {
-                    const f = e.currentTarget.files?.[0];
-                    setPreview(f ? URL.createObjectURL(f) : null);
-                    setImageData(null);
-                    if (f) {
-                      const reader = new FileReader();
-                      reader.onload = () => setImageData(String(reader.result));
-                      reader.readAsDataURL(f);
-                    }
-                  }}
+        <s-section heading="Basics">
+          <s-stack gap="base">
+            <TextInput
+              label="Title"
+              placeholder="Win a Prismatic Evolutions Booster Box"
+              required
+              value={v.title}
+              onChange={(title) => set({ title })}
+            />
+            <TextInput
+              label="Prize"
+              placeholder="1x sealed booster box"
+              value={v.prize}
+              onChange={(prize) => set({ prize })}
+            />
+            <TextArea
+              label="Description"
+              value={v.description}
+              onChange={(description) => set({ description })}
+            />
+            <s-stack gap="small-200">
+              <s-text>Prize image</s-text>
+              {preview || (v.imageUrl && !v.removeImage) ? (
+                <img
+                  src={preview ?? v.imageUrl!}
+                  alt="Prize"
+                  style={{ maxWidth: 240, borderRadius: 8 }}
                 />
-                {v.imageUrl && !preview && (
-                  <Check
-                    label="Remove the current image"
-                    checked={v.removeImage}
-                    onChange={(removeImage) => set({ removeImage })}
-                  />
-                )}
-                <Select
-                  label="Image Background"
-                  value={v.settings.imageBackdrop}
-                  options={[
-                    { value: "light", label: "Light" },
-                    { value: "gold", label: "Gold Spotlight (dark)" },
-                    { value: "red", label: "Red Spotlight (dark)" },
-                  ]}
-                  details="What shows around the prize image. The spotlights suit dark, flashy artwork; change it each month to match."
-                  onChange={(imageBackdrop) =>
-                    set({ settings: { ...v.settings, imageBackdrop } })
+              ) : null}
+              <input
+                type="file"
+                name="image"
+                accept={IMAGE_TYPES.join(",")}
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  setPreview(f ? URL.createObjectURL(f) : null);
+                  setImageData(null);
+                  if (f) {
+                    const reader = new FileReader();
+                    reader.onload = () => setImageData(String(reader.result));
+                    reader.readAsDataURL(f);
                   }
-                />
-                <s-text color="subdued">
-                  PNG, JPG, WebP or GIF, up to 5 MB.
-                  {v.imageUrl
-                    ? " Choosing a file replaces the current image."
-                    : ""}
-                </s-text>
-              </s-stack>
-              <TextInput
-                label="Link name"
-                value={v.slug}
-                details={
-                  props.isEdit
-                    ? "Used in the giveaway URL. Changing it breaks links and theme blocks that use the old name."
-                    : "Used in the giveaway URL. Leave blank to use the title."
-                }
-                onChange={(slug) => set({ slug })}
+                }}
               />
-              <s-grid gridTemplateColumns="1fr 1fr" gap="base">
-                <DateTimeInput
-                  label="Starts"
-                  zoneLabel={zone}
-                  value={v.startsAt}
-                  onChange={(startsAt) => set({ startsAt })}
+              {v.imageUrl && !preview && (
+                <Check
+                  label="Remove the current image"
+                  checked={v.removeImage}
+                  onChange={(removeImage) => set({ removeImage })}
                 />
-                <DateTimeInput
-                  label="Ends"
-                  zoneLabel={zone}
-                  value={v.endsAt}
-                  onChange={(endsAt) => set({ endsAt })}
-                />
-              </s-grid>
+              )}
+              <Select
+                label="Image Background"
+                value={v.settings.imageBackdrop}
+                options={[
+                  { value: "light", label: "Light" },
+                  { value: "gold", label: "Gold Spotlight (dark)" },
+                  { value: "red", label: "Red Spotlight (dark)" },
+                ]}
+                details="What shows around the prize image. The spotlights suit dark, flashy artwork; change it each month to match."
+                onChange={(imageBackdrop) =>
+                  set({ settings: { ...v.settings, imageBackdrop } })
+                }
+              />
               <s-text color="subdued">
-                Leave Starts blank to open as soon as you click Go live.
+                PNG, JPG, WebP or GIF, up to 5 MB.
+                {v.imageUrl
+                  ? " Choosing a file replaces the current image."
+                  : ""}
               </s-text>
             </s-stack>
-          </s-section>
-
-          {props.dailyChooser && v.settings.daily.enabled && (
-            <s-section heading="Today's prize">
-              <s-stack gap="base">
-                {chosen ? (
-                  <s-stack direction="inline" gap="base" alignItems="center">
-                    {chosen.imageUrl && (
-                      <s-thumbnail src={chosen.imageUrl} alt={chosen.title} />
-                    )}
-                    <s-text>{chosen.title}</s-text>
-                  </s-stack>
-                ) : (
-                  <s-paragraph>
-                    Pick the product for today&apos;s draw, or leave it and the
-                    app picks one automatically when the giveaway goes live.
-                    From tomorrow the app picks each day&apos;s prize.
-                  </s-paragraph>
-                )}
-                <s-stack direction="inline" gap="base">
-                  <s-button
-                    onClick={async () => {
-                      const selected = await shopify.resourcePicker({
-                        type: "product",
-                        action: "select",
-                        multiple: false,
-                      });
-                      const p = selected?.[0];
-                      if (p)
-                        setChosen({
-                          id: p.id,
-                          title: p.title,
-                          imageUrl: p.images?.[0]?.originalSrc ?? null,
-                        });
-                    }}
-                  >
-                    {chosen ? "Choose a different product" : "Choose product"}
-                  </s-button>
-                  {chosen && (
-                    <s-button
-                      variant="tertiary"
-                      onClick={() => setChosen(null)}
-                    >
-                      Let the app pick
-                    </s-button>
-                  )}
-                </s-stack>
-              </s-stack>
-            </s-section>
-          )}
-
-          <ActionsEditor
-            actions={v.actions}
-            archivedCount={props.archivedCount}
-            onChange={(actions) => set({ actions })}
-          />
-
-          <PurchaseRulesEditor
-            rules={v.rules}
-            timezone={v.timezone}
-            resources={v.resources}
-            onChange={(rules) => set({ rules })}
-            onResources={(labels: ResourceLabels) =>
-              setV((prev) => ({
-                ...prev,
-                resources: { ...prev.resources, ...labels },
-              }))
-            }
-          />
-
-          <ShopPromoEditor
-            shop={v.settings.shop}
-            onChange={(shop) => set({ settings: { ...v.settings, shop } })}
-          />
-
-          <SettingsEditor
-            settings={v.settings}
-            onChange={(settings) => set({ settings })}
-          />
-
-          <s-section heading="Official rules">
-            <s-stack gap="base">
-              <TextInput
-                label="Who can enter"
-                value={v.settings.eligibility}
-                details="Used in the eligibility section of the generated rules."
-                onChange={(eligibility) =>
-                  set({ settings: { ...v.settings, eligibility } })
-                }
+            <TextInput
+              label="Link name"
+              value={v.slug}
+              details={
+                props.isEdit
+                  ? "Used in the giveaway URL. Changing it breaks links and theme blocks that use the old name."
+                  : "Used in the giveaway URL. Leave blank to use the title."
+              }
+              onChange={(slug) => set({ slug })}
+            />
+            <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+              <DateTimeInput
+                label="Starts"
+                zoneLabel={zone}
+                value={v.startsAt}
+                onChange={(startsAt) => set({ startsAt })}
               />
-              <s-stack direction="inline">
-                <s-button icon="wand" onClick={generate}>
-                  Generate From Giveaway Details
-                </s-button>
-              </s-stack>
-              <TextArea
-                key={rulesKey}
-                label="Rules text"
-                rows={14}
-                value={v.rulesText}
-                details="Shown on the giveaway as the official rules. Review it before going live; it isn't legal advice."
-                onChange={(rulesText) => set({ rulesText })}
+              <DateTimeInput
+                label="Ends"
+                zoneLabel={zone}
+                value={v.endsAt}
+                onChange={(endsAt) => set({ endsAt })}
               />
-            </s-stack>
-          </s-section>
-
-          <s-section heading="Bot protection">
-            <s-paragraph>
-              On by default: Cloudflare Turnstile, email verification codes,
-              disposable and alias email checks, IP, subnet and device limits,
-              and referral fraud checks. Suspicious entries are held for your
-              review automatically.
-            </s-paragraph>
-          </s-section>
-
-          {props.error && <s-banner tone="critical">{props.error}</s-banner>}
-          <s-banner tone="info">
-            <s-stack direction="inline" gap="base" alignItems="center">
-              <s-text>{recommendText}</s-text>
-              <s-button onClick={recommend}>Use recommended settings</s-button>
-            </s-stack>
-          </s-banner>
-          <s-stack direction="inline">
-            <s-button
-              type="submit"
-              variant="primary"
-              {...(props.saving ? { loading: true } : {})}
-            >
-              {props.submitLabel}
-            </s-button>
+            </s-grid>
+            <s-text color="subdued">
+              Leave Starts blank to open as soon as you click Go live.
+            </s-text>
           </s-stack>
+        </s-section>
+
+        {props.dailyChooser && v.settings.daily.enabled && (
+          <s-section heading="Today's prize">
+            <s-stack gap="base">
+              {chosen ? (
+                <s-stack direction="inline" gap="base" alignItems="center">
+                  {chosen.imageUrl && (
+                    <s-thumbnail src={chosen.imageUrl} alt={chosen.title} />
+                  )}
+                  <s-text>{chosen.title}</s-text>
+                </s-stack>
+              ) : (
+                <s-paragraph>
+                  Pick the product for today&apos;s draw, or leave it and the
+                  app picks one automatically when the giveaway goes live. From
+                  tomorrow the app picks each day&apos;s prize.
+                </s-paragraph>
+              )}
+              <s-stack direction="inline" gap="base">
+                <s-button
+                  onClick={async () => {
+                    const selected = await shopify.resourcePicker({
+                      type: "product",
+                      action: "select",
+                      multiple: false,
+                    });
+                    const p = selected?.[0];
+                    if (p)
+                      setChosen({
+                        id: p.id,
+                        title: p.title,
+                        imageUrl: p.images?.[0]?.originalSrc ?? null,
+                      });
+                  }}
+                >
+                  {chosen ? "Choose a different product" : "Choose product"}
+                </s-button>
+                {chosen && (
+                  <s-button variant="tertiary" onClick={() => setChosen(null)}>
+                    Let the app pick
+                  </s-button>
+                )}
+              </s-stack>
+            </s-stack>
+          </s-section>
+        )}
+
+        <ActionsEditor
+          actions={v.actions}
+          archivedCount={props.archivedCount}
+          onChange={(actions) => set({ actions })}
+        />
+
+        <PurchaseRulesEditor
+          rules={v.rules}
+          timezone={v.timezone}
+          resources={v.resources}
+          onChange={(rules) => set({ rules })}
+          onResources={(labels: ResourceLabels) =>
+            setV((prev) => ({
+              ...prev,
+              resources: { ...prev.resources, ...labels },
+            }))
+          }
+        />
+
+        <ShopPromoEditor
+          shop={v.settings.shop}
+          onChange={(shop) => set({ settings: { ...v.settings, shop } })}
+        />
+
+        <SettingsEditor
+          settings={v.settings}
+          onChange={(settings) => set({ settings })}
+        />
+
+        <s-section heading="Official rules">
+          <s-stack gap="base">
+            <TextInput
+              label="Who can enter"
+              value={v.settings.eligibility}
+              details="Used in the eligibility section of the generated rules."
+              onChange={(eligibility) =>
+                set({ settings: { ...v.settings, eligibility } })
+              }
+            />
+            <s-stack direction="inline">
+              <s-button icon="wand" onClick={generate}>
+                Generate From Giveaway Details
+              </s-button>
+            </s-stack>
+            <TextArea
+              key={rulesKey}
+              label="Rules text"
+              rows={14}
+              value={v.rulesText}
+              details="Shown on the giveaway as the official rules. Review it before going live; it isn't legal advice."
+              onChange={(rulesText) => set({ rulesText })}
+            />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Bot protection">
+          <s-paragraph>
+            On by default: Cloudflare Turnstile, email verification codes,
+            disposable and alias email checks, IP, subnet and device limits, and
+            referral fraud checks. Suspicious entries are held for your review
+            automatically.
+          </s-paragraph>
+        </s-section>
+
+        {props.error && <s-banner tone="critical">{props.error}</s-banner>}
+        <s-banner tone="info">
+          <s-stack direction="inline" gap="base" alignItems="center">
+            <s-text>{recommendText}</s-text>
+            <s-button onClick={recommend}>Use recommended settings</s-button>
+          </s-stack>
+        </s-banner>
+        <s-stack direction="inline">
+          <s-button
+            type="submit"
+            variant="primary"
+            {...(props.saving ? { loading: true } : {})}
+          >
+            {props.submitLabel}
+          </s-button>
         </s-stack>
-        <div className="pcg-editor__preview">
-          <GiveawayPreview
-            values={v}
-            imageUrl={
-              imageData ?? (v.imageUrl && !v.removeImage ? v.imageUrl : null)
-            }
-            dailyPrize={
-              chosen
-                ? { title: chosen.title, imageUrl: chosen.imageUrl }
-                : props.dailyPrize
-            }
-          />
-        </div>
+      </s-stack>
+      <div className="pcg-editor__preview">
+        <GiveawayPreview
+          values={v}
+          imageUrl={
+            imageData ?? (v.imageUrl && !v.removeImage ? v.imageUrl : null)
+          }
+          dailyPrize={
+            chosen
+              ? { title: chosen.title, imageUrl: chosen.imageUrl }
+              : props.dailyPrize
+          }
+        />
+      </div>
       </div>
     </Form>
   );
