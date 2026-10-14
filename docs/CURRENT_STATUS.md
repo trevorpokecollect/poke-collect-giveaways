@@ -158,7 +158,11 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
   winners (Trevor removed the archive 10-14); the imported monthly's winner shows once it's drawn in the app. Preview:
   `/pages/giveaway-info-winners?view=giveaway-winners&preview_theme_id=155481931959` (shows "Couldn't Load" until the
   Railway deploy). Source: `~/Documents/poke-collect-theme/giveaway-winners/new`.
-- To go live: deploy Railway; re-check MAIN hasn't changed since 16:28Z (else re-copy), then publish v2; point a page at the `giveaway-winners` template (Trevor to choose: swap the
+- **See All Winners button** on the giveaway panels (popup, theme block, hosted page): `winnersLink()` in giveaway.js, inside
+  the Last Winner box, or on its own above the rules when nobody has won yet. URL = `campaign.winnersPage` from setting
+  `winnersPageUrl` (default `/pages/giveaway-info-winners`; no editor field yet), hidden when Show winners is off. Needs a
+  Shopify deploy + Railway deploy.
+- To go live: deploy Railway + `shopify app deploy`; re-check MAIN hasn't changed since 16:28Z (else re-copy), then publish v2; point a page at the `giveaway-winners` template (Trevor to choose: swap the
   old page's template, keeping its URL and menu links, or a new page + menu change).
 
 ## Open items / next steps

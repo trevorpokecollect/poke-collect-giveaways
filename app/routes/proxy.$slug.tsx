@@ -81,6 +81,8 @@ const publicState = (campaign: LiveCampaign) =>
         rulesText: campaign.rulesText,
         requireEmailConsent: settings.requireEmailConsent,
         requireName: settings.requireName,
+        // "See All Winners" button (null hides it).
+        winnersPage: (settings.showWinners && settings.winnersPageUrl) || null,
         actions: visibleActions(campaign.actions).map(publicAction),
       },
       // Set for giveaways with the daily draw on: today's prize, when it's drawn, the last winner.

@@ -404,7 +404,7 @@
     // The last daily winner sits under the prize in the wide layout, and after the tasks when
     // stacked; both copies are rendered and the CSS shows one.
     return head([this.upcoming(signup), this.lastDailyWinner("pcg__last-winner--side")])
-      .concat(tasks([this.lastDailyWinner(), this.winners(), this.leaderboard(), this.footer()]));
+      .concat(tasks([this.lastDailyWinner() || this.winnersLink(), this.winners(), this.leaderboard(), this.footer()]));
   };
 
   // The next few prizes the store has lined up (daily giveaways), under today's prize. A row of
@@ -437,7 +437,16 @@
       el("span", { text: "🏆 Last Winner: " }),
       el("b", { text: w.name }),
       document.createTextNode(" won " + w.prize),
+      this.winnersLink(),
     ]);
+  };
+
+  // "See All Winners" button: opens the store's Giveaway Winners page (campaign.winnersPage).
+  // Inside the last-winner box, or on its own when nobody has won yet.
+  Widget.prototype.winnersLink = function () {
+    var url = this.data.campaign && this.data.campaign.winnersPage;
+    if (!url) return null;
+    return el("a", { class: "pcg__btn pcg__btn--ghost pcg__btn--small pcg__winners-link", href: url, text: "🏆 See All Winners" });
   };
 
   Widget.prototype.leaderboard = function () {
