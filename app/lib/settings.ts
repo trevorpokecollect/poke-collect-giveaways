@@ -94,6 +94,9 @@ export const campaignSettingsSchema = z.object({
   webhookUrl: z.string().url().or(z.literal("")).default(""),
   showLeaderboard: z.boolean().default(false),
   showWinners: z.boolean().default(true),
+  // Backdrop behind the giveaway's own prize image (not the daily prize): "light" (white),
+  // or a dark stage with a gold or red spotlight that suits dark, flashy artwork.
+  imageBackdrop: z.enum(["light", "gold", "red"]).catch("light"),
   // The storefront "Giveaway Winners" page the widget's "See All Winners" button opens.
   winnersPageUrl: z.string().default("/pages/giveaway-info-winners"),
   // Link name of a partner giveaway (e.g. the daily for a monthly). Signing up for one
