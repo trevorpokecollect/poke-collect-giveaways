@@ -125,6 +125,11 @@ Private Relay); inferred, the production DB wasn't queried. Change: `ip_burst` 3
 `subnet_burst` when `ip_burst` is present, so a busy connection alone (or with one weak signal) asks for an email code;
 two other warning signs still hold. Already-held entrants need Approve in the Entrants tab (Needs Review filter).
 
+## Admin Approve buttons (live 2026-10-14 ~03:25Z: Railway `ae5c28d`, PR #15)
+`s-button-group` hid buttons without a slot (entrant list Approve/Disqualify) and primary buttons in
+`secondary-actions` (selected tab/filter, expired winner's Forfeit and redraw). Replaced with inline `s-stack`; entrant
+page has Approve Entrant for held/unverified. Used it to approve all 25 held entrants (Needs Review now 0).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
