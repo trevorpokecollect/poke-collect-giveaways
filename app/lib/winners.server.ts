@@ -56,7 +56,7 @@ export async function storefrontUrl(admin: AdminApiContext, shop: string) {
 
 const winnerInclude = {
   entrant: true,
-  draw: { include: { campaign: true } },
+  draw: { include: { campaign: true, dailyPrize: true } },
 } satisfies Prisma.WinnerInclude;
 
 export async function emailWinner(winnerId: string, siteUrl: string) {
@@ -130,7 +130,7 @@ export async function emailDrawWinners(drawId: string, siteUrl: string) {
 
 /**
  * Marks an unclaimed winner forfeited and draws one replacement, excluding
- * everyone who has ever won this campaign. The guarded update makes a double
+ * everyone who has ever won this campaign (daily prizes: see redrawDailyWinner). The guarded update makes a double
  * click a no-op instead of a second redraw.
  */
 export async function forfeitAndRedraw(campaignId: string, winnerId: string) {
@@ -145,6 +145,19 @@ export async function forfeitAndRedraw(campaignId: string, winnerId: string) {
   });
   if (count === 0) throw new Error("This winner can't be forfeited.");
   try {
+    // A daily winner is replaced from that day's entries, in the same draw.
+    const daily = await db.dailyPrize.findFirst({
+      where: { draw: { winners: { some: { id: winnerId } } } },
+    });
+    if (daily?.drawId) {
+      // Imported here: daily.server imports this module.
+      const { redrawDailyWinner } = await import("./daily.server");
+      await redrawDailyWinner({ ...daily, drawId: daily.drawId });
+      return await db.draw.findUniqueOrThrow({
+        where: { id: daily.drawId },
+        include: { winners: { include: { entrant: true } } },
+      });
+    }
     return await runDraw(campaignId, 1, `redraw:${winnerId}`, {
       excludeForfeited: true,
     });
@@ -190,7 +203,9 @@ export async function loadClaim(
     return { kind: "invalid" };
   const { winner, parsed } = found;
   const campaign = winner.draw.campaign;
-  const prize = campaign.prize || campaign.title;
+  // Daily winners won that day's product, not the giveaway's main prize.
+  const daily = winner.draw.dailyPrize;
+  const prize = daily?.title || campaign.prize || campaign.title;
   if (winner.claimedAt)
     return { kind: "claimed", title: campaign.title, prize };
   if (winner.forfeited || parsed.expired)
@@ -199,7 +214,7 @@ export async function loadClaim(
     kind: "form",
     title: campaign.title,
     prize,
-    imageUrl: campaign.imageUrl,
+    imageUrl: daily ? daily.imageUrl : campaign.imageUrl,
     deadline: parsed.expiresAt,
     defaults: { name: winner.entrant.name ?? "" },
   };

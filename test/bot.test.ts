@@ -4,7 +4,12 @@ import {
   looksGenerated,
   normalizeEmail,
 } from "../app/lib/bot/email";
-import { decide, DEFAULT_RISK_POLICY, scoreSignals } from "../app/lib/bot/risk";
+import {
+  decide,
+  DEFAULT_RISK_POLICY,
+  scoreSignals,
+  turnstileSignal,
+} from "../app/lib/bot/risk";
 import { verifyTurnstile } from "../app/lib/bot/turnstile.server";
 import { subnetOf } from "../app/lib/bot/fingerprint.server";
 
@@ -123,5 +128,28 @@ describe("subnets", () => {
   it("groups IPv4 by /24 and IPv6 by /48", () => {
     expect(subnetOf("203.0.113.77")).toBe("203.0.113.0/24");
     expect(subnetOf("2001:db8:abcd:12::1")).toBe("2001:db8:abcd::/48");
+  });
+});
+
+describe("turnstile signals", () => {
+  it("only blocks a token Cloudflare calls invalid", () => {
+    expect(turnstileSignal(["invalid-input-response"]).code).toBe(
+      "turnstile_failed",
+    );
+    for (const codes of [
+      ["missing-input-response"],
+      ["timeout-or-duplicate"],
+      ["network-error"],
+      ["missing-secret"],
+      ["internal-error"],
+      ["invalid-input-secret"],
+      [],
+    ])
+      expect(turnstileSignal(codes).code).toBe("turnstile_missing");
+  });
+
+  it("asks a real person hit by a Cloudflare outage for an email code", () => {
+    const { score } = scoreSignals([turnstileSignal(["network-error"])]);
+    expect(decide(score, DEFAULT_RISK_POLICY)).toBe("verify");
   });
 });

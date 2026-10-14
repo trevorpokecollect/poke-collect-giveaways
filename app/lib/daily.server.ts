@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
-import type { Campaign, DailyPrize } from "@prisma/client";
+import type { Campaign, DailyPrize, DailyPrizeStatus } from "@prisma/client";
 import db from "../db.server";
 import { unauthenticated } from "../shopify.server";
 import {
@@ -329,13 +329,12 @@ export async function ensurePrize(
   if (campaign.endsAt && campaign.endsAt < period.drawAt) return null;
   if (campaign.startsAt && campaign.startsAt > period.drawAt) return null;
 
-  const existing = await db.dailyPrize.findFirst({
-    where: {
-      campaignId: campaign.id,
-      periodKey: period.key,
-      status: { in: ["RESERVED", "DRAWN", "SENT"] },
-    },
-  });
+  const held = {
+    campaignId: campaign.id,
+    periodKey: period.key,
+    status: { in: ["RESERVED", "DRAWN", "SENT"] as DailyPrizeStatus[] },
+  };
+  const existing = await db.dailyPrize.findFirst({ where: held });
   if (existing) return existing;
 
   let pick: Candidate | null = null;
@@ -392,23 +391,36 @@ export async function ensurePrize(
     return null;
   }
 
-  const prize = await db.dailyPrize.create({
-    data: {
-      campaignId: campaign.id,
-      periodKey: period.key,
-      opensAt: period.opensAt,
-      drawAt: period.drawAt,
-      productId: pick.productId,
-      variantId: pick.variantId,
-      productHandle: pick.productHandle,
-      title: pick.title,
-      imageUrl: pick.imageUrl,
-      value: pick.value,
-      inventoryItemId: pick.inventoryItemId,
-      locationId: pick.locationId,
-      reservedFrom: pick.source,
-    },
+  // Picking takes a few seconds of Shopify calls, and the scheduler, the admin buttons and an
+  // overlapping deploy can all pick at once. Re-check and create under a per-day lock so only
+  // one prize is ever held (and reserved) for a day.
+  const prize = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`daily-prize:${campaign.id}:${period.key}`}))`;
+    if (await tx.dailyPrize.findFirst({ where: held })) return null;
+    return tx.dailyPrize.create({
+      data: {
+        campaignId: campaign.id,
+        periodKey: period.key,
+        opensAt: period.opensAt,
+        drawAt: period.drawAt,
+        productId: pick.productId,
+        variantId: pick.variantId,
+        productHandle: pick.productHandle,
+        title: pick.title,
+        imageUrl: pick.imageUrl,
+        value: pick.value,
+        inventoryItemId: pick.inventoryItemId,
+        locationId: pick.locationId,
+        reservedFrom: pick.source,
+      },
+    });
   });
+  if (!prize) {
+    // Someone else picked this day's prize while we were looking.
+    if (opts.productId || opts.exclude)
+      throw new Error("Today's prize just changed. Refresh and try again.");
+    return db.dailyPrize.findFirst({ where: held });
+  }
   try {
     await moveOne(admin, prize, "reserve");
   } catch (err) {
@@ -614,6 +626,52 @@ export async function drawPrize(prize: DailyPrize, admin: Admin) {
     }
     throw err;
   }
+}
+
+/**
+ * Replaces a forfeited daily winner from that day's entries. The new winner joins the same
+ * draw, so the winner email, claim page and $0 prize order all still name that day's
+ * product. Skips everyone already in this draw and recent winners (the nightly cooldown).
+ */
+export async function redrawDailyWinner(
+  prize: Pick<DailyPrize, "campaignId" | "opensAt" | "drawAt"> & {
+    drawId: string;
+  },
+) {
+  const campaign = await db.campaign.findUniqueOrThrow({
+    where: { id: prize.campaignId },
+  });
+  const cfg = dailySettings(campaign);
+  const [inDraw, recentWinners] = await Promise.all([
+    db.winner.findMany({
+      where: { drawId: prize.drawId },
+      select: { entrantId: true },
+    }),
+    db.winner.findMany({
+      where: {
+        forfeited: false,
+        draw: {
+          campaignId: campaign.id,
+          createdAt: {
+            gte: new Date(Date.now() - cfg.winCooldownDays * DAY_MS),
+          },
+        },
+      },
+      select: { entrantId: true },
+    }),
+  ]);
+  const excluded = new Set(
+    [...inDraw, ...recentWinners].map((w) => w.entrantId),
+  );
+  const pool = (await dayTickets(prize)).filter(
+    (t) => !excluded.has(t.entrantId),
+  );
+  if (!pool.length) throw new Error("Nobody else entered that day.");
+
+  const [entrantId] = drawWinners(pool, 1, newSeed());
+  return db.winner.create({
+    data: { drawId: prize.drawId, entrantId, position: inDraw.length + 1 },
+  });
 }
 
 // ── Scheduler ───────────────────────────────────────────────────────────────

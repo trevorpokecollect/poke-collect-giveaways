@@ -15,6 +15,7 @@ import {
   decide,
   parsePolicy,
   scoreSignals,
+  turnstileSignal,
   type Signal,
 } from "../bot/risk";
 import { verifyTurnstile } from "../bot/turnstile.server";
@@ -190,15 +191,7 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
 
   const signals: Signal[] = [];
   const turnstile = await verifyTurnstile(input.turnstileToken, input.ip);
-  if (!turnstile.success)
-    signals.push({
-      code: turnstile.errorCodes.every((c) =>
-        ["missing-input-response", "timeout-or-duplicate"].includes(c),
-      )
-        ? "turnstile_missing"
-        : "turnstile_failed",
-      detail: turnstile.errorCodes.join(","),
-    });
+  if (!turnstile.success) signals.push(turnstileSignal(turnstile.errorCodes));
   if (input.honeypot) signals.push({ code: "honeypot" });
   if (input.elapsedMs !== undefined && input.elapsedMs < MIN_FILL_MS) {
     signals.push({ code: "too_fast", detail: `${input.elapsedMs}ms` });
