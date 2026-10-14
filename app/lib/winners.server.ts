@@ -8,6 +8,7 @@ import { sendMail } from "./mailer.server";
 import { createPrizeOrder, replacePrizeOrder } from "./prize-order.server";
 import { parseSettings } from "./settings";
 import { slugify } from "./slug";
+import { buildWinnersFeed } from "./winners-feed";
 import {
   brandedEmail,
   claimDeadline,
@@ -290,6 +291,50 @@ export async function publicWinners(shop: string, slug: string) {
     position: w.position,
     name: publicName(w.entrant.name, w.entrant.email),
   }));
+}
+
+/**
+ * Every Daily and Monthly winner in the shop, newest first, for the storefront winners
+ * page. Skips draft/archived giveaways and any with "Show winners" turned off.
+ */
+export async function winnersFeed(shop: string) {
+  const draws = await db.draw.findMany({
+    where: {
+      campaign: { shop, status: { in: ["ACTIVE", "ENDED", "SCHEDULED"] } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 400,
+    select: {
+      createdAt: true,
+      campaign: {
+        select: {
+          slug: true,
+          title: true,
+          prize: true,
+          imageUrl: true,
+          settings: true,
+        },
+      },
+      dailyPrize: {
+        select: {
+          periodKey: true,
+          title: true,
+          imageUrl: true,
+          productHandle: true,
+        },
+      },
+      winners: {
+        select: {
+          position: true,
+          forfeited: true,
+          entrant: { select: { name: true, email: true, status: true } },
+        },
+      },
+    },
+  });
+  return buildWinnersFeed(
+    draws.filter((d) => parseSettings(d.campaign.settings).showWinners),
+  );
 }
 
 // ── Admin: draws section intents ────────────────────────────────────────────
