@@ -141,8 +141,9 @@ try again." (400) from sign-up instead of a 500. Tests in `email-typos.test.ts`.
 `orderCreate` defaults line-item `requiresShipping` to false, so #258275 (Ryne) and #258279 (Steven) said "Shipping not
 required" (no labels). New prize orders set `requiresShipping: true` + a $0 "Giveaway Prize Shipping" line. Draws tab has
 **Redo Order** (`replacePrizeOrder`): new $0 order, then `orderCancel` of the old one (no restock, no email). The
-Shopify MCP connector lacks `write_orders`, so orders can only be made through the app. Trevor to click Redo Order for
-both winners (the browser pane can't accept the confirm dialog).
+Shopify MCP connector lacks `write_orders` (and orderCreate needs an offline token), so orders are made through the app.
+Redo Order now confirms inline (PR #18, Railway `41d5943`). 10-14 14:51Z: Ryne #258275 → #258315, Steven #258279 → #258316
+(new ones require shipping with a SHIPPING delivery method; old ones cancelled, no restock).
 
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
