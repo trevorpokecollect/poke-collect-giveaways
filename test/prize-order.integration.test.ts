@@ -9,6 +9,10 @@ const admin = {
       calls.push({ query, variables: opts?.variables });
       if (query.includes("currencyCode"))
         return Response.json({ data: { shop: { currencyCode: "USD" } } });
+      if (query.includes("orderCancel"))
+        return Response.json({
+          data: { orderCancel: { orderCancelUserErrors: [] } },
+        });
       if (failNext) {
         failNext = false;
         return Response.json({
@@ -185,6 +189,43 @@ describe.skipIf(!process.env.DATABASE_URL)(
         form,
       });
       expect(res).toMatchObject({ ok: true, message: "Order #1001 created." });
+    });
+
+    it("Redo Order makes a new order and quietly cancels the old one", async () => {
+      const { winner, token } = await makeWinner(true, 4);
+      await w.submitClaim(shop, token, address);
+      await db.winner.update({
+        where: { id: winner.id },
+        data: {
+          prizeOrderId: "gid://shopify/Order/old",
+          prizeOrderName: "#OLD",
+        },
+      });
+      calls.length = 0;
+      const form = new FormData();
+      form.set("winnerId", winner.id);
+      const draw = await db.draw.findUniqueOrThrow({
+        where: { id: winner.drawId },
+      });
+      const res = await w.handleDrawIntent({
+        admin: admin as never,
+        shop,
+        campaignId: draw.campaignId,
+        intent: "redoPrizeOrder",
+        form,
+      });
+      expect(res).toMatchObject({ ok: true });
+      expect(calls.some((c) => c.query.includes("orderCreate"))).toBe(true);
+      const cancel = calls.find((c) => c.query.includes("orderCancel"))!;
+      expect(cancel.variables).toMatchObject({
+        orderId: "gid://shopify/Order/old",
+      });
+      expect(cancel.query).toContain("restock: false");
+      expect(cancel.query).toContain("notifyCustomer: false");
+      const saved = await db.winner.findUniqueOrThrow({
+        where: { id: winner.id },
+      });
+      expect(saved.prizeOrderName).toBe("#1001");
     });
 
     it("doesn't create an order for a monthly winner", async () => {
