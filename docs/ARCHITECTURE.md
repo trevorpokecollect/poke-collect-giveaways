@@ -37,6 +37,7 @@ Checkout ▶ giveaway-thank-you UI extension ─▶ POST https://app-production-
 | Hosted page | `app/lib/storefront/landing.server.ts` — returns `application/liquid`, **inlines `giveaway.css/js` via `?raw` imports** |
 | Sign-up / verify | `app/lib/entries/signup.server.ts` (`signup`, `findLiveCampaign`, `activate`, `hasFullName`, `clawBackReferrals`), `app/lib/otp.server.ts`, `app/lib/token.server.ts` |
 | Actions (tasks) | `app/lib/entries/actions.server.ts` (`completeAction`, `entrantState`, `verifyEntrant`, `leaderboard`), pure helpers `actions.ts`, repeat keys `repeat.ts` |
+| Daily Tasks | `app/lib/daily-tasks.ts` (task day / reset, Friday-style windows, unlock = every one-time follow task, link rotation), server state `dailyTaskState` + claim checks in `completeAction`; config on the action (`daily`, `urls`, `confirm`, `schedule`, `live`, `paused`); setting `dailyTasks.resetAt` |
 | Ledger | `app/lib/entries/ledger.server.ts` (`award` w/ optional backdated `createdAt`, `entrantTotal`, `eligibleTickets`) |
 | Purchases | `app/lib/entries/orders.server.ts` (`processOrder` idempotent, `ordersCountFrom`, `removePreStartOrderEntries`), scoring `rules.ts`, estimates `estimate*.ts`, thank-you `order-entries.server.ts`, `app/lib/backfill.server.ts` |
 | Bot protection | `app/lib/bot/risk.ts` (weights/policy), `turnstile.server.ts`, `email.ts`, `fingerprint.server.ts`, `rate-limit.server.ts` |

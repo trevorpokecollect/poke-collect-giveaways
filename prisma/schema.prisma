@@ -409,3 +409,11 @@ model FollowClickDay {
   @@unique([shop, date, giveaway, platform])
   @@index([date])
 }
+
+// Small app-wide values the app keeps up to date itself, e.g. the refreshed Instagram API token
+// (key "instagram_token"). Secrets here never leave the server.
+model AppValue {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

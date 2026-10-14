@@ -29,7 +29,9 @@ const NOT_GATING: ActionType[] = ["SIGNUP", "REFERRAL", "ALTERNATE_ENTRY"];
 
 /** Actions an entrant must complete to be in the draw (and before the other tasks unlock). */
 export const requiredActions = <T extends ActionLike>(actions: T[]) =>
-  actions.filter((a) => a.mandatory && !isArchived(a) && !NOT_GATING.includes(a.type));
+  actions.filter(
+    (a) => a.mandatory && !isArchived(a) && !NOT_GATING.includes(a.type),
+  );
 
 // Awarded by the server on its own, so the widget never offers them as buttons.
 const AUTOMATIC: ActionType[] = ["SIGNUP"];
@@ -75,8 +77,23 @@ export function publicConfig(type: ActionType, raw: unknown) {
   }
 }
 
+/** Daily Task display fields (no secrets): see app/lib/daily-tasks.ts. */
+function taskConfig(raw: unknown) {
+  const c = asConfig(raw);
+  if (c.daily !== true) return {};
+  const s = asConfig(c.schedule);
+  return {
+    daily: true,
+    confirm: str(c.confirm) ?? null,
+    live: c.live === true,
+    schedule: Array.isArray(s.days)
+      ? { days: s.days, start: str(s.start), end: str(s.end) }
+      : null,
+  };
+}
+
 export function publicAction(a: ActionLike) {
-  const config = publicConfig(a.type, a.config);
+  const config = { ...publicConfig(a.type, a.config), ...taskConfig(a.config) };
   return {
     id: a.id,
     type: a.type,

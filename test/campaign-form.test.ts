@@ -259,3 +259,51 @@ describe("generateOfficialRules", () => {
     expect(text).not.toContain("after the entry period ends. Winners");
   });
 });
+
+describe("daily task fields", () => {
+  const signup = newAction("SIGNUP");
+  const live = () => ({
+    ...newAction("VISIT_URL"),
+    label: "Join Our Live Whatnot Show",
+    config: {
+      url: "https://whatnot.com/live/x",
+      daily: true,
+      live: true,
+      schedule: { days: [5], start: "17:00", end: "20:00" },
+      urls: ["  ", "https://instagram.com/p/b"],
+      confirm: " ",
+    },
+  });
+
+  it("keeps the daily fields and makes the task repeat", () => {
+    const r = validateActions([signup, live()]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value[1].repeatable).toBe(true);
+    expect(r.value[1].config).toEqual({
+      url: "https://whatnot.com/live/x",
+      daily: true,
+      live: true,
+      schedule: { days: [5], start: "17:00", end: "20:00" },
+      urls: ["https://instagram.com/p/b"],
+    });
+  });
+
+  it("rejects a schedule with no days or an end before the start", () => {
+    const noDays = live();
+    noDays.config.schedule = { days: [], start: "17:00", end: "20:00" };
+    expect(validateActions([signup, noDays]).ok).toBe(false);
+    const backwards = live();
+    backwards.config.schedule = { days: [5], start: "20:00", end: "17:00" };
+    expect(validateActions([signup, backwards]).ok).toBe(false);
+  });
+
+  it("drops daily fields from non-daily tasks", () => {
+    const plain = live();
+    plain.config.daily = false;
+    const r = validateActions([signup, plain]);
+    expect(r.ok && r.value[1].config).toEqual({
+      url: "https://whatnot.com/live/x",
+    });
+  });
+});

@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { ActionType } from "@prisma/client";
 import db from "../../db.server";
 import { normalizeEmail } from "../bot/email";
 import { hit } from "../bot/rate-limit.server";
@@ -19,6 +20,89 @@ import { actionDedupeKey, repeatSuffix } from "./repeat";
 import { mirrorAction } from "./linked.server";
 import { normalizeUsPhone } from "../phone";
 import { queueKlaviyoSync } from "../klaviyo.server";
+import { parseSettings } from "../settings";
+import { latestInstagramPost } from "../instagram.server";
+import {
+  dailyUnlocked,
+  isDailyTask,
+  nextWindow,
+  openWindow,
+  rotatedUrl,
+  taskDay,
+  taskStatus,
+  type TaskConfig,
+} from "../daily-tasks";
+
+type CampaignLike = { settings: unknown; timezone: string };
+
+/** The current task day for a giveaway's Daily Tasks (see app/lib/daily-tasks.ts). */
+export function currentTaskDay(campaign: CampaignLike, now = new Date()) {
+  const s = parseSettings(campaign.settings);
+  return taskDay(
+    now,
+    s.dailyTasks.resetAt,
+    s.daily.enabled
+      ? { timeZone: campaign.timezone, drawTime: s.daily.drawTime }
+      : null,
+  );
+}
+
+interface TaskAction {
+  id: string;
+  type: ActionType;
+  mandatory: boolean;
+  config: unknown;
+}
+
+/**
+ * Daily Tasks for the widget: whether they're unlocked, when they reset, and per task whether
+ * it's open now, already claimed in this task day (or scheduled window), and today's link.
+ */
+export function dailyTaskState(
+  campaign: CampaignLike & { actions: (TaskAction & { label: string })[] },
+  entrantId: string,
+  events: { actionId: string | null; dedupeKey: string | null }[],
+  now = new Date(),
+  // The newest Instagram post, for tasks set to always open it.
+  latestInstagram: string | null = null,
+) {
+  const live = campaign.actions.filter((a) => !isArchived(a));
+  const daily = live.filter(isDailyTask);
+  if (!daily.length) return null;
+  const done = new Set(events.map((e) => e.actionId));
+  const keys = new Set(events.map((e) => e.dedupeKey));
+  const { unlocked, need } = dailyUnlocked(live, done);
+  const day = currentTaskDay(campaign, now);
+  return {
+    unlocked,
+    // The tasks still to do before Daily Tasks unlock.
+    needed: need.filter((a) => !done.has(a.id)).map((a) => a.label),
+    needCount: need.length,
+    resetsAt: day.resetsAt,
+    tasks: Object.fromEntries(
+      daily.map((a) => {
+        const c = (a.config ?? {}) as TaskConfig;
+        const st = taskStatus(c, day, true, now);
+        const win = c.schedule ? openWindow(c.schedule, now) : null;
+        const next = c.schedule && !win ? nextWindow(c.schedule, now) : null;
+        return [
+          a.id,
+          {
+            // Scheduled tasks are only open in their window (and not switched off).
+            open: st.claimable,
+            done:
+              st.claimable &&
+              keys.has(actionDedupeKey(a.id, entrantId, st.dedupeSuffix)),
+            url:
+              (c.latestInstagram && latestInstagram) || rotatedUrl(c, day.key),
+            closesAt: win?.closesAt ?? null,
+            nextAt: c.paused ? null : (next?.opensAt ?? null),
+          },
+        ];
+      }),
+    ),
+  };
+}
 
 export async function verifyEntrant(
   shop: string,
@@ -74,6 +158,7 @@ export async function entrantState(token: string) {
   const entrant = await db.entrant.findUnique({
     where: { id: t.entrantId },
     include: {
+      campaign: { include: { actions: true } },
       events: {
         select: {
           actionId: true,
@@ -145,6 +230,18 @@ export async function entrantState(token: string) {
     ),
     pollResults,
     quizAttemptsLeft,
+    // Null when the giveaway has no Daily Tasks.
+    dailyTasks: dailyTaskState(
+      entrant.campaign,
+      entrant.id,
+      entrant.events,
+      new Date(),
+      entrant.campaign.actions.some(
+        (a) => isDailyTask(a) && (a.config as TaskConfig).latestInstagram,
+      )
+        ? await latestInstagramPost()
+        : null,
+    ),
   };
 }
 
@@ -184,6 +281,8 @@ export async function leaderboard(
 // time has passed since then. Stateless, so nothing is stored until the entry is earned.
 const VIDEO_GRACE_MS = 1000;
 const VIDEO_MAX_AGE_MS = 6 * 3600 * 1000;
+// Seconds between opening a "tap after you do it" daily task's link and claiming it.
+export const CONFIRM_WAIT_S = 5;
 
 function videoKey() {
   const s = process.env.ENTRANT_TOKEN_SECRET ?? process.env.SHOPIFY_API_SECRET;
@@ -292,6 +391,42 @@ export async function completeAction(
   }
 
   const config = (action.config ?? {}) as Record<string, unknown>;
+
+  // Daily Tasks: unlocked by the follow tasks, once per task day (or scheduled window).
+  let dailySuffix: string | null = null;
+  if (isDailyTask(action)) {
+    const { unlocked } = dailyUnlocked(
+      action.campaign.actions.filter((a) => !isArchived(a)),
+      done,
+    );
+    const st = taskStatus(
+      config as TaskConfig,
+      currentTaskDay(action.campaign),
+      unlocked,
+      new Date(),
+    );
+    if (!st.claimable) return fail(st.reason);
+    dailySuffix = st.dedupeSuffix;
+    // "Tap after you do it" tasks: the link has to be opened (step "start") a few seconds
+    // before the claim. It's a self-confirmation, not proof the person liked or commented.
+    if (
+      typeof config.confirm === "string" &&
+      config.confirm &&
+      action.type !== "WATCH_VIDEO"
+    ) {
+      if (payload.step === "start")
+        return {
+          ok: true as const,
+          started: issueVideoStart(entrant.id, action.id),
+          seconds: CONFIRM_WAIT_S,
+        };
+      const elapsed = videoElapsed(payload.started, entrant.id, action.id);
+      if (elapsed === null) return fail("Open the link first.");
+      if (elapsed + VIDEO_GRACE_MS < CONFIRM_WAIT_S * 1000)
+        return fail("Give it a few seconds, then tap again.");
+    }
+  }
+
   const answer = payload.answer?.trim() ?? "";
   let repeatable = action.type === "DAILY_CHECKIN" || action.repeatable;
   let smsOptIn = false;
@@ -421,7 +556,7 @@ export async function completeAction(
     dedupeKey: actionDedupeKey(
       action.id,
       entrant.id,
-      repeatSuffix(action.campaign, repeatable),
+      dailySuffix ?? repeatSuffix(action.campaign, repeatable),
     ),
   });
   // Texts, follows and check-ins also count in the linked giveaway, if there is one.

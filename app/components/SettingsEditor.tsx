@@ -1,6 +1,7 @@
 import type { CampaignSettings } from "../lib/settings";
 import {
   Check,
+  Select,
   NumberInput,
   RowCard,
   TextArea,
@@ -135,6 +136,16 @@ export function SettingsEditor(props: {
                 details="Automatic picks can use a product whose only stock is safety stock. Products you line up or choose yourself can always use it."
                 checked={s.daily.useSafetyStock}
                 onChange={(useSafetyStock) => daily({ useSafetyStock })}
+              />
+              <Select
+                label="Daily Tasks Reset"
+                details="When entrants can claim each Daily Task again. At the draw, each task counts once per daily drawing."
+                value={s.dailyTasks.resetAt}
+                options={[
+                  { value: "draw", label: "At The Daily Draw" },
+                  { value: "midnight", label: "Midnight Central Time" },
+                ]}
+                onChange={(resetAt) => set({ dailyTasks: { resetAt } })}
               />
             </>
           )}

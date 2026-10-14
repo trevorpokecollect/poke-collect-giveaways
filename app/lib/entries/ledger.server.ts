@@ -31,7 +31,20 @@ export async function award(input: AwardInput, tx: Tx = db) {
     });
     if (existing) return false;
   }
-  await tx.entryEvent.create({ data: input });
+  try {
+    await tx.entryEvent.create({ data: input });
+  } catch (e) {
+    // Two requests raced past the check above (double tap, two tabs): the unique dedupe key
+    // stopped the second one, so it simply wasn't awarded. (Inside a transaction the error
+    // has already aborted it, so it's rethrown there.)
+    if (
+      tx === db &&
+      input.dedupeKey &&
+      (e as { code?: string }).code === "P2002"
+    )
+      return false;
+    throw e;
+  }
   return true;
 }
 

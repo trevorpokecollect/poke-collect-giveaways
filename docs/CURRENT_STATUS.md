@@ -77,6 +77,53 @@ no widget or Shopify changes).
   database session timezone is UTC (Railway's default); set it locally (`ALTER DATABASE … SET timezone='UTC'`).
 - Still open from that report: Release on a DRAWN prize, purchase-entry webhook race, void after rollback, $0 order
   idempotency, prize value in storefront JSON, `restoreEvent` hard delete, rate-limit pruning.
+## Daily Tasks (live 2026-10-13: Railway `237ae38`, Shopify **poke-collect-giveaways-30**; plan: `docs/DAILY_TASKS_PLAN.md`)
+Trevor's spec 10-13. A "Daily Tasks" section under the follow buttons: locked ("Complete All 4 Social Tasks To Unlock
+Daily Entries!", progress bar) until every one-time follow task is done (Whatnot, Discord, Facebook, Instagram; texts
+never count), then each task is claimable once per task day, with a "Resets In …" countdown and "Done Today. Back In …".
+- Any VISIT_URL / DAILY_CHECKIN / WATCH_VIDEO / SECRET_CODE task can be ticked **Daily Task** in the editor. Extras:
+  rotating links (one per day), a claim button for off-site tasks ("I Liked & Commented": opens the link, claim allowed
+  5s later, honor system, rules say so), a weekly Central-time window (e.g. Fri 17:00–20:00) shown only while open, a
+  "live show button" style (🔴 LIVE ON WHATNOT — JOIN NOW) and a **Turned off** switch for canceled shows.
+- Reset: setting `dailyTasks.resetAt`, default **"draw"** (9pm ET, once per daily drawing; keys = draw day, so the
+  old repeatable Bookmark claims carry over). "midnight" = midnight Central (`ct-YYYY-MM-DD` keys). Trevor chose
+  **draw** (10-13) for a smooth hand-off to the next day's giveaway.
+- Scheduled tasks dedupe per window (`win-YYYY-MM-DD`). Everything is checked on the server; completion records are
+  the ledger rows (dedupe key = task + entrant + day/window, unique per giveaway). `award()` now returns false instead
+  of erroring when two identical claims race (P2002, outside transactions).
+- Referral box: link + Copy only (X / Facebook / WhatsApp share buttons removed). Referral tracking untouched.
+- Official Rules generator: daily tasks wording (unlock, once per day/show, not verified) + release of Instagram,
+  Facebook, Whatnot.
+- No migration. Tests: `daily-tasks.test.ts`, `daily-tasks.integration.test.ts`, campaign-form (203 total).
+- **Still to do in the daily giveaway editor** (the section only appears once a task is ticked Daily Task): tick Daily Task on "Bookmark Our
+  Next Show" (+20); add Visit A Page "Like & Comment On Instagram" (+5, post link(s), claim button "I Liked &
+  Commented"); add Visit A Page "Join Our Live Whatnot Show" (+50, Whatnot link, Daily Task, Only At Set Times Fri
+  17:00–20:00, live show button); regenerate the Official Rules.
+- **Newest Instagram post** (live 2026-10-13: Railway `d1b6945`; token set by Trevor 23:01Z; ticked on the live
+  Instagram task): editor checkbox "Always open our newest
+  Instagram post" (`config.latestInstagram`, VISIT_URL daily tasks). `app/lib/instagram.server.ts` asks the Instagram
+  API (Instagram Login) for `/me/media?limit=1` permalink, cached 10 min (Trevor posts ~10:05am CT), falls back to the
+  task's link. Needs Railway var `INSTAGRAM_ACCESS_TOKEN` (long-lived token for @pokecollectcards, Trevor pastes it;
+  never in chat). The app refreshes it weekly and stores it in the new `AppValue` table (migration
+  `20261013230000_app_value`). Test: `instagram.integration.test.ts`.
+- Live store setup done 10-13: Bookmark Our Next Show (daily, +20), Join Our Live Whatnot Show (+50, Fri 17:00–20:00,
+  live button, Whatnot invite link), Like & Comment On Instagram (+5, newest post via API, profile link as fallback,
+  "I Liked & Commented"). Meta app "Poke-Collect Giveaways" (936934886163446), Instagram API use case, @pokecollectcards
+  is its Instagram Tester. Lookup failures log `[instagram] newest post lookup failed`. Official
+  Rules NOT yet regenerated (the Generate confirm popup can't be accepted from the Claude browser pane; Trevor to do).
+- **iPhone outside links** (live 2026-10-13: Railway `6269242`, Shopify **poke-collect-giveaways-31**): on iOS, follow/daily-task/share links open in
+  the same tab (`openExternal` in giveaway.js) because a new tab was left as about:blank when the app (Instagram,
+  Whatnot, Discord) took over (Trevor, iPhone Chrome, 10-13). Claim requests use `keepalive` so they finish. Desktop
+  and Android unchanged (new tab).
+- Not verifiable: Instagram likes (no API), Whatnot live status/attendance (no public API). Possible later: verify
+  Instagram comments via the Graph API with the entrant's IG handle.
+
+## Shared-connection holds (branch `claude/shared-ip-holds`, NOT deployed yet)
+10-13 ~7:38–8:02pm CT (pre-draw rush): 25 entrants HELD, almost all "ip burst, subnet burst" (35+20=55 ≥ hold 50).
+They look like real people (varied real-looking emails, a phone number). Likely shared addresses (carrier NAT, iCloud
+Private Relay); inferred, the production DB wasn't queried. Change: `ip_burst` 35→25 and `scoreSignals` drops
+`subnet_burst` when `ip_burst` is present, so a busy connection alone (or with one weak signal) asks for an email code;
+two other warning signs still hold. Already-held entrants need Approve in the Entrants tab (Needs Review filter).
 
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll

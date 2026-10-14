@@ -112,6 +112,14 @@
     for (var i = 0; i < PLATFORMS.length; i++) if (PLATFORMS[i][1].test(host)) return PLATFORMS[i][0];
     return a.type === "SOCIAL_FOLLOW" ? "other" : null;
   }
+  // iPhone/iPad: a new tab for Instagram, Whatnot or Discord is left blank (about:blank) when the
+  // phone hands the link to the app, and getting back to the giveaway is awkward. There we open
+  // the link in this tab instead: the app opens and the giveaway stays put, or Back returns to it.
+  var IOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  function openExternal(url, features) {
+    if (IOS) { window.setTimeout(function () { window.location.href = url; }, 50); return; }
+    window.open(url, "_blank", features || "noopener");
+  }
   function entriesText(n) { return "+" + n + plural(n, " entry", " entries"); }
 
   function otherTokens(own) {
@@ -156,6 +164,8 @@
       method: method,
       headers: headers,
       credentials: "same-origin",
+      // Finishes even if the page moves on to the link the shopper tapped (iPhone, see openExternal).
+      keepalive: method === "POST",
       body: body ? JSON.stringify(body) : undefined,
     }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
@@ -520,7 +530,7 @@
         onclick: function () {
           var url = (a.config && a.config.url) || a.url;
           if (!entrant) { self.focusEmail("Enter your email first, then tap to earn " + entriesText(a.entries) + "."); return; }
-          if (url) { window.open(url, "_blank", "noopener"); self.followClick(a); }
+          if (url) { openExternal(url); self.followClick(a); }
           if (finished) return;
           if (isLocked) { error.textContent = "Complete the required step first to unlock this one."; return; }
           self.submitAction(a, {}, { error: error, button: btn }).catch(function () {});
@@ -684,7 +694,7 @@
     ]);
 
     // A preview of the follow/join buttons, so visitors see what else they can earn.
-    var socials = this.data.campaign.actions.filter(function (a) { return platformOf(a); });
+    var socials = this.data.campaign.actions.filter(function (a) { return platformOf(a) && !(a.config && a.config.daily); });
     var shop = this.shopBox();
     var preview = !compact && (socials.length || shop) ? tasks([
       el("h3", { class: "pcg__subheading", text: "Then Earn Bonus Entries" }),
@@ -826,7 +836,7 @@
             );
             return;
           }
-          window.open(n.url(link, text), "_blank", "noopener,width=600,height=540");
+          openExternal(n.url(link, text), "noopener,width=600,height=540");
           if (onShare) onShare(n.id);
         },
       });
@@ -838,7 +848,10 @@
     var self = this;
     var done = {};
     (entrant.completedActionIds || []).forEach(function (id) { done[id] = true; });
-    var all = this.data.campaign.actions.filter(function (a) { return !NOT_LISTED[a.type]; });
+    var listed = this.data.campaign.actions.filter(function (a) { return !NOT_LISTED[a.type]; });
+    // Daily Tasks get their own section (when the server sends their state).
+    var dailyList = listed.filter(function (a) { return a.config && a.config.daily; });
+    var all = listed.filter(function (a) { return dailyList.indexOf(a) === -1; });
     var requiredLeft = all.filter(function (a) { return a.mandatory && !done[a.id]; });
     var socials = all.filter(function (a) { return platformOf(a); });
     var actions = all.filter(function (a) { return socials.indexOf(a) === -1; });
@@ -858,13 +871,14 @@
     var refBox = referral && entrant.referralCode ? this.referralBox(referral) : null;
 
     var shop = this.shopBox();
-    if (all.length || shop) {
+    if (all.length || (dailyList.length && entrant.dailyTasks) || shop) {
       nodes = nodes.concat(tasks([
         el("h3", { class: "pcg__subheading", text: "Earn More Entries" }),
         requiredLeft.length
           ? el("p", { class: "pcg__note pcg__note--nudge", text: "Almost in: " + requiredLeft.map(function (a) { return a.label; }).join(" and ") + " to finish entering. Your entries count once " + plural(requiredLeft.length, "it's", "they're") + " done, and the other tasks unlock." })
           : null,
         socials.length ? this.socialGrid(socials, entrant, done, requiredLeft.length > 0) : null,
+        this.dailyTasksBox(dailyList, entrant),
         actions.length ? el("ul", { class: "pcg__actions" }, actions.map(function (a) {
           return self.actionItem(a, entrant, !!done[a.id], !a.mandatory && requiredLeft.length > 0);
         })) : null,
@@ -874,6 +888,128 @@
     } else if (refBox) nodes.push(refBox);
 
     this.show(nodes.concat(this.extras()));
+  };
+
+  // "3h 12m" until `iso`, or "" once it has passed.
+  function untilText(iso) {
+    var ms = new Date(iso).getTime() - Date.now();
+    if (!(ms > 0)) return "";
+    var m = Math.ceil(ms / 60000), h = Math.floor(m / 60);
+    return h ? h + "h " + (m % 60) + "m" : m + "m";
+  }
+  // "5:00 PM" in Central Time, for scheduled tasks.
+  function centralTime(iso) {
+    try {
+      return new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }) + " CT";
+    } catch (e) { return ""; }
+  }
+  // Keeps a text node counting down each minute while it's on the page.
+  function ticking(node, fn) {
+    node.textContent = fn();
+    var id = window.setInterval(function () {
+      if (!node.isConnected) { window.clearInterval(id); return; }
+      node.textContent = fn();
+    }, 30000);
+    return node;
+  }
+
+  // Daily Tasks: locked until the follow tasks are done, then claimable once per day (the
+  // server decides, see app/lib/daily-tasks.ts). Scheduled tasks only show while open.
+  Widget.prototype.dailyTasksBox = function (list, entrant) {
+    var self = this;
+    var dt = entrant.dailyTasks;
+    if (!dt || !list.length) return null;
+    var rows = list.filter(function (a) {
+      var st = dt.tasks[a.id];
+      return st && (!a.config.schedule || st.open);
+    });
+    if (!rows.length) return null;
+    var reset = ticking(el("span", { class: "pcg__daily-reset" }), function () {
+      var t = untilText(dt.resetsAt);
+      return t ? "Resets In " + t : "Resetting Now";
+    });
+    var head = el("div", { class: "pcg__daily-head" }, [
+      el("div", {}, [
+        el("h3", { class: "pcg__subheading", text: "Daily Tasks" }),
+        el("p", { class: "pcg__daily-sub", text: "Come Back Every Day To Earn More Entries!" }),
+      ]),
+      dt.unlocked ? reset : null,
+    ]);
+    var lockNote = null;
+    if (!dt.unlocked) {
+      var doneCount = dt.needCount - dt.needed.length;
+      lockNote = el("div", { class: "pcg__daily-lock" }, [
+        el("p", { class: "pcg__lock", text: "Complete All " + dt.needCount + " Social Tasks To Unlock Daily Entries!" }),
+        el("div", { class: "pcg__daily-progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(dt.needCount), "aria-valuenow": String(doneCount) }, [
+          el("span", { style: "width:" + Math.round((doneCount / Math.max(1, dt.needCount)) * 100) + "%" }),
+        ]),
+        el("small", { class: "pcg__daily-left", text: doneCount + " Of " + dt.needCount + " Done" + (dt.needed.length ? " · Still To Do: " + dt.needed.map(tc).join(", ") : "") }),
+      ]);
+    }
+    return el("div", { class: "pcg__daily" + (dt.unlocked ? "" : " pcg__daily--locked") }, [
+      head,
+      lockNote,
+      el("ul", { class: "pcg__daily-list", role: "list" }, rows.map(function (a) {
+        return self.dailyTaskItem(a, dt.tasks[a.id], dt);
+      })),
+    ]);
+  };
+
+  Widget.prototype.dailyTaskItem = function (a, st, dt) {
+    var self = this;
+    var cfg = a.config || {};
+    var locked = !dt.unlocked;
+    var error = el("p", { class: "pcg__error", role: "alert" });
+    var label = cfg.live ? "Join Our Live Whatnot Show" : tc(a.label);
+    var status;
+    if (st.done) {
+      status = cfg.schedule
+        ? el("small", { class: "pcg__daily-when", text: "Done For This Show" })
+        : ticking(el("small", { class: "pcg__daily-when" }), function () {
+            var t = untilText(dt.resetsAt);
+            return t ? "Done Today. Back In " + t : "Done Today";
+          });
+    } else if (cfg.schedule && st.closesAt) {
+      status = el("small", { class: "pcg__daily-when", text: "Open Until " + centralTime(st.closesAt) });
+    }
+    var btnText = cfg.live ? "🔴 LIVE ON WHATNOT — JOIN NOW" : cfg.confirm ? (st.url ? "Open" : tc(cfg.confirm)) : st.url ? "Go" : "Claim";
+    var started = null;
+    var btn = el("button", {
+      class: "pcg__btn pcg__btn--small pcg__daily-btn" + (cfg.live ? " pcg__daily-btn--live" : ""),
+      type: "button",
+      disabled: st.done || locked ? true : null,
+      text: st.done ? "Done ✓" : locked ? "Locked" : btnText,
+      onclick: function () {
+        if (st.done || locked) return;
+        // Open the link inside the click so popup blockers allow it.
+        if (st.url && !started) openExternal(st.url);
+        if (st.url && !started) self.followClick(a);
+        if (cfg.confirm && !started) {
+          // Step 1 opened the link; step 2 ("I Liked & Commented") claims a few seconds later.
+          self.submitAction(a, { step: "start" }, { error: error, button: btn }).then(function (res) {
+            started = res.started;
+            btn.disabled = false;
+            btn.textContent = tc(cfg.confirm);
+            hint.hidden = false;
+          }).catch(function () {});
+          return;
+        }
+        self.submitAction(a, started ? { step: "done", started: started } : {}, { error: error, button: btn }).catch(function () {});
+      },
+    });
+    var hint = el("small", { class: "pcg__daily-hint", hidden: true, text: "Tap after you like and comment. It's on the honor system." });
+    var cls = "pcg__daily-task" + (st.done ? " pcg__daily-task--done" : "") + (cfg.live ? " pcg__daily-task--live" : "") + (locked ? " pcg__daily-task--locked" : "");
+    return el("li", { class: cls }, [
+      el("div", { class: "pcg__daily-info" }, [
+        el("span", { class: "pcg__daily-label", text: label }),
+        cfg.live ? el("small", { class: "pcg__daily-sub", text: "Join Our Friday Live Show And Earn " + a.entries + " Giveaway Entries!" }) : null,
+        status,
+        hint,
+      ]),
+      el("span", { class: "pcg__pill", text: "+" + a.entries }),
+      btn,
+      error,
+    ]);
   };
 
   // Daily draws only count the day's entries, so returning players enter again each day.
@@ -966,8 +1102,8 @@
     ctx.error.textContent = "";
     return this.request("POST", body)
       .then(function (res) {
-        if (res.awarded === false && (a.type === "DAILY_CHECKIN" || a.repeatable)) {
-          ctx.error.textContent = "Already counted today. Come back tomorrow.";
+        if (res.awarded === false && (a.type === "DAILY_CHECKIN" || a.repeatable || (a.config && a.config.daily))) {
+          ctx.error.textContent = a.config && a.config.schedule ? "Already counted for this show." : "Already counted today. Come back tomorrow.";
           if (ctx.button) ctx.button.disabled = false;
           return res;
         }
@@ -1128,7 +1264,7 @@
         // VISIT_URL, SOCIAL_FOLLOW, DAILY_CHECKIN, CUSTOM.
         var url = cfg.url || a.url;
         var b = btn(a.type === "DAILY_CHECKIN" ? "Check In" : a.type === "SOCIAL_FOLLOW" ? "Follow" : url ? "Visit" : "Done", function () {
-          if (url) { window.open(url, "_blank", "noopener"); self.followClick(a); }
+          if (url) { openExternal(url); self.followClick(a); }
           self.submitAction(a, {}, ctx).catch(function () {});
         });
         ctx.button = b;
@@ -1198,7 +1334,6 @@
     return el("div", { class: "pcg__ref" }, [
       el("label", { class: "pcg__note", for: inputId, text: "Get +" + referral.entries + plural(referral.entries, " Entry", " Entries") + " For Every Friend Who Enters With Your Link" }),
       el("div", { class: "pcg__row" }, [input, copy]),
-      this.shareButtons("share", null),
     ]);
   };
 
