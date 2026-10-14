@@ -165,6 +165,16 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
 - Live: page "Giveaway Winners" (handle still `giveaway-info-winners`, template `giveaway-winners`; old body kept on the page,
   unused). Footer Help menu item renamed "Giveaway Winners" (16:52Z, Trevor OK). Staff Guide not updated.
 
+## Signed-in one-tap entry, winners button, wider 2-column (live 2026-10-14 ~17:15Z: Railway `b1e11db`, Shopify **poke-collect-giveaways-33**, PR #22)
+- Signed-in shoppers (`logged_in_customer_id`, signed by the app proxy): loader returns their entrant token if they already
+  entered (by `shopifyCustomerId`, or by account email, which then gets the id saved), else `customer: {firstName,
+  needsName, needsConsent}`. Widget `renderCustomerEntry()` = one "Enter Today's Giveaway"/"Enter Giveaway" button + "Use
+  A Different Email". Intent `customer-signup` reads email/name/consent from the Admin API (`customer.server.ts`, cached
+  60s) and calls `signup({signedInCustomer})`, which skips Turnstile/honeypot/fill-time. Untested while signed in; Trevor to try.
+- `.pcg__winners-link` width auto (ran off the right on iPhone); `.pcg--wide` max-width 1120 → 1400px.
+- Theme draft "Storepass - Monthly Giveaway Two Columns (draft)" 155482456247 (copy of live 155481931959): only
+  `templates/page.giveaway.json` block layout three → wide. Waiting on Trevor's "publish".
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
