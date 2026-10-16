@@ -65,6 +65,27 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(r).toMatchObject({ ok: true, state: "active" });
     });
 
+    it("keeps the mobile number and text opt-in from the one-tap entry", async () => {
+      const r = await signup({
+        shop,
+        campaignSlug: "daily",
+        email: "dawn@example.com",
+        name: "Dawn Berlitz",
+        ip: "203.0.113.10",
+        shopifyCustomerId: "gid://shopify/Customer/3",
+        signedInCustomer: true,
+        marketingConsent: true,
+        phone: "(555) 234-5678",
+        smsConsent: true,
+      });
+      expect(r).toMatchObject({ ok: true });
+      const saved = await db.entrant.findFirstOrThrow({
+        where: { campaignId, emailNormalized: "dawn@example.com" },
+      });
+      expect(saved.phone).toBeTruthy();
+      expect(saved.smsConsentAt).not.toBeNull();
+    });
+
     it("hands the entry back on another device", async () => {
       const token = await tokenForCustomer(
         campaignId,

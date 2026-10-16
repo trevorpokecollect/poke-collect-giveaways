@@ -598,6 +598,41 @@
     }).then(function (res) { self.handleResult(res); });
   };
 
+  // Texts: an optional number plus an unchecked consent box, worth the SMS action's entries.
+  // Compact: the text sign-up opens from a button, so the first screen stays short.
+  Widget.prototype.smsFields = function (compact) {
+    var sms = this.smsAction();
+    var phone = null, smsConsent = null, smsBox = null;
+    if (sms) {
+      var phoneId = nextId("tel");
+      var root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
+      phone = el("input", { class: "pcg__input", id: phoneId, type: "tel", name: "phone", inputmode: "tel", autocomplete: "tel-national", placeholder: "(555) 234-5678", maxlength: "20" });
+      smsConsent = el("input", { type: "checkbox", name: "sms-consent" });
+      smsBox = el("div", { class: "pcg__sms" }, [
+        el("label", { class: "pcg__label", for: phoneId }, [el("span", { text: "Mobile Number (Optional)" }), el("span", { class: "pcg__pts", text: tc(entriesText(sms.entries)) })]),
+        phone,
+        el("label", { class: "pcg__check pcg__check--fine" }, [smsConsent, el("span", {}, [
+          (sms.config && sms.config.disclosure) || "",
+          " ",
+          el("a", { href: root + "policies/terms-of-service", target: "_blank", rel: "noopener", text: "Terms" }),
+          " · ",
+          el("a", { href: root + "policies/privacy-policy", target: "_blank", rel: "noopener", text: "Privacy" }),
+        ])]),
+      ]);
+    }
+
+    var smsToggle = null;
+    if (smsBox && compact) {
+      smsBox.hidden = true;
+      smsToggle = el("button", {
+        class: "pcg__more", type: "button", text: "+ Add Your Phone For " + tc(entriesText(sms.entries)),
+        onclick: function () { smsBox.hidden = false; smsToggle.remove(); phone.focus(); },
+      });
+    }
+
+    return { sms: sms, phone: phone, smsConsent: smsConsent, smsBox: smsBox, smsToggle: smsToggle };
+  };
+
   // Signed in to a store account: one button instead of the email and name form (the server
   // takes both from the account). Asks for a name or the email opt-in only if the account lacks them.
   Widget.prototype.renderCustomerEntry = function (error) {
@@ -610,6 +645,8 @@
     var compact = this.compact();
     var formId = nextId("form");
     var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", form: formId, text: this.data.daily ? "Enter Today's Giveaway" : "Enter Giveaway" });
+    var smsF = this.smsFields(compact);
+    var phone = smsF.phone, smsConsent = smsF.smsConsent;
     var form = el("form", {
       class: "pcg__form",
       id: formId,
@@ -618,9 +655,12 @@
         e.preventDefault();
         if (name && name.value.trim().split(/\s+/).filter(function (w) { return /[^\s\d\W_]/.test(w); }).length < 2) { err.textContent = "Enter your first and last name."; name.focus(); return; }
         if (consent && !consent.checked) { err.textContent = "Tick the email box to enter."; consent.focus(); return; }
+        if (phone && phone.value.trim() && !smsConsent.checked) { err.textContent = "Check the box to agree to texts, or leave the number blank."; smsConsent.focus(); return; }
         button.disabled = true;
         self.request("POST", {
           intent: "customer-signup",
+          phone: phone && smsConsent.checked ? phone.value : undefined,
+          smsConsent: !!(smsConsent && smsConsent.checked && phone.value.trim()),
           name: name ? name.value : undefined,
           consent: consent ? consent.checked : undefined,
           ref: self.ref,
@@ -638,6 +678,8 @@
         "Email me deals, drops and stream alerts.",
         el("span", { class: "pcg__req", text: " Required To Enter" }),
       ])]) : null,
+      smsF.smsBox,
+      smsF.smsToggle,
       err,
       compact ? null : button,
       el("button", {
@@ -677,36 +719,8 @@
     var button = el("button", { class: "pcg__btn pcg__btn--block", type: "submit", form: formId, text: compact ? "Enter Free" : this.data.daily ? "Enter Today's Giveaway" : "Enter Giveaway" });
     var turnstileToken = "";
 
-    // Texts: an optional number plus an unchecked consent box, worth the SMS action's entries.
-    var sms = this.smsAction();
-    var phone = null, smsConsent = null, smsBox = null;
-    if (sms) {
-      var phoneId = nextId("tel");
-      var root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
-      phone = el("input", { class: "pcg__input", id: phoneId, type: "tel", name: "phone", inputmode: "tel", autocomplete: "tel-national", placeholder: "(555) 234-5678", maxlength: "20" });
-      smsConsent = el("input", { type: "checkbox", name: "sms-consent" });
-      smsBox = el("div", { class: "pcg__sms" }, [
-        el("label", { class: "pcg__label", for: phoneId }, [el("span", { text: "Mobile Number (Optional)" }), el("span", { class: "pcg__pts", text: tc(entriesText(sms.entries)) })]),
-        phone,
-        el("label", { class: "pcg__check pcg__check--fine" }, [smsConsent, el("span", {}, [
-          (sms.config && sms.config.disclosure) || "",
-          " ",
-          el("a", { href: root + "policies/terms-of-service", target: "_blank", rel: "noopener", text: "Terms" }),
-          " · ",
-          el("a", { href: root + "policies/privacy-policy", target: "_blank", rel: "noopener", text: "Privacy" }),
-        ])]),
-      ]);
-    }
-
-    // Compact: the text sign-up opens from a button, so the first screen is just name and email.
-    var smsToggle = null;
-    if (smsBox && compact) {
-      smsBox.hidden = true;
-      smsToggle = el("button", {
-        class: "pcg__more", type: "button", text: "+ Add Your Phone For " + tc(entriesText(sms.entries)),
-        onclick: function () { smsBox.hidden = false; smsToggle.remove(); phone.focus(); },
-      });
-    }
+    var smsF = this.smsFields(compact);
+    var phone = smsF.phone, smsConsent = smsF.smsConsent, smsBox = smsF.smsBox, smsToggle = smsF.smsToggle;
 
     var form = el("form", {
       class: "pcg__form",
