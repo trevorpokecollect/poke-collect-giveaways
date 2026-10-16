@@ -194,14 +194,17 @@ Shopify needs `ledgerDocumentUri` for every quantity name except `available`; `m
 safety_stock too. The failed choose had released the day's prize; the scheduler picked the next queue item (Booster
 Bundle) for 10-14. Test: `daily-safety-stock.integration`.
 
-## Verified buylist daily task (branch `claude/buylist-verify`, NOT deployed)
+## Verified buylist daily task (live 2026-10-16: Railway `3c9f74e`; ticked on the live "Submit A Buylist" task)
 Trevor 10-16: "Try Our New Scan & Sell" (+20/day, opens /apps/buylist/cards/app.html, counts on tap) and "Submit A
 Buylist" (+50/day, opens /apps/buylist, claim "I Submitted My Buylist") added to the daily giveaway in the editor (live
 settings). Trevor chose to verify real submissions: editor checkbox "Only count real buylist submissions"
 (`config.verifyBuylist`). On claim, `buylistSubmittedSince` (`app/lib/buylist-verify.server.ts`) asks the buylist app
 `GET BUYLIST_VERIFY_URL?email=&since=<task day start>` with header `x-verify-secret: BUYLIST_VERIFY_SECRET` and expects
 `{submitted: boolean}`; not set up / error → claim refused ("couldn't check"). The endpoint lives in poke-collect-singles
-(its own thread builds it). Needs Railway vars on both apps. `TaskDay.startsAt` added. Test:
+(built by its thread 10-16: `https://app-production-cd07.up.railway.app/api/giveaway/buylist-submitted`, customer
+submissions only, not DRAFT/CANCELLED; `GIVEAWAY_COUNT_STAFF=true` there would count walk-ins). Railway vars set:
+`BUYLIST_VERIFY_URL` (giveaway app) and `BUYLIST_VERIFY_SECRET` (both apps, same value; copied by Trevor). Failures log
+`[buylist-verify] check failed`. `TaskDay.startsAt` added. Test:
 `buylist-verify.integration.test.ts`.
 
 ## Open items / next steps
