@@ -30,6 +30,7 @@ export interface TaskConfig {
   live?: boolean;
   paused?: boolean;
   latestInstagram?: boolean;
+  verifyBuylist?: boolean;
   archived?: boolean;
 }
 
@@ -98,6 +99,8 @@ const at = (ymd: string, hm: string, tz = TASK_TIMEZONE) =>
 export interface TaskDay {
   /** Ends every daily task's dedupe key, so a task pays once per task day. */
   key: string;
+  /** When this task day began (the previous draw, or midnight Central). */
+  startsAt: Date;
   resetsAt: Date;
 }
 
@@ -112,10 +115,14 @@ export function taskDay(
 ): TaskDay {
   if (mode === "draw" && draw) {
     const p = periodFor(now, draw.timeZone, draw.drawTime);
-    return { key: p.key, resetsAt: p.drawAt };
+    return { key: p.key, startsAt: p.opensAt, resetsAt: p.drawAt };
   }
   const { ymd } = localParts(now, TASK_TIMEZONE);
-  return { key: `ct-${ymd}`, resetsAt: at(addDays(ymd, 1), "00:00") };
+  return {
+    key: `ct-${ymd}`,
+    startsAt: at(ymd, "00:00"),
+    resetsAt: at(addDays(ymd, 1), "00:00"),
+  };
 }
 
 export interface Window {

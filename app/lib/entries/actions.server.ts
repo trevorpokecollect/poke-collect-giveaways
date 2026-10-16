@@ -22,6 +22,7 @@ import { normalizeUsPhone } from "../phone";
 import { queueKlaviyoSync } from "../klaviyo.server";
 import { parseSettings } from "../settings";
 import { latestInstagramPost } from "../instagram.server";
+import { buylistSubmittedSince } from "../buylist-verify.server";
 import {
   dailyUnlocked,
   isDailyTask,
@@ -411,19 +412,30 @@ export async function completeAction(
       action.campaign.actions.filter((a) => !isArchived(a)),
       done,
     );
-    const st = taskStatus(
-      config as TaskConfig,
-      currentTaskDay(action.campaign),
-      unlocked,
-      new Date(),
-    );
+    const day = currentTaskDay(action.campaign);
+    const st = taskStatus(config as TaskConfig, day, unlocked, new Date());
     if (!st.claimable) return fail(st.reason);
     dailySuffix = st.dedupeSuffix;
+    // "Submit A Buylist": only a real submission from this email since the task day began counts.
+    if (config.verifyBuylist === true) {
+      if (payload.step === "start")
+        return { ok: true as const, started: "verify", seconds: 0 };
+      const found = await buylistSubmittedSince(entrant.email, day.startsAt);
+      if (found === null)
+        return fail(
+          "We couldn't check the buylist right now. Try again in a minute.",
+        );
+      if (!found)
+        return fail(
+          `We don't see a buylist from ${entrant.email} yet today. Submit one with this email, then tap again.`,
+        );
+    }
     // "Tap after you do it" tasks: the link has to be opened (step "start") a few seconds
     // before the claim. It's a self-confirmation, not proof the person liked or commented.
     if (
       typeof config.confirm === "string" &&
       config.confirm &&
+      config.verifyBuylist !== true &&
       action.type !== "WATCH_VIDEO"
     ) {
       if (payload.step === "start")

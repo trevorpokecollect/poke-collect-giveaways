@@ -161,6 +161,9 @@ const taskFields = {
   paused: z.boolean().optional(),
   // Open the newest post on our Instagram instead of the link (app/lib/instagram.server.ts).
   latestInstagram: z.boolean().optional(),
+  // Only pays when the buylist app has a real submission from the entrant's email in this task
+  // day (app/lib/buylist-verify.server.ts).
+  verifyBuylist: z.boolean().optional(),
 };
 
 export const actionConfigSchema = {

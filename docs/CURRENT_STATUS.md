@@ -194,6 +194,16 @@ Shopify needs `ledgerDocumentUri` for every quantity name except `available`; `m
 safety_stock too. The failed choose had released the day's prize; the scheduler picked the next queue item (Booster
 Bundle) for 10-14. Test: `daily-safety-stock.integration`.
 
+## Verified buylist daily task (branch `claude/buylist-verify`, NOT deployed)
+Trevor 10-16: "Try Our New Scan & Sell" (+20/day, opens /apps/buylist/cards/app.html, counts on tap) and "Submit A
+Buylist" (+50/day, opens /apps/buylist, claim "I Submitted My Buylist") added to the daily giveaway in the editor (live
+settings). Trevor chose to verify real submissions: editor checkbox "Only count real buylist submissions"
+(`config.verifyBuylist`). On claim, `buylistSubmittedSince` (`app/lib/buylist-verify.server.ts`) asks the buylist app
+`GET BUYLIST_VERIFY_URL?email=&since=<task day start>` with header `x-verify-secret: BUYLIST_VERIFY_SECRET` and expects
+`{submitted: boolean}`; not set up / error → claim refused ("couldn't check"). The endpoint lives in poke-collect-singles
+(its own thread builds it). Needs Railway vars on both apps. `TaskDay.startsAt` added. Test:
+`buylist-verify.integration.test.ts`.
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
