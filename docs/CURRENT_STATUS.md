@@ -171,6 +171,10 @@ Replaces the old "Giveaway Info & Winners" page (/pages/giveaway-info-winners, f
   needsName, needsConsent}`. Widget `renderCustomerEntry()` = one "Enter Today's Giveaway"/"Enter Giveaway" button + "Use
   A Different Email". Intent `customer-signup` reads email/name/consent from the Admin API (`customer.server.ts`, cached
   60s) and calls `signup({signedInCustomer})`, which skips Turnstile/honeypot/fill-time. Untested while signed in; Trevor to try.
+- **Text alerts box restored on the one-tap entry** (live 2026-10-16 ~22:57Z: Railway `38aa5c0`, Shopify
+  **poke-collect-giveaways-35**, PR #25). Without it new SMS subscribers fell (Klaviyo: 306 on 10-13 → 188 on 10-15 while
+  entries rose 864 → 2,897). `smsFields()` in giveaway.js now builds the optional phone + consent for both forms; checked on
+  the live hosted page with a mocked signed-in customer (phone size).
 - `.pcg__winners-link` width auto (ran off the right on iPhone); `.pcg--wide` max-width 1120 → 1400px.
 - Theme "Storepass - Monthly Giveaway Two Columns (draft)" 155482456247 (copy of 155481931959; only
   `templates/page.giveaway.json` block layout three → wide) **published 2026-10-14 ~17:20Z on Trevor's "publish"** — now MAIN.
