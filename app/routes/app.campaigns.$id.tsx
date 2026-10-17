@@ -37,6 +37,11 @@ import {
   removePreStartOrderEntries,
 } from "../lib/entries/orders.server";
 import { periodFor } from "../lib/daily";
+import {
+  disqualifyDomain,
+  restoreDomain,
+  suspiciousDomains,
+} from "../lib/entries/domain-tools.server";
 import { entriesByMethod } from "../lib/entries/methods.server";
 import { checkListStatus, listGrowth } from "../lib/entries/list-status.server";
 import {
@@ -286,6 +291,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       })),
     })),
     drawExtras: await drawsSectionExtras(campaign),
+    // Uncommon email domains with many entrants (bot farms), for the Entrants tab.
+    domains: await suspiciousDomains(campaign.id),
     daily,
     methods: { period: methodPeriod, rows: methods.rows },
     growth,
@@ -491,6 +498,31 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       await audit("entrant.disqualify", { entrantIds });
       break;
     }
+    case "disqualifyDomain": {
+      const domain = String(form.get("domain") ?? "");
+      const ids = await disqualifyDomain(campaign.id, domain);
+      await audit("entrant.disqualifyDomain", { domain, count: ids.length });
+      // Referral entries they gave out are taken back in the background (can be thousands).
+      void (async () => {
+        for (const id of ids)
+          await clawBackReferrals(id).catch((err) =>
+            console.warn(`[domains] clawback ${id}: ${(err as Error).message}`),
+          );
+      })();
+      return {
+        ok: true,
+        message: `Disqualified ${ids.length.toLocaleString()} entrants on ${domain}.`,
+      };
+    }
+    case "restoreDomain": {
+      const domain = String(form.get("domain") ?? "");
+      const n = await restoreDomain(campaign.id, domain);
+      await audit("entrant.restoreDomain", { domain, count: n });
+      return {
+        ok: true,
+        message: `Restored ${n.toLocaleString()} entrants on ${domain}.`,
+      };
+    }
     case "draw": {
       const count = Math.max(1, Math.min(50, Number(form.get("count") || 1)));
       try {
@@ -531,6 +563,7 @@ export default function CampaignPage() {
     startsLabel,
     activity,
     growth,
+    domains,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const submit = (data: Record<string, string>) =>
@@ -776,6 +809,76 @@ export default function CampaignPage() {
                 ))}
               </s-stack>
             </s-stack>
+            {domains.length > 0 && (
+              <s-box padding="base" borderWidth="base" borderRadius="base">
+                <s-stack gap="small">
+                  <s-heading>Suspicious Email Domains</s-heading>
+                  <s-text color="subdued">
+                    Uncommon domains with many entrants, usually bot farms.
+                    Disqualified entrants stop counting in draws; Restore puts
+                    them back.
+                  </s-text>
+                  <s-table>
+                    <s-table-header-row>
+                      <s-table-header listSlot="primary">Domain</s-table-header>
+                      <s-table-header format="numeric">Active</s-table-header>
+                      <s-table-header format="numeric">
+                        Disqualified
+                      </s-table-header>
+                      <s-table-header />
+                    </s-table-header-row>
+                    <s-table-body>
+                      {domains.map((d) => (
+                        <s-table-row key={d.domain}>
+                          <s-table-cell>
+                            {d.domain}
+                            {d.blocked ? " (blocked)" : ""}
+                          </s-table-cell>
+                          <s-table-cell>
+                            {d.active.toLocaleString()}
+                          </s-table-cell>
+                          <s-table-cell>
+                            {d.disqualified.toLocaleString()}
+                          </s-table-cell>
+                          <s-table-cell>
+                            <s-stack direction="inline" gap="small-200">
+                              {d.active > 0 && (
+                                <s-button
+                                  tone="critical"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    submit({
+                                      intent: "disqualifyDomain",
+                                      domain: d.domain,
+                                    })
+                                  }
+                                >
+                                  Disqualify All
+                                </s-button>
+                              )}
+                              {d.disqualified > 0 && (
+                                <s-button
+                                  variant="tertiary"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    submit({
+                                      intent: "restoreDomain",
+                                      domain: d.domain,
+                                    })
+                                  }
+                                >
+                                  Restore
+                                </s-button>
+                              )}
+                            </s-stack>
+                          </s-table-cell>
+                        </s-table-row>
+                      ))}
+                    </s-table-body>
+                  </s-table>
+                </s-stack>
+              </s-box>
+            )}
             {entrants.length === 0 ? (
               <s-paragraph>No entrants here yet.</s-paragraph>
             ) : (

@@ -14,7 +14,9 @@ export type SignalCode =
   | "honeypot"
   | "too_fast"
   | "self_referral"
-  | "referral_ring";
+  | "referral_ring"
+  | "blocked_domain"
+  | "domain_burst";
 
 export interface Signal {
   code: SignalCode;
@@ -23,6 +25,10 @@ export interface Signal {
 
 export const SIGNAL_WEIGHTS: Record<SignalCode, number> = {
   turnstile_failed: 100,
+  // Server-side: a known bot-farm email domain, or an uncommon domain sending a flood of
+  // sign-ups (app/lib/bot/domains.ts).
+  blocked_domain: 100,
+  domain_burst: 100,
   // No token, or one already used: a real person who submitted before the check finished, or
   // retried after an error. Enough to ask for an email code, not to refuse the entry.
   turnstile_missing: 20,

@@ -19,6 +19,7 @@ import {
   type Signal,
 } from "../bot/risk";
 import { verifyTurnstile } from "../bot/turnstile.server";
+import { DOMAIN_BURST, isBlockedDomain, isCommonDomain } from "../bot/domains";
 import { MailAddressRejected } from "../mailer.server";
 import { issueOtp } from "../otp.server";
 import { issueEntrantToken } from "../token.server";
@@ -206,6 +207,25 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
     }
   }
   if (isDisposableEmail(email)) signals.push({ code: "disposable_email" });
+  const domain = emailNormalized.split("@")[1] ?? "";
+  if (domain && isBlockedDomain(domain))
+    signals.push({ code: "blocked_domain", detail: domain });
+  else if (domain && !isCommonDomain(domain)) {
+    const sameDomain = await db.entrant.count({
+      where: {
+        campaignId: campaign.id,
+        emailNormalized: { endsWith: `@${domain}` },
+        createdAt: {
+          gte: new Date(Date.now() - DOMAIN_BURST.hours * 3600_000),
+        },
+      },
+    });
+    if (sameDomain >= DOMAIN_BURST.count)
+      signals.push({
+        code: "domain_burst",
+        detail: `${domain} ${sameDomain} in ${DOMAIN_BURST.hours}h`,
+      });
+  }
   if (looksGenerated(email)) signals.push({ code: "generated_email" });
 
   const hourAgo = new Date(Date.now() - 3600_000);
