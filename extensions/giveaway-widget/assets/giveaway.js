@@ -990,6 +990,12 @@
       return new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }) + " CT";
     } catch (e) { return ""; }
   }
+  // "Fri 5:00 PM CT", for when a scheduled task opens next.
+  function centralDayTime(iso) {
+    try {
+      return new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago", weekday: "short", hour: "numeric", minute: "2-digit" }) + " CT";
+    } catch (e) { return ""; }
+  }
   // Keeps a text node counting down each minute while it's on the page.
   function ticking(node, fn) {
     node.textContent = fn();
@@ -1008,7 +1014,8 @@
     if (!dt || !list.length) return null;
     var rows = list.filter(function (a) {
       var st = dt.tasks[a.id];
-      return st && (!a.config.schedule || st.open);
+      // Scheduled tasks show while open, and as "Opens Fri 5:00 PM CT" until then (not when switched off).
+      return st && (!a.config.schedule || st.open || st.nextAt);
     });
     if (!rows.length) return null;
     var reset = ticking(el("span", { class: "pcg__daily-reset" }), function () {
@@ -1045,7 +1052,9 @@
   Widget.prototype.dailyTaskItem = function (a, st, dt) {
     var self = this;
     var cfg = a.config || {};
-    var locked = !dt.unlocked;
+    // A scheduled task between its windows: shown so people know when to come back.
+    var upcoming = !!(cfg.schedule && !st.open && st.nextAt);
+    var locked = !dt.unlocked || upcoming;
     var error = el("p", { class: "pcg__error", role: "alert" });
     var label = cfg.live ? "Join Our Live Whatnot Show" : tc(a.label);
     var status;
@@ -1056,6 +1065,14 @@
             var t = untilText(dt.resetsAt);
             return t ? "Done Today. Back In " + t : "Done Today";
           });
+    } else if (upcoming) {
+      status = ticking(el("small", { class: "pcg__daily-when" }), function () {
+        var t = untilText(st.nextAt);
+        return t && new Date(st.nextAt).getTime() - Date.now() < 86400000 ? "Opens In " + t : "Opens " + centralDayTime(st.nextAt);
+      });
+      // Reopen the widget's data when the window starts, so the button turns on by itself.
+      var wait = new Date(st.nextAt).getTime() - Date.now() + 2000;
+      if (wait > 0 && wait < 86400000) window.setTimeout(function () { if (btn.isConnected) self.load(); }, wait);
     } else if (cfg.schedule && st.closesAt) {
       status = el("small", { class: "pcg__daily-when", text: "Open Until " + centralTime(st.closesAt) });
     }
@@ -1065,7 +1082,7 @@
       class: "pcg__btn pcg__btn--small pcg__daily-btn" + (cfg.live ? " pcg__daily-btn--live" : ""),
       type: "button",
       disabled: st.done || locked ? true : null,
-      text: st.done ? "Done ✓" : locked ? "Locked" : btnText,
+      text: st.done ? "Done ✓" : upcoming ? "Opens Soon" : locked ? "Locked" : btnText,
       onclick: function () {
         if (st.done || locked) return;
         // Open the link inside the click so popup blockers allow it.
