@@ -258,3 +258,14 @@ submissions only, not DRAFT/CANCELLED; `GIVEAWAY_COUNT_STAFF=true` there would c
 - Repo is public. Shopify connector is on the LIVE store. Changing scopes requires re-approval in each store.
 - Hosted page needs Railway deploy for widget changes; popup/blocks need Shopify deploy.
 - DST ends 2026-11-01: draw time stays 9pm ET (logic uses timezone; tested in `test/daily.test.ts`).
+
+## Bot farm block + live show task visible all week (2026-10-17)
+- **Bot farm** (~10,600 fake entrants since 10-14 on 13 catch-all domains, e.g. putterkickz.com, google-o.com; won the
+  10-14 and 10-15 dailies, orders #258459 shipped / #258673 held). PR #26 (Railway `110f25a`, live 18:29Z): `app/lib/bot/domains.ts`
+  refuses the farm domains (+ env `BLOCKED_EMAIL_DOMAINS`) and any uncommon domain with 8+ sign-ups in 24h
+  (`blocked_domain` / `domain_burst`, weight 100). Entrants tab: "Suspicious Email Domains" with Disqualify All / Restore.
+  Trevor disqualified the farm domains on the daily and the monthly (10-17). Klaviyo segment `UUvikG` "Giveaway Bot Farm
+  Domains (Do Not Mail)" (11,144 profiles) suppressed; Trevor to exclude it from campaigns.
+- **Join Our Live Whatnot Show** had 0 claims on 10-16: it only rendered while open. PR #27 (Railway `0f08fcc`, Shopify
+  **poke-collect-giveaways-36**, 10-18 ~00:45Z): scheduled tasks show all week dimmed ("Opens Fri 5:00 PM CT", countdown on
+  the day, "Opens Soon") and the widget reloads itself when the window opens.
