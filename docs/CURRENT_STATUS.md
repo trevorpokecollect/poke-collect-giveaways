@@ -217,6 +217,12 @@ tasks that didn't attach. `addEntries()` (`app/lib/entries/adjust.server.ts`) wr
 (whole numbers, ±100,000, optional reason shown as "Adjustment (reason)"; minus takes entries away). Per giveaway; counts
 in the daily draw of the day added. Refuses disqualified entrants and emails not in the giveaway. Audit `entry.add`.
 
+## Entrants search fix (live 2026-10-19 ~17:12Z: Railway `a9770ef`, PR #30)
+The Entrants and Activity search boxes were `GET <Form>`s, which never submit from Polaris' `s-search-field` inside the
+embedded admin. `SearchBox` (`app/components/SearchBox.tsx`, full width) drives the URL via `setParams` as you type
+(400ms) or on Enter; `entrantSearchWhere()` (`app/lib/entries/search.ts`) needs every word in the email or name.
+Not tried in the live admin (Claude's browser pane was signed out of Shopify).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
