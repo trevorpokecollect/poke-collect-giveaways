@@ -21,6 +21,8 @@ import { riskTone, statusTone } from "../lib/ui";
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
 import { EntryActivityTable } from "../components/EntryActivity";
 import { flag, TextInput } from "../components/fields";
+import { AddEntriesForm } from "../components/AddEntries";
+import { addEntries } from "../lib/entries/adjust.server";
 
 // One entrant: entries per method, every entry with Disqualify / Restore, and disqualifying
 // or reinstating the whole entrant. Named with "$id_" so it renders as its own page.
@@ -143,6 +145,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       await audit("entrant.disqualify", { entrantId: entrant.id, reason });
       return { ok: true };
     }
+    case "addEntries": {
+      const r = await addEntries({
+        campaignId: entrant.campaignId,
+        entrantId: entrant.id,
+        entries: form.get("entries"),
+        note: String(form.get("note") ?? ""),
+      });
+      if ("error" in r) return r;
+      await audit("entry.add", { entrantId: entrant.id, entries: r.entries });
+      return { ok: true };
+    }
     case "reinstate": {
       await activate(entrant.id);
       await audit("entrant.approve", { entrantIds: [entrant.id] });
@@ -242,6 +255,12 @@ export default function EntrantEntries() {
           </s-stack>
         </s-grid>
       </s-section>
+
+      {!disqualified && (
+        <s-section heading="Add Entries">
+          <AddEntriesForm submit={submit} busy={busy} />
+        </s-section>
+      )}
 
       <s-section heading="Entries By Method">
         <EntriesByMethodTable rows={rows} showPeople={false} />

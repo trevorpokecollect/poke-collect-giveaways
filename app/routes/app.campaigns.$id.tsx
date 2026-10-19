@@ -3,6 +3,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
+import { useState } from "react";
 import { Form, useFetcher, useLoaderData, useSearchParams } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { CampaignStatus, EntrantStatus } from "@prisma/client";
@@ -56,6 +57,8 @@ type GrowthData = Awaited<ReturnType<typeof listGrowth>>;
 import { EntriesByMethodTable } from "../components/EntriesByMethod";
 import { EntryActivityTable } from "../components/EntryActivity";
 import { flag, Select } from "../components/fields";
+import { AddEntriesForm } from "../components/AddEntries";
+import { addEntries } from "../lib/entries/adjust.server";
 import {
   activityFeed,
   restoreEvent,
@@ -498,6 +501,20 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       await audit("entrant.disqualify", { entrantIds });
       break;
     }
+    case "addEntries": {
+      const r = await addEntries({
+        campaignId: campaign.id,
+        email: String(form.get("email") ?? ""),
+        entries: form.get("entries"),
+        note: String(form.get("note") ?? ""),
+      });
+      if ("error" in r) return r;
+      await audit("entry.add", { entrantId: r.entrantId, entries: r.entries });
+      return {
+        ok: true,
+        message: `${r.entries > 0 ? "Added" : "Took away"} ${Math.abs(r.entries).toLocaleString()} entries for ${r.label}. They now have ${r.total.toLocaleString()}.`,
+      };
+    }
     case "disqualifyDomain": {
       const domain = String(form.get("domain") ?? "");
       const ids = await disqualifyDomain(campaign.id, domain);
@@ -569,6 +586,7 @@ export default function CampaignPage() {
   const submit = (data: Record<string, string>) =>
     fetcher.submit(data, { method: "post" });
   const [search, setSearch] = useSearchParams();
+  const [showAdd, setShowAdd] = useState(false);
   const tab = (TABS.find(([t]) => t === search.get("tab"))?.[0] ??
     "overview") as Tab;
   // Changes some query params and keeps the rest (tab, filters, searches).
@@ -777,6 +795,20 @@ export default function CampaignPage() {
       {tab === "entrants" && (
         <s-section heading="Entrants">
           <s-stack gap="base">
+            <s-stack direction="inline">
+              <s-button onClick={() => setShowAdd(!showAdd)}>
+                {showAdd ? "Close" : "Add Entries"}
+              </s-button>
+            </s-stack>
+            {showAdd && (
+              <s-box padding="base" border="base" borderRadius="base">
+                <AddEntriesForm
+                  submit={submit}
+                  busy={fetcher.state !== "idle"}
+                  askEmail
+                />
+              </s-box>
+            )}
             <s-stack direction="inline" gap="base" alignItems="center">
               <Form method="get">
                 <input type="hidden" name="tab" value="entrants" />
