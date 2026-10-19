@@ -1,6 +1,7 @@
 import type { EntrySource, Prisma } from "@prisma/client";
 import db from "../../db.server";
 import { award } from "./ledger.server";
+import { entrantSearchWhere } from "./search";
 import { methodLabel, type MethodAction } from "./methods";
 
 // Disqualifying a single entry: a rollback that cancels one ledger event, keyed so it can only
@@ -109,16 +110,7 @@ export async function activityFeed(
       where: {
         campaignId,
         ...(opts.method ? methodWhere(opts.method) : {}),
-        ...(q
-          ? {
-              entrant: {
-                OR: [
-                  { email: { contains: q, mode: "insensitive" } },
-                  { name: { contains: q, mode: "insensitive" } },
-                ],
-              },
-            }
-          : {}),
+        ...(q ? { entrant: entrantSearchWhere(q) ?? {} } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: opts.take ?? 100,
