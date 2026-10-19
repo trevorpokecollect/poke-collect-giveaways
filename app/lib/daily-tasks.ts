@@ -31,6 +31,7 @@ export interface TaskConfig {
   paused?: boolean;
   latestInstagram?: boolean;
   verifyBuylist?: boolean;
+  verifyMarketListing?: boolean;
   archived?: boolean;
 }
 

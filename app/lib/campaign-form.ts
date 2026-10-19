@@ -167,6 +167,7 @@ export interface ActionConfigForm {
   paused?: boolean;
   latestInstagram?: boolean;
   verifyBuylist?: boolean;
+  verifyMarketListing?: boolean;
 }
 
 /** Types that can be a Daily Task. */
@@ -539,6 +540,8 @@ export function validateActions(actions: ActionForm[]): Result<ActionData[]> {
         (daily && a.type === "VISIT_URL" && c.latestInstagram) || undefined;
       raw.verifyBuylist =
         (daily && a.type === "VISIT_URL" && c.verifyBuylist) || undefined;
+      raw.verifyMarketListing =
+        (daily && a.type === "VISIT_URL" && c.verifyMarketListing) || undefined;
       const parsed = schema.safeParse(raw);
       if (!parsed.success) {
         const field = String(parsed.error.issues[0]?.path[0] ?? "");

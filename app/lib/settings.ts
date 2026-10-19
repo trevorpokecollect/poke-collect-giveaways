@@ -164,6 +164,9 @@ const taskFields = {
   // Only pays when the buylist app has a real submission from the entrant's email in this task
   // day (app/lib/buylist-verify.server.ts).
   verifyBuylist: z.boolean().optional(),
+  // Only pays when Vault Market (Mystery Packs app) has a listing from the entrant since the task
+  // day began (app/lib/market-verify.server.ts).
+  verifyMarketListing: z.boolean().optional(),
 };
 
 export const actionConfigSchema = {

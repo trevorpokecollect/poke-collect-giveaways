@@ -23,6 +23,7 @@ import { queueKlaviyoSync } from "../klaviyo.server";
 import { parseSettings } from "../settings";
 import { latestInstagramPost } from "../instagram.server";
 import { buylistSubmittedSince } from "../buylist-verify.server";
+import { marketListedSince } from "../market-verify.server";
 import {
   dailyUnlocked,
   isDailyTask,
@@ -430,12 +431,32 @@ export async function completeAction(
           `We don't see a buylist from ${entrant.email} yet today. Submit one with this email, then tap again.`,
         );
     }
+    // "List A Card On Vault Marketplace": only a real Vault Market listing since the task day began.
+    if (config.verifyMarketListing === true) {
+      if (payload.step === "start")
+        return { ok: true as const, started: "verify", seconds: 0 };
+      const found = await marketListedSince(
+        action.campaign.shop,
+        entrant.email,
+        day.startsAt,
+        entrant.shopifyCustomerId,
+      );
+      if (found === null)
+        return fail(
+          "We couldn't check Vault Market right now. Try again in a minute.",
+        );
+      if (!found)
+        return fail(
+          `We don't see a Vault Market listing from ${entrant.email} yet today. List a card from your vault while signed in with this email, then tap again.`,
+        );
+    }
     // "Tap after you do it" tasks: the link has to be opened (step "start") a few seconds
     // before the claim. It's a self-confirmation, not proof the person liked or commented.
     if (
       typeof config.confirm === "string" &&
       config.confirm &&
       config.verifyBuylist !== true &&
+      config.verifyMarketListing !== true &&
       action.type !== "WATCH_VIDEO"
     ) {
       if (payload.step === "start")
