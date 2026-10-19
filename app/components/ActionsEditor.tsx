@@ -364,6 +364,14 @@ function DailyTaskFields({
             checked={!!c.verifyBuylist}
             onChange={(verifyBuylist) => setConfig({ verifyBuylist })}
           />
+          <Check
+            label="Only count real Vault Market listings"
+            details="Entries are given only when Vault Market (Mystery Packs app) has a card listed by the entrant (matched by email or store account) since the task last reset. Needs MARKET_VERIFY_URL and MARKET_VERIFY_SECRET in Railway; until then claims are refused."
+            checked={!!c.verifyMarketListing}
+            onChange={(verifyMarketListing) =>
+              setConfig({ verifyMarketListing })
+            }
+          />
           <TextInput
             label="Claim button (optional)"
             details={

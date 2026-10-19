@@ -86,6 +86,8 @@ function taskConfig(raw: unknown) {
     daily: true,
     confirm: str(c.confirm) ?? null,
     live: c.live === true,
+    // Checked against another app (buylist, Vault Market), not the honor system.
+    verified: c.verifyBuylist === true || c.verifyMarketListing === true,
     schedule: Array.isArray(s.days)
       ? { days: s.days, start: str(s.start), end: str(s.end) }
       : null,
