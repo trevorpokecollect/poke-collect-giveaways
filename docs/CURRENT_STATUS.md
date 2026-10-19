@@ -269,3 +269,11 @@ submissions only, not DRAFT/CANCELLED; `GIVEAWAY_COUNT_STAFF=true` there would c
 - **Join Our Live Whatnot Show** had 0 claims on 10-16: it only rendered while open. PR #27 (Railway `0f08fcc`, Shopify
   **poke-collect-giveaways-36**, 10-18 ~00:45Z): scheduled tasks show all week dimmed ("Opens Fri 5:00 PM CT", countdown on
   the day, "Opens Soon") and the widget reloads itself when the window opens.
+
+## Verified Vault Market task (live 2026-10-19 ~16:10Z: Railway `129f8d9`, Shopify **poke-collect-giveaways-37**)
+Trevor 10-19: replace "Try Our New Scan & Sell" (+20) with "List A Card On Vault Marketplace" (+20), tracked. VISIT_URL daily
+task option `verifyMarketListing` ("Only count real Vault Market listings"): claim asks the Mystery Packs app
+`GET /api/giveaway/market-listed?shop&email&since[&customer]` (packs PR #51, `x-verify-secret`) via `app/lib/market-verify.server.ts`;
+any listing created since the task day began counts. Railway vars `MARKET_VERIFY_URL` (packs public host) + `MARKET_VERIFY_SECRET`
+here, `MARKET_VERIFY_SECRET` on packs. Tested live: wrong secret 401, unknown email false, Trevor's account true.
+Verified tasks show "Tap once it's done. We check this one." Trevor swaps the task in the editor.
