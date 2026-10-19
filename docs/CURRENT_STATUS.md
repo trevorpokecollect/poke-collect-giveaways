@@ -211,6 +211,12 @@ submissions only, not DRAFT/CANCELLED; `GIVEAWAY_COUNT_STAFF=true` there would c
 `[buylist-verify] check failed`. `TaskDay.startsAt` added. Test:
 `buylist-verify.integration.test.ts`.
 
+## Add Entries (live 2026-10-19 ~16:30Z: Railway `56725aa`, PR #29)
+Admin "Add Entries" on the entrant page and (by email) behind a button on the giveaway's Entrants tab, for purchases or
+tasks that didn't attach. `addEntries()` (`app/lib/entries/adjust.server.ts`) writes an append-only ADJUSTMENT event
+(whole numbers, ±100,000, optional reason shown as "Adjustment (reason)"; minus takes entries away). Per giveaway; counts
+in the daily draw of the day added. Refuses disqualified entrants and emails not in the giveaway. Audit `entry.add`.
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.
