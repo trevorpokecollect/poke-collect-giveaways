@@ -1101,7 +1101,7 @@
         self.submitAction(a, started ? { step: "done", started: started } : {}, { error: error, button: btn }).catch(function () {});
       },
     });
-    var hint = el("small", { class: "pcg__daily-hint", hidden: true, text: "Tap after you like and comment. It's on the honor system." });
+    var hint = el("small", { class: "pcg__daily-hint", hidden: true, text: cfg.verified ? "Tap once it's done. We check this one." : "Tap after you like and comment. It's on the honor system." });
     var cls = "pcg__daily-task" + (st.done ? " pcg__daily-task--done" : "") + (cfg.live ? " pcg__daily-task--live" : "") + (locked ? " pcg__daily-task--locked" : "");
     return el("li", { class: cls }, [
       el("div", { class: "pcg__daily-info" }, [
