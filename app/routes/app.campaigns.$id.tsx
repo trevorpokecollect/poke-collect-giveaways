@@ -4,7 +4,7 @@ import type {
   LoaderFunctionArgs,
 } from "react-router";
 import { useState } from "react";
-import { Form, useFetcher, useLoaderData, useSearchParams } from "react-router";
+import { useFetcher, useLoaderData, useSearchParams } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { CampaignStatus, EntrantStatus } from "@prisma/client";
 import { authenticate } from "../shopify.server";
@@ -58,6 +58,8 @@ import { EntriesByMethodTable } from "../components/EntriesByMethod";
 import { EntryActivityTable } from "../components/EntryActivity";
 import { flag, Select } from "../components/fields";
 import { AddEntriesForm } from "../components/AddEntries";
+import { SearchBox } from "../components/SearchBox";
+import { entrantSearchWhere } from "../lib/entries/search";
 import { addEntries } from "../lib/entries/adjust.server";
 import {
   activityFeed,
@@ -83,16 +85,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const url = new URL(request.url);
   const filter = url.searchParams.get("status") ?? "ALL";
-  // Entrant search: case-insensitive match on email or name.
+  // Entrant search: every word in the email or name (app/lib/entries/search.ts).
   const q = url.searchParams.get("q")?.trim().slice(0, 200) ?? "";
-  const searchWhere = q
-    ? {
-        OR: [
-          { email: { contains: q, mode: "insensitive" as const } },
-          { name: { contains: q, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const searchWhere = entrantSearchWhere(q) ?? {};
   const statusWhere =
     filter !== "ALL" && FILTERS.includes(filter as never)
       ? { status: filter as EntrantStatus }
@@ -760,23 +755,12 @@ export default function CampaignPage() {
                 ]}
                 onChange={(v) => setParams({ activity: v || null })}
               />
-              <Form method="get">
-                <input type="hidden" name="tab" value="activity" />
-                {activity.method && (
-                  <input
-                    type="hidden"
-                    name="activity"
-                    value={activity.method}
-                  />
-                )}
-                <s-search-field
-                  name="aq"
-                  label="Search"
-                  labelAccessibilityVisibility="exclusive"
-                  placeholder="Search by email or name"
-                  defaultValue={activity.q}
-                />
-              </Form>
+              <SearchBox
+                label="Search"
+                placeholder="Search by name or email"
+                value={activity.q}
+                onSearch={(v) => setParams({ aq: v || null })}
+              />
             </s-grid>
             <EntryActivityTable
               items={activity.items}
@@ -809,20 +793,13 @@ export default function CampaignPage() {
                 />
               </s-box>
             )}
+            <SearchBox
+              label="Search entrants"
+              placeholder="Search by name or email, like Ash Ketchum or ash@gmail.com"
+              value={q}
+              onSearch={(v) => setParams({ q: v || null })}
+            />
             <s-stack direction="inline" gap="base" alignItems="center">
-              <Form method="get">
-                <input type="hidden" name="tab" value="entrants" />
-                {filter !== "ALL" && (
-                  <input type="hidden" name="status" value={filter} />
-                )}
-                <s-search-field
-                  name="q"
-                  label="Search entrants"
-                  labelAccessibilityVisibility="exclusive"
-                  placeholder="Search by email or name"
-                  defaultValue={q}
-                />
-              </Form>
               <s-stack direction="inline" gap="small-200">
                 {FILTERS.map((f) => (
                   <s-button
