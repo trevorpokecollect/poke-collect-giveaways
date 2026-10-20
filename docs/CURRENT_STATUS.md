@@ -239,7 +239,7 @@ address still counts). (4) Rules generator adds the US shipping line to Eligibil
 the claim check is the backstop (forfeit + redraw a non-US winner). No IP geolocation. Deploy order: Shopify first,
 then Railway (old widgets don't send `usResident`). Tests: `us-only.test.ts`, flow + winners integration (250 total).
 
-## Daily prize bundles (branch `claude/prize-bundles`, NOT deployed)
+## Daily prize bundles (live 2026-10-20: Railway `da85c96`, Shopify **poke-collect-giveaways-39**; Staff Guide updated)
 Trevor 10-20: few single products fit the daily price range, so a day's prize can be a bundle. Upcoming Prizes has
 **Add Bundle**: pick up to 6 products, set 1–10 of each (one product defaults to 3 = "3x"); needs 2+ units in all.
 Stored as `DailyQueueItem.bundle` (BundlePart[]); when picked, `ensurePrize` finds stock for every part (a variant with
