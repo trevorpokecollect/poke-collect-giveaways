@@ -87,6 +87,7 @@ const publicState = (campaign: LiveCampaign) =>
         rulesText: campaign.rulesText,
         requireEmailConsent: settings.requireEmailConsent,
         requireName: settings.requireName,
+        usOnly: settings.usOnly,
         // "See All Winners" button (null hides it).
         winnersPage: (settings.showWinners && settings.winnersPageUrl) || null,
         imageBackdrop: settings.imageBackdrop,
