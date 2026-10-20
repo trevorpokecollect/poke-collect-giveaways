@@ -2,6 +2,7 @@ import type { Campaign } from "@prisma/client";
 import db from "../db.server";
 import { addDays, periodFor, planQueue, type Period } from "./daily";
 import { parseSettings } from "./settings";
+import { bundleTitle, type BundlePart } from "./bundles";
 
 // The daily prize queue: products the merchant lined up, used one per day ahead of the
 // automatic pick (see ensurePrize in daily.server.ts).
@@ -31,6 +32,27 @@ export async function addToQueue(
   let position = (last?.position ?? 0) + 1;
   await db.dailyQueueItem.createMany({
     data: products.map((p) => ({ campaignId, ...p, position: position++ })),
+  });
+}
+
+/** Lines up a bundle (several products, or several of one) as one upcoming prize. */
+export async function addBundleToQueue(
+  campaignId: string,
+  parts: BundlePart[],
+) {
+  const last = await db.dailyQueueItem.findFirst({
+    where: { campaignId, usedAt: null },
+    orderBy: { position: "desc" },
+  });
+  await db.dailyQueueItem.create({
+    data: {
+      campaignId,
+      productId: parts[0].productId,
+      title: bundleTitle(parts).slice(0, 300),
+      imageUrl: parts[0].imageUrl,
+      bundle: parts as unknown as object,
+      position: (last?.position ?? 0) + 1,
+    },
   });
 }
 

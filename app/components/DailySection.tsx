@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useFetcher, useSearchParams } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 
@@ -25,6 +26,15 @@ export interface QueueRow {
   note: string | null;
   /** The draw date it's planned for, within the next 7 days. */
   plannedFor: string | null;
+  /** Several products, or several of one, as one prize. */
+  bundle: boolean;
+}
+
+interface BundleDraftPart {
+  productId: string;
+  title: string;
+  imageUrl: string | null;
+  quantity: number;
 }
 
 export interface DailyData {
@@ -194,6 +204,21 @@ export function DailySection({ daily }: { daily: DailyData }) {
               ),
             });
           }}
+          pickBundle={async () => {
+            const selected = await shopify.resourcePicker({
+              type: "product",
+              action: "select",
+              multiple: 6,
+            });
+            if (!selected?.length) return null;
+            return selected.map((p) => ({
+              productId: p.id,
+              title: p.title,
+              imageUrl: p.images?.[0]?.originalSrc ?? null,
+              // One product: default to 3 of it; several: 1 of each.
+              quantity: selected.length === 1 ? 3 : 1,
+            }));
+          }}
         />
 
         {daily.prizes.length > 0 && (
@@ -274,8 +299,11 @@ function UpcomingPrizes(props: {
   busy: boolean;
   submit: (data: Record<string, string>) => void;
   pickProducts: () => void;
+  pickBundle: () => Promise<BundleDraftPart[] | null>;
 }) {
   const { queue, busy, submit } = props;
+  const [draft, setDraft] = useState<BundleDraftPart[] | null>(null);
+  const total = draft?.reduce((n, p) => n + p.quantity, 0) ?? 0;
   return (
     <s-box padding="base" borderWidth="base" borderRadius="base">
       <s-stack gap="base">
@@ -286,10 +314,100 @@ function UpcomingPrizes(props: {
           justifyContent="space-between"
         >
           <s-heading>Upcoming Prizes</s-heading>
-          <s-button disabled={busy} onClick={props.pickProducts}>
-            Add Products
-          </s-button>
+          <s-stack direction="inline" gap="small-200">
+            <s-button disabled={busy} onClick={props.pickProducts}>
+              Add Products
+            </s-button>
+            <s-button
+              disabled={busy}
+              onClick={async () => setDraft(await props.pickBundle())}
+            >
+              Add Bundle
+            </s-button>
+          </s-stack>
         </s-stack>
+        {draft && (
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack gap="small-200">
+              <s-heading>New Bundle</s-heading>
+              <s-text color="subdued">
+                One day&apos;s prize made of these products. Set how many of
+                each (pick one product and set 3 for &quot;3x&quot;). Every unit
+                is reserved together, so the bundle is skipped on a day any
+                product is short.
+              </s-text>
+              {draft.map((p, i) => (
+                <s-stack
+                  key={p.productId}
+                  direction="inline"
+                  gap="small-200"
+                  alignItems="center"
+                >
+                  {p.imageUrl && (
+                    <s-thumbnail src={p.imageUrl} alt={p.title} size="small" />
+                  )}
+                  <s-text>{p.title}</s-text>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    aria-label={`How many ${p.title}`}
+                    value={p.quantity}
+                    style={{ width: 64 }}
+                    onChange={(e) => {
+                      const quantity = Math.min(
+                        10,
+                        Math.max(
+                          1,
+                          Math.floor(Number(e.currentTarget.value)) || 1,
+                        ),
+                      );
+                      setDraft(
+                        draft.map((x, j) => (j === i ? { ...x, quantity } : x)),
+                      );
+                    }}
+                  />
+                  <s-button
+                    variant="tertiary"
+                    tone="critical"
+                    onClick={() =>
+                      setDraft(
+                        draft.length > 1
+                          ? draft.filter((_, j) => j !== i)
+                          : null,
+                      )
+                    }
+                  >
+                    Remove
+                  </s-button>
+                </s-stack>
+              ))}
+              {total < 2 && (
+                <s-text tone="critical">
+                  A bundle needs 2 or more items in all.
+                </s-text>
+              )}
+              <s-stack direction="inline" gap="small-200">
+                <s-button
+                  variant="primary"
+                  disabled={busy || total < 2}
+                  onClick={() => {
+                    submit({
+                      intent: "dailyQueueBundle",
+                      parts: JSON.stringify(draft),
+                    });
+                    setDraft(null);
+                  }}
+                >
+                  Add Bundle To Upcoming Prizes
+                </s-button>
+                <s-button variant="tertiary" onClick={() => setDraft(null)}>
+                  Cancel
+                </s-button>
+              </s-stack>
+            </s-stack>
+          </s-box>
+        )}
         <s-text color="subdued">
           Each night the next product here that&apos;s in stock becomes the next
           day&apos;s prize (or the one pinned to that day). When the list is
@@ -333,6 +451,7 @@ function UpcomingPrizes(props: {
                       )}
                       <s-stack gap="none">
                         <s-text>{q.title}</s-text>
+                        {q.bundle && <s-badge tone="info">Bundle</s-badge>}
                         {q.note && <s-text tone="critical">{q.note}</s-text>}
                       </s-stack>
                     </s-stack>

@@ -239,6 +239,19 @@ address still counts). (4) Rules generator adds the US shipping line to Eligibil
 the claim check is the backstop (forfeit + redraw a non-US winner). No IP geolocation. Deploy order: Shopify first,
 then Railway (old widgets don't send `usResident`). Tests: `us-only.test.ts`, flow + winners integration (250 total).
 
+## Daily prize bundles (branch `claude/prize-bundles`, NOT deployed)
+Trevor 10-20: few single products fit the daily price range, so a day's prize can be a bundle. Upcoming Prizes has
+**Add Bundle**: pick up to 6 products, set 1–10 of each (one product defaults to 3 = "3x"); needs 2+ units in all.
+Stored as `DailyQueueItem.bundle` (BundlePart[]); when picked, `ensurePrize` finds stock for every part (a variant with
+enough units at one location, available first, then safety stock) or skips the bundle with "Not enough stock of …".
+The prize keeps `DailyPrize.items` (PrizeItem[], `app/lib/bundles.ts`); single fields hold the first line, title like
+"Elite Trainer Box + 2x Booster Pack", value = sum. Reserve/release/Mark Sent move each line with its quantity
+(idempotency keys `daily-<op>-<prize>-<n>`; single prizes keep the old keys), and a failed bundle reserve puts back
+what it took. The $0 claim order has one line per product with its quantity. Storefront `daily.prize.items` /
+`upcoming[].items` (pictures + counts, no values); the widget shows the products side by side with a yellow "3x"
+above repeated ones. Migration `20261020170000_prize_bundles`. Needs Shopify + Railway deploy. Tests:
+`bundles.test.ts`, `bundles.integration.test.ts` (261 total).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.

@@ -45,7 +45,9 @@ import {
 } from "../lib/entries/domain-tools.server";
 import { entriesByMethod } from "../lib/entries/methods.server";
 import { checkListStatus, listGrowth } from "../lib/entries/list-status.server";
+import { parseBundle } from "../lib/bundles";
 import {
+  addBundleToQueue,
   addToQueue,
   moveQueueItem,
   pinQueueItem,
@@ -193,6 +195,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         pinnedDate: q.pinnedDate,
         note: q.note,
         plannedFor: plannedFor.get(q.id) ?? null,
+        bundle: Array.isArray(q.bundle),
       })),
       drawTime: dailyCfg.drawTime,
       timezone: campaign.timezone,
@@ -381,6 +384,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           if (!products.length) return { error: "Choose a product." };
           await addToQueue(campaign.id, products);
           await audit("daily.queueAdd", { count: products.length });
+          return { ok: true };
+        }
+        case "dailyQueueBundle": {
+          const parts = parseBundle(
+            JSON.parse(String(form.get("parts") ?? "[]")),
+          );
+          if (!parts)
+            return {
+              error:
+                "A bundle needs 2 or more items in all (up to 6 products, 10 of each).",
+            };
+          await addBundleToQueue(campaign.id, parts);
+          await audit("daily.queueBundle", { parts: parts.length });
           return { ok: true };
         }
         case "dailyQueueMove": {

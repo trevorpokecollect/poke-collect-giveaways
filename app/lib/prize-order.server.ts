@@ -3,6 +3,7 @@ import db from "../db.server";
 import { unauthenticated } from "../shopify.server";
 import { countryCode, provinceCode, splitName } from "./address";
 import type { ClaimData } from "./winners";
+import { prizeItems } from "./bundles";
 
 // Daily prizes: once the winner confirms their shipping details, a $0 paid order for the
 // prize is created in Shopify so it ships through the normal fulfillment list. The unit is
@@ -32,6 +33,8 @@ export function prizeOrderInput(opts: {
   email: string;
   claim: ClaimData;
   variantId: string;
+  /** Bundle prizes: every variant with its quantity (overrides variantId). */
+  lines?: { variantId: string; quantity: number }[];
   prizeTitle: string;
   giveawayTitle: string;
   drawDate: string;
@@ -55,18 +58,18 @@ export function prizeOrderInput(opts: {
     financialStatus: "PAID",
     tags: ["Giveaway Prize"],
     note: `Daily giveaway prize (${opts.prizeTitle}) from ${opts.giveawayTitle}, draw ${opts.drawDate}. Ship to: ${address}`,
-    lineItems: [
-      {
-        variantId: opts.variantId,
-        quantity: 1,
+    lineItems: (opts.lines ?? [{ variantId: opts.variantId, quantity: 1 }]).map(
+      (l) => ({
+        variantId: l.variantId,
+        quantity: l.quantity,
         // orderCreate defaults this to false, which makes the order "Shipping not required"
         // and blocks shipping labels.
         requiresShipping: true,
         priceSet: {
           shopMoney: { amount: "0.00", currencyCode: opts.currencyCode },
         },
-      },
-    ],
+      }),
+    ),
     shippingLines: [
       {
         title: "Giveaway Prize Shipping",
@@ -120,6 +123,10 @@ export async function createPrizeOrder(
         email: winner.entrant.email,
         claim,
         variantId: prize.variantId,
+        lines: prizeItems(prize.items)?.map((i) => ({
+          variantId: i.variantId,
+          quantity: i.quantity,
+        })),
         prizeTitle: prize.title,
         giveawayTitle: winner.draw.campaign.title,
         drawDate: prize.periodKey,

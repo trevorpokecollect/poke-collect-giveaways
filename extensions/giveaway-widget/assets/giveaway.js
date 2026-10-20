@@ -265,10 +265,22 @@
   // with a soft glow. Only once a prize is picked; the rain pauses while off-screen or hidden.
   function prizeStage(p) {
     var canvas = el("canvas", { class: "pcg__matrix", "aria-hidden": "true" });
+    // Bundles: every product side by side, with "3x" above any that come more than once.
+    var items = p.items && p.items.length ? p.items : null;
+    var bundle = items && (items.length > 1 || items[0].quantity > 1);
+    var art = bundle
+      ? el("div", { class: "pcg__stage-items pcg__stage-items--" + Math.min(items.length, 4), role: "img", "aria-label": p.title }, items.map(function (i) {
+          return el("div", { class: "pcg__stage-item" }, [
+            // Every product keeps the badge's space, so pictures line up.
+            el("span", { class: "pcg__qty" + (i.quantity > 1 ? "" : " pcg__qty--none"), "aria-hidden": "true", text: i.quantity > 1 ? i.quantity + "x" : "1x" }),
+            i.imageUrl ? el("img", { src: i.imageUrl, alt: "", loading: "lazy" }) : el("span", { class: "pcg__stage-ph", "aria-hidden": "true", text: "🎁" }),
+          ]);
+        }))
+      : el("img", { class: "pcg__stage-img", src: p.imageUrl, alt: p.title, loading: "lazy" });
     var stage = el("div", { class: "pcg__image pcg__stage" }, [
       canvas,
       el("span", { class: "pcg__spot", "aria-hidden": "true" }),
-      el("img", { class: "pcg__stage-img", src: p.imageUrl, alt: p.title, loading: "lazy" }),
+      art,
     ]);
     matrixRain(canvas, stage);
     return stage;

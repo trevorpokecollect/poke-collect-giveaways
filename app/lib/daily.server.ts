@@ -13,6 +13,14 @@ import {
   type StockSource,
 } from "./daily";
 import { queueFor, upcomingPlan } from "./daily-queue.server";
+import {
+  bundleTitle,
+  bundleValue,
+  prizeItems,
+  publicItems,
+  type BundlePart,
+  type PrizeItem,
+} from "./bundles";
 import { drawWinners, newSeed, snapshotHash } from "./draw";
 import { enteredToday, onlyFullyEntered } from "./entries/ledger.server";
 import { parseSettings } from "./settings";
@@ -196,19 +204,69 @@ const byStock = (a: Candidate, b: Candidate) =>
 const ledgerFor = (prize: { campaignId: string; id: string }) =>
   `poke-collect-giveaways://daily/${prize.campaignId}/${prize.id}`;
 
-/** Moves one unit between reserved and where it came from (available or safety stock). */
+/** One reserved line of a prize: the whole prize, or one product of a bundle. */
+interface Line {
+  inventoryItemId: string;
+  locationId: string;
+  reservedFrom: string;
+  quantity: number;
+  /** Idempotency-key suffix: "" for single prizes (as before), "-<n>" per bundle line. */
+  key: string;
+}
+
+/** The lines to reserve, release or remove for a prize. */
+function linesOf(
+  prize: Pick<
+    DailyPrize,
+    "inventoryItemId" | "locationId" | "reservedFrom" | "items"
+  >,
+): Line[] {
+  const items = prizeItems(prize.items);
+  return items
+    ? items.map((i, n) => ({ ...i, key: `-${n}` }))
+    : [{ ...prize, quantity: 1, key: "" }];
+}
+
+/** Moves a prize's units between reserved and where they came from (available or safety stock). */
 async function moveOne(
   admin: Admin,
   prize: Pick<
     DailyPrize,
-    "id" | "campaignId" | "inventoryItemId" | "locationId" | "reservedFrom"
+    | "id"
+    | "campaignId"
+    | "inventoryItemId"
+    | "locationId"
+    | "reservedFrom"
+    | "items"
   >,
+  direction: "reserve" | "release",
+) {
+  const lines = linesOf(prize);
+  const done: Line[] = [];
+  try {
+    for (const line of lines) {
+      await moveLine(admin, prize, line, direction);
+      done.push(line);
+    }
+  } catch (err) {
+    // A bundle that can't be fully reserved puts back what it already took.
+    if (direction === "reserve")
+      for (const line of done)
+        await moveLine(admin, prize, line, "release").catch(() => {});
+    throw err;
+  }
+}
+
+async function moveLine(
+  admin: Admin,
+  prize: Pick<DailyPrize, "id" | "campaignId">,
+  line: Line,
   direction: "reserve" | "release",
 ) {
   const [from, to] =
     direction === "reserve"
-      ? [prize.reservedFrom, "reserved"]
-      : ["reserved", prize.reservedFrom];
+      ? [line.reservedFrom, "reserved"]
+      : ["reserved", line.reservedFrom];
   const ledger = ledgerFor(prize);
   await gql(
     admin,
@@ -220,7 +278,7 @@ async function moveOne(
         }
       }`,
     {
-      key: `daily-${direction}-${prize.id}`,
+      key: `daily-${direction}-${prize.id}${line.key}`,
       input: {
         reason:
           direction === "reserve"
@@ -229,10 +287,10 @@ async function moveOne(
         referenceDocumentUri: ledger,
         changes: [
           {
-            quantity: 1,
-            inventoryItemId: prize.inventoryItemId,
+            quantity: line.quantity,
+            inventoryItemId: line.inventoryItemId,
             from: {
-              locationId: prize.locationId,
+              locationId: line.locationId,
               name: from,
               // Shopify wants a ledger document for every quantity name except "available"
               // (reserved and safety_stock both need one).
@@ -240,7 +298,7 @@ async function moveOne(
               changeFromQuantity: null,
             },
             to: {
-              locationId: prize.locationId,
+              locationId: line.locationId,
               name: to,
               ledgerDocumentUri: to === "available" ? null : ledger,
               changeFromQuantity: null,
@@ -252,9 +310,15 @@ async function moveOne(
   );
 }
 
-/** Takes the sent prize out of stock: releases the reservation, then removes one unit. */
+/** Takes the sent prize out of stock: releases the reservation, then removes the units. */
 async function removeOne(admin: Admin, prize: DailyPrize) {
-  await moveOne(admin, prize, "release");
+  for (const line of linesOf(prize)) {
+    await moveLine(admin, prize, line, "release");
+    await removeLine(admin, prize, line);
+  }
+}
+
+async function removeLine(admin: Admin, prize: DailyPrize, line: Line) {
   await gql(
     admin,
     `#graphql
@@ -265,18 +329,18 @@ async function removeOne(admin: Admin, prize: DailyPrize) {
         }
       }`,
     {
-      key: `daily-sent-${prize.id}`,
+      key: `daily-sent-${prize.id}${line.key}`,
       input: {
-        name: prize.reservedFrom,
+        name: line.reservedFrom,
         reason: "promotion",
         referenceDocumentUri: ledgerFor(prize),
         changes: [
           {
-            delta: -1,
-            inventoryItemId: prize.inventoryItemId,
-            locationId: prize.locationId,
+            delta: -line.quantity,
+            inventoryItemId: line.inventoryItemId,
+            locationId: line.locationId,
             ledgerDocumentUri:
-              prize.reservedFrom === "available" ? null : ledgerFor(prize),
+              line.reservedFrom === "available" ? null : ledgerFor(prize),
             changeFromQuantity: null,
           },
         ],
@@ -298,6 +362,45 @@ async function recentProducts(campaignId: string, days: number) {
     select: { productId: true },
   });
   return new Set(rows.map((r) => r.productId));
+}
+
+/**
+ * Finds stock for every product of a queued bundle: per product, the variant with enough units
+ * at one location (available first, then safety stock). Reports the first product that's short.
+ */
+async function bundleFor(
+  admin: Admin,
+  cfg: DailySettings,
+  parts: BundlePart[],
+): Promise<{ items: PrizeItem[] } | { short: string }> {
+  const items: PrizeItem[] = [];
+  for (const part of parts) {
+    const variants = await fetchCandidates(admin, cfg, {
+      productId: part.productId,
+      safetyStock: true,
+    });
+    const v = variants
+      .filter((c) => c.available >= part.quantity)
+      .sort(byStock)[0];
+    if (!v)
+      return {
+        short:
+          part.quantity > 1 ? `${part.quantity}x ${part.title}` : part.title,
+      };
+    items.push({
+      productId: v.productId,
+      variantId: v.variantId,
+      productHandle: v.productHandle,
+      title: v.title,
+      imageUrl: v.imageUrl ?? part.imageUrl,
+      value: v.value,
+      inventoryItemId: v.inventoryItemId,
+      locationId: v.locationId,
+      reservedFrom: v.source,
+      quantity: part.quantity,
+    });
+  }
+  return { items };
 }
 
 /** The prize for the period containing `now`, if one is picked and still held. */
@@ -342,10 +445,27 @@ export async function ensurePrize(
   if (existing) return existing;
 
   let pick: Candidate | null = null;
+  let bundle: PrizeItem[] | null = null;
   let queued: string | null = null;
   if (!opts.productId && !opts.exclude) {
     // The merchant's queue first: the item pinned to this day, else the next in stock.
     for (const item of await queueFor(campaign.id, period)) {
+      const parts = item.bundle as BundlePart[] | null;
+      if (parts?.length) {
+        const found = await bundleFor(admin, cfg, parts);
+        if ("items" in found) {
+          bundle = found.items;
+          queued = item.id;
+          break;
+        }
+        await db.dailyQueueItem.update({
+          where: { id: item.id },
+          data: {
+            note: `Not enough stock of ${found.short} on ${period.key}, skipped`,
+          },
+        });
+        continue;
+      }
       const variants = await fetchCandidates(admin, cfg, {
         productId: item.productId,
         safetyStock: true,
@@ -361,7 +481,9 @@ export async function ensurePrize(
       });
     }
   }
-  if (pick) {
+  if (bundle) {
+    // From the queue, as a bundle.
+  } else if (pick) {
     // From the queue.
   } else if (opts.productId) {
     // Chosen by the merchant: any in-stock variant of that product, ignoring the price range
@@ -388,7 +510,7 @@ export async function ensurePrize(
       () => randomInt(2 ** 31) / 2 ** 31,
     );
   }
-  if (!pick) {
+  if (!pick && !bundle) {
     console.warn(
       `[daily] ${campaign.shop} ${campaign.slug}: no in-stock product matches the daily rules`,
     );
@@ -401,21 +523,37 @@ export async function ensurePrize(
   const prize = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`daily-prize:${campaign.id}:${period.key}`}))`;
     if (await tx.dailyPrize.findFirst({ where: held })) return null;
+    const first = bundle?.[0];
     return tx.dailyPrize.create({
       data: {
         campaignId: campaign.id,
         periodKey: period.key,
         opensAt: period.opensAt,
         drawAt: period.drawAt,
-        productId: pick.productId,
-        variantId: pick.variantId,
-        productHandle: pick.productHandle,
-        title: pick.title,
-        imageUrl: pick.imageUrl,
-        value: pick.value,
-        inventoryItemId: pick.inventoryItemId,
-        locationId: pick.locationId,
-        reservedFrom: pick.source,
+        ...(bundle && first
+          ? {
+              productId: first.productId,
+              variantId: first.variantId,
+              productHandle: first.productHandle,
+              title: bundleTitle(bundle),
+              imageUrl: first.imageUrl,
+              value: bundleValue(bundle),
+              inventoryItemId: first.inventoryItemId,
+              locationId: first.locationId,
+              reservedFrom: first.reservedFrom,
+              items: bundle as unknown as object,
+            }
+          : {
+              productId: pick!.productId,
+              variantId: pick!.variantId,
+              productHandle: pick!.productHandle,
+              title: pick!.title,
+              imageUrl: pick!.imageUrl,
+              value: pick!.value,
+              inventoryItemId: pick!.inventoryItemId,
+              locationId: pick!.locationId,
+              reservedFrom: pick!.source,
+            }),
       },
     });
   });
@@ -780,7 +918,16 @@ export async function storefrontDaily(
   // What's lined up for the next few days (only the merchant's queue is known ahead).
   const upcoming = (await upcomingPlan(campaign, 4)).plan.flatMap((d) =>
     d.item
-      ? [{ date: d.date, title: d.item.title, imageUrl: d.item.imageUrl }]
+      ? [
+          {
+            date: d.date,
+            title: d.item.title,
+            imageUrl: d.item.imageUrl,
+            items: Array.isArray(d.item.bundle)
+              ? publicItems(d.item.bundle as unknown as BundlePart[])
+              : null,
+          },
+        ]
       : [],
   );
   return {
@@ -794,6 +941,11 @@ export async function storefrontDaily(
           imageUrl: prize.imageUrl,
           value: prize.value,
           url: prize.productHandle ? `/products/${prize.productHandle}` : null,
+          // Bundles: each product with its "3x" count (null for a single product).
+          items: (() => {
+            const items = prizeItems(prize.items);
+            return items ? publicItems(items) : null;
+          })(),
         }
       : null,
     yourEntries: entrantId
