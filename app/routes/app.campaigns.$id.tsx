@@ -37,7 +37,7 @@ import {
   ordersCountFrom,
   removePreStartOrderEntries,
 } from "../lib/entries/orders.server";
-import { periodFor } from "../lib/daily";
+import { methodWindow } from "../lib/method-window";
 import {
   disqualifyDomain,
   restoreDomain,
@@ -128,20 +128,38 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }),
   ]);
   const dailyCfg = dailySettings(campaign);
-  // Daily giveaways can show just the current draw period ("Today").
-  const methodPeriod =
-    dailyCfg.enabled && url.searchParams.get("methods") !== "all"
-      ? "today"
-      : "all";
-  const methodsSince =
-    methodPeriod === "today"
-      ? periodFor(new Date(), campaign.timezone, dailyCfg.drawTime).opensAt
-      : undefined;
+  // Daily giveaways show the current draw by default, or one past draw, or all time.
+  const pastDraws: { key: string; title: string }[] = [];
+  if (dailyCfg.enabled)
+    for (const p of await db.dailyPrize.findMany({
+      where: {
+        campaignId: campaign.id,
+        drawId: { not: null },
+        drawAt: { lte: new Date() },
+      },
+      orderBy: [{ drawAt: "desc" }, { createdAt: "desc" }],
+      take: 120,
+      select: { periodKey: true, title: true },
+    }))
+      if (!pastDraws.some((d) => d.key === p.periodKey))
+        pastDraws.push({ key: p.periodKey, title: p.title });
+  const methodWin = methodWindow({
+    daily: dailyCfg.enabled,
+    methods: url.searchParams.get("methods"),
+    draw: url.searchParams.get("draw"),
+    pastDraws: pastDraws.map((d) => d.key),
+    now: new Date(),
+    timeZone: campaign.timezone,
+    drawTime: dailyCfg.drawTime,
+  });
   // Looks up new sign-ups in Shopify in the background; counts fill in on later visits.
   void checkListStatus(campaign);
   const [methods, growth] = await Promise.all([
-    entriesByMethod(campaign.id, { since: methodsSince }),
-    listGrowth(campaign.id, methodsSince),
+    entriesByMethod(campaign.id, {
+      since: methodWin.since,
+      until: methodWin.until,
+    }),
+    listGrowth(campaign.id, methodWin.since, methodWin.until),
   ]);
   let daily: DailyData | null = null;
   if (dailyCfg.enabled) {
@@ -292,7 +310,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     // Uncommon email domains with many entrants (bot farms), for the Entrants tab.
     domains: await suspiciousDomains(campaign.id),
     daily,
-    methods: { period: methodPeriod, rows: methods.rows },
+    methods: {
+      period: methodWin.period,
+      draw: methodWin.draw,
+      draws: pastDraws,
+      rows: methods.rows,
+    },
     growth,
     activity: {
       method: activityMethod,
@@ -558,6 +581,15 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
+// "Mon, Oct 19" for a draw key (YYYY-MM-DD).
+const shortDay = (ymd: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${ymd}T12:00:00Z`));
+
 export default function CampaignPage() {
   const {
     campaign,
@@ -598,21 +630,42 @@ export default function CampaignPage() {
   const base = `/app/campaigns/${campaign.id}`;
 
   const methodSwitch = daily && (
-    <s-stack direction="inline" gap="small-200">
-      {(
-        [
-          ["today", "Current Draw"],
-          ["all", "All Time"],
-        ] as const
-      ).map(([value, label]) => (
-        <s-button
-          key={value}
-          variant={methods.period === value ? "primary" : "secondary"}
-          onClick={() => setParams({ methods: value === "all" ? "all" : null })}
-        >
-          {label}
-        </s-button>
-      ))}
+    <s-stack gap="small-200">
+      <s-stack direction="inline" gap="small-200">
+        {(
+          [
+            ["today", "Current Draw"],
+            ["draw", "Past Draws"],
+            ["all", "All Time"],
+          ] as const
+        )
+          .filter(([value]) => value !== "draw" || methods.draws.length)
+          .map(([value, label]) => (
+            <s-button
+              key={value}
+              variant={methods.period === value ? "primary" : "secondary"}
+              onClick={() =>
+                setParams({
+                  methods: value === "today" ? null : value,
+                  draw: null,
+                })
+              }
+            >
+              {label}
+            </s-button>
+          ))}
+      </s-stack>
+      {methods.period === "draw" && (
+        <Select
+          label="Draw"
+          value={methods.draw ?? ""}
+          options={methods.draws.map((d) => ({
+            value: d.key,
+            label: `${shortDay(d.key)} · ${d.title}`,
+          }))}
+          onChange={(v) => setParams({ methods: "draw", draw: v })}
+        />
+      )}
     </s-stack>
   );
 

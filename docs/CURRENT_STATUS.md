@@ -23,6 +23,12 @@ giveaway page tabs have just a "Current draw / All time" toggle for Entries By M
 Turnstile/honeypot false-block fixes; pre-start order cleanup; entries-by-method, activity feed, disqualify entry/entrant;
 new-vs-existing sign-ups; tabs UI; mobile sheet/header icon; Title Case; theme `.pcg` collision fixes.
 
+## Past Draws in Entries By Method (PR pending, 2026-10-20; Railway only, no Shopify deploy)
+- Daily giveaway page, Entries By Method: **Current Draw / Past Draws / All Time**. Past Draws shows a Draw picker
+  ("Mon, Oct 19 · <prize>", newest first, up to 120 drawn days) and counts only entries in that draw's 9pm-to-9pm
+  window; New Sign-Ups follows the same choice. URL `?methods=draw&draw=YYYY-MM-DD`. Logic: `app/lib/method-window.ts`
+  (`test/method-window.test.ts`); `listGrowth` takes an optional `until`.
+
 ## Follow button click counts (live 2026-10-13: Railway `7dc1a48`, Shopify **poke-collect-giveaway-27**)
 Trevor's weekly ad report uses "Follow On Whatnot" clicks as a stand-in for Whatnot sign-ups. The widget sends a
 fire-and-forget beacon (`navigator.sendBeacon`, fetch keepalive fallback) to `/apps/giveaways/follow-click` after the
