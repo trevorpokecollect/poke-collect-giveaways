@@ -98,14 +98,23 @@ describe.skipIf(!enabled)("after the draw", async () => {
     expect((await w.loadClaim(shop, token)).kind).toBe("form");
     const bad = await w.submitClaim(shop, token, { name: "Ash" });
     expect(bad.error).toBeTruthy();
-    const ok = await w.submitClaim(shop, token, {
+    const address = {
       name: "Ash Ketchum",
       address1: "1 Route 1",
       city: "Pallet",
       zip: "12345",
       country: "US",
       phone: "555-123-4567",
+    };
+    // US-only (the default): a Canadian address or a missing state is refused.
+    const abroad = await w.submitClaim(shop, token, {
+      ...address,
+      province: "ON",
+      country: "Canada",
     });
+    expect(abroad.error).toMatch(/US addresses/);
+    expect((await w.submitClaim(shop, token, address)).error).toMatch(/state/);
+    const ok = await w.submitClaim(shop, token, { ...address, province: "OH" });
     expect(ok.view.kind).toBe("claimed");
     // A claimed winner can't be forfeited.
     await expect(w.forfeitAndRedraw(campaignId, winner.id)).rejects.toThrow();

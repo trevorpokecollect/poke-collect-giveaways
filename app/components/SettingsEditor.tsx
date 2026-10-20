@@ -269,6 +269,12 @@ export function SettingsEditor(props: {
             onChange={(requireName) => set({ requireName })}
           />
           <Check
+            label="US residents only"
+            details="Sign-up needs a ticked “I live in the US and have a US shipping address” box, winners must claim with an address in the 50 states or DC, and orders shipping outside the US earn no entries."
+            checked={s.usOnly}
+            onChange={(usOnly) => set({ usOnly })}
+          />
+          <Check
             label="Require the email opt-in to enter"
             details={
               'The "Email me deals" box must be ticked to sign up, and only people who ticked it are in the draw.'

@@ -229,6 +229,16 @@ embedded admin. `SearchBox` (`app/components/SearchBox.tsx`, full width) drives 
 (400ms) or on Enter; `entrantSearchWhere()` (`app/lib/entries/search.ts`) needs every word in the email or name.
 Not tried in the live admin (Claude's browser pane was signed out of Shopify).
 
+## US-only giveaways (branch `claude/us-only`, NOT deployed)
+Trevor 10-20: giveaways only for people in the US with a US shipping address. Setting `usOnly` (default **true**,
+editor "US residents only"). (1) Both storefront sign-up forms have a required box "I live in the US and have a US
+shipping address." (`usResident`, refused on the server when false). (2) Winner claims must be a US address: country US,
+a state in the 50 + DC (no territories/APO), 5-digit ZIP (`usAddressProblem`, `app/lib/us-only.ts`); claim page says so.
+(3) Orders with a shipping country other than US earn no purchase entries and don't auto-create entrants (pickup / no
+address still counts). (4) Rules generator adds the US shipping line to Eligibility. Existing entrants aren't re-asked;
+the claim check is the backstop (forfeit + redraw a non-US winner). No IP geolocation. Deploy order: Shopify first,
+then Railway (old widgets don't send `usResident`). Tests: `us-only.test.ts`, flow + winners integration (250 total).
+
 ## Open items / next steps
 1. **Add a daily repeatable task** (e.g. Daily Check-In) so returning players can earn entries each day — Trevor: "we'll
    add one when my credits reset" (10-13). Today only Bookmark (+20/day) and purchases repeat.

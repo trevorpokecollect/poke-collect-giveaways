@@ -1,3 +1,4 @@
+import { shipsOutsideUs } from "../us-only";
 import { randomBytes } from "node:crypto";
 import type { Campaign } from "@prisma/client";
 import db from "../../db.server";
@@ -24,6 +25,7 @@ export interface OrderWebhookPayload {
     first_name?: string | null;
     last_name?: string | null;
   } | null;
+  shipping_address?: { country_code?: string | null } | null;
   billing_address?: {
     first_name?: string | null;
     last_name?: string | null;
@@ -150,11 +152,14 @@ export async function processOrder(
   const email = payload.email || payload.contact_email;
   const shopifyOrderId = String(payload.id);
   const cancelled = opts.cancelled || !!payload.cancelled_at;
+  // US-only giveaways: an order shipping abroad earns nothing and signs nobody up.
+  const abroad = shipsOutsideUs(payload.shipping_address);
 
   for (const campaign of await liveCampaigns(shop, order.createdAt)) {
     const parsed = purchaseRulesSchema.safeParse(campaign.purchaseRules);
     if (!parsed.success) continue;
     const rules = parsed.data;
+    const excluded = abroad && parseSettings(campaign.settings).usOnly;
     const log = await db.orderLog.findUnique({
       where: {
         campaignId_shopifyOrderId: { campaignId: campaign.id, shopifyOrderId },
@@ -166,7 +171,7 @@ export async function processOrder(
           campaign,
           email,
           payload.customer?.id ? gid("Customer", payload.customer.id) : null,
-          rules.autoSignupFromOrders && !cancelled,
+          rules.autoSignupFromOrders && !cancelled && !excluded,
           orderBuyerName(payload),
         )
       : null;
@@ -186,7 +191,7 @@ export async function processOrder(
       continue;
     }
 
-    const breakdown = cancelled ? null : scoreOrder(rules, order);
+    const breakdown = cancelled || excluded ? null : scoreOrder(rules, order);
     const target = breakdown?.entries ?? 0;
     const orderLog =
       log ??
@@ -250,7 +255,7 @@ export async function processOrder(
               placedAt: order.createdAt.toISOString(),
             }
           : {
-              reason: "cancelled",
+              reason: cancelled ? "cancelled" : "ships outside the US",
               placedAt: order.createdAt.toISOString(),
             }) as object,
         status: cancelled

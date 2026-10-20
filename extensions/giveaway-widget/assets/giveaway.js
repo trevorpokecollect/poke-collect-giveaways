@@ -579,6 +579,20 @@
     mount();
   };
 
+  // US-only giveaways: a required "I live in the US" box on both sign-up forms (checked on the server too).
+  Widget.prototype.usBox = function () {
+    if (this.data.campaign.usOnly === false) return { box: null, input: null };
+    var input = el("input", { type: "checkbox", name: "us-resident", required: true });
+    return {
+      input: input,
+      box: el("label", { class: "pcg__check" }, [input, el("span", {}, [
+        "I live in the US and have a US shipping address.",
+        el("span", { class: "pcg__req", text: " Required To Enter" }),
+      ])]),
+    };
+  };
+  var US_ERROR = "This giveaway is only open to people who live in the US. Tick the box to confirm you have a US shipping address.";
+
   Widget.prototype.signup = function (fields) {
     var self = this;
     this.email = fields.email;
@@ -588,6 +602,7 @@
       name: fields.name,
       website: fields.website,
       consent: fields.consent,
+      usResident: fields.usResident,
       phone: fields.phone,
       smsConsent: fields.smsConsent,
       ref: this.ref,
@@ -641,6 +656,7 @@
     var nameId = nextId("name");
     var name = c.needsName ? el("input", { class: "pcg__input", id: nameId, type: "text", name: "name", autocomplete: "name", placeholder: "Ash Ketchum", required: true, maxlength: "80" }) : null;
     var consent = c.needsConsent ? el("input", { type: "checkbox", name: "consent", required: true }) : null;
+    var us = this.usBox();
     var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
     var compact = this.compact();
     var formId = nextId("form");
@@ -655,6 +671,7 @@
         e.preventDefault();
         if (name && name.value.trim().split(/\s+/).filter(function (w) { return /[^\s\d\W_]/.test(w); }).length < 2) { err.textContent = "Enter your first and last name."; name.focus(); return; }
         if (consent && !consent.checked) { err.textContent = "Tick the email box to enter."; consent.focus(); return; }
+        if (us.input && !us.input.checked) { err.textContent = US_ERROR; us.input.focus(); return; }
         if (phone && phone.value.trim() && !smsConsent.checked) { err.textContent = "Check the box to agree to texts, or leave the number blank."; smsConsent.focus(); return; }
         button.disabled = true;
         self.request("POST", {
@@ -663,6 +680,7 @@
           smsConsent: !!(smsConsent && smsConsent.checked && phone.value.trim()),
           name: name ? name.value : undefined,
           consent: consent ? consent.checked : undefined,
+          usResident: us.input ? us.input.checked : undefined,
           ref: self.ref,
           deviceId: deviceId(),
           utm: utm(),
@@ -678,6 +696,7 @@
         "Email me deals, drops and stream alerts.",
         el("span", { class: "pcg__req", text: " Required To Enter" }),
       ])]) : null,
+      us.box,
       smsF.smsBox,
       smsF.smsToggle,
       err,
@@ -712,6 +731,7 @@
     var honeypot = el("input", { type: "text", name: "pcg_hp_" + uid, tabindex: "-1", autocomplete: "off", "data-1p-ignore": "true", "data-lpignore": "true", "aria-hidden": "true" });
     var emailRequired = !!this.data.campaign.requireEmailConsent;
     var consent = el("input", { type: "checkbox", name: "consent", required: emailRequired });
+    var us = this.usBox();
     var turnstileBox = el("div");
     var err = el("p", { class: "pcg__error", role: "alert", text: error || "" });
     var compact = this.compact();
@@ -732,6 +752,7 @@
         // First and last name, so a winner can be shown as "Emily S.".
         if (nameRequired && name.value.trim().split(/\s+/).filter(function (w) { return /[^\s\d\W_]/.test(w); }).length < 2) { err.textContent = "Enter your first and last name."; name.focus(); return; }
         if (emailRequired && !consent.checked) { err.textContent = "Tick the email box to enter."; consent.focus(); return; }
+        if (us.input && !us.input.checked) { err.textContent = US_ERROR; us.input.focus(); return; }
         if (phone && phone.value.trim() && !smsConsent.checked) { err.textContent = "Check the box to agree to texts, or leave the number blank."; smsConsent.focus(); return; }
         button.disabled = true;
         // The bot check runs in the background; wait for it (up to 8s) rather than sending the
@@ -754,7 +775,7 @@
           return;
         }
         self.signup({
-          email: email.value, name: name.value, website: honeypot.value, consent: consent.checked, turnstileToken: turnstileToken,
+          email: email.value, name: name.value, website: honeypot.value, consent: consent.checked, usResident: us.input ? us.input.checked : undefined, turnstileToken: turnstileToken,
           phone: phone && smsConsent.checked ? phone.value : undefined, smsConsent: !!(smsConsent && smsConsent.checked && phone.value.trim()),
         })
           .catch(function (e2) {
@@ -773,6 +794,7 @@
         "Email me deals, drops and stream alerts.",
         emailRequired ? el("span", { class: "pcg__req", text: " Required To Enter" }) : null,
       ])]),
+      us.box,
       smsToggle,
       smsBox,
       turnstileBox,

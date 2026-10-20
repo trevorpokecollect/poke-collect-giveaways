@@ -172,6 +172,31 @@ describe.skipIf(!enabled)("giveaway flow", async () => {
     expect(brock.status).toBe("ACTIVE");
   });
 
+  it("gives no entries and signs nobody up for orders shipping outside the US", async () => {
+    await processOrder(shop, {
+      id: 1003,
+      name: "#1003",
+      email: "misty@example.ca",
+      created_at: new Date().toISOString(),
+      source_name: "web",
+      subtotal_price: "120.00",
+      total_price: "129.60",
+      shipping_address: { country_code: "CA" },
+      line_items: [
+        { product_id: 1, variant_id: 11, quantity: 1, price: "120.00" },
+      ],
+    });
+    expect(
+      await db.entrant.findFirst({
+        where: { campaignId, emailNormalized: "misty@example.ca" },
+      }),
+    ).toBeNull();
+    const log = await db.orderLog.findFirstOrThrow({
+      where: { campaignId, shopifyOrderId: "1003" },
+    });
+    expect(log.status).not.toBe("ENTRIES");
+  });
+
   it("draws only from active entrants and never repeats a winner", async () => {
     const first = await runDraw(campaignId, 2);
     const second = await runDraw(campaignId, 5);

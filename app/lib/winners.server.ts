@@ -1,3 +1,4 @@
+import { usAddressProblem } from "./us-only";
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 import db from "../db.server";
@@ -237,6 +238,14 @@ export async function submitClaim(
         "Please fill in every required field.",
     };
   const { winnerId } = readClaimToken(claimSecret(), token)!;
+  const settings = await db.winner.findUnique({
+    where: { id: winnerId },
+    select: { draw: { select: { campaign: { select: { settings: true } } } } },
+  });
+  if (parseSettings(settings?.draw.campaign.settings).usOnly) {
+    const problem = usAddressProblem(parsed.data);
+    if (problem) return { view, error: problem };
+  }
   // Only the first submission counts.
   const first = await db.winner.updateMany({
     where: { id: winnerId, claimedAt: null, forfeited: false },

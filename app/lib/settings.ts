@@ -105,6 +105,10 @@ export const campaignSettingsSchema = z.object({
   linkedSlug: z.string().default(""),
   // The "Email me deals" box must be ticked to enter (and to be in the draw).
   requireEmailConsent: z.boolean().default(false),
+  // Only people in the US with a US shipping address may enter: a required "I live in the US"
+  // box at sign-up, winners must claim with a US address (50 states + DC), and orders shipping
+  // abroad earn no purchase entries. See app/lib/us-only.ts.
+  usOnly: z.boolean().default(true),
   // First and last name on the sign-up form, so winners can be shown as "Emily S.".
   requireName: z.boolean().default(true),
   // Who may enter, used by the official rules generator in the editor.

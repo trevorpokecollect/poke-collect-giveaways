@@ -141,13 +141,13 @@ ${input("name", "Full name", v("name", view.defaults.name), { wide: true, autoco
 ${input("address1", "Address", v("address1"), { wide: true, autocomplete: "address-line1" })}
 ${input("address2", "Apartment, suite (optional)", v("address2"), { wide: true, required: false, autocomplete: "address-line2" })}
 ${input("city", "City", v("city"), { autocomplete: "address-level2" })}
-${input("province", "State / province", v("province"), { required: false, autocomplete: "address-level1" })}
-${input("zip", "ZIP / postal code", v("zip"), { autocomplete: "postal-code" })}
+${input("province", "State", v("province"), { autocomplete: "address-level1" })}
+${input("zip", "ZIP code", v("zip"), { autocomplete: "postal-code" })}
 ${input("country", "Country", v("country", "United States"), { autocomplete: "country-name" })}
 ${input("phone", "Phone", v("phone"), { wide: true, type: "tel", autocomplete: "tel" })}
 <button class="pcc__btn" type="submit">Confirm my details</button>
 </form>
-<p class="pcc__note" style="margin-top:14px">We only use these details to ship your prize.</p>`,
+<p class="pcc__note" style="margin-top:14px">Prizes ship only to US addresses (the 50 states and DC). We only use these details to ship your prize.</p>`,
         view.imageUrl,
       );
     }

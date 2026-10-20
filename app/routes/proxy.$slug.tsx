@@ -225,6 +225,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           ? `gid://shopify/Customer/${url.searchParams.get("logged_in_customer_id")}`
           : undefined,
         marketingConsent: body.consent === true,
+        usResident: body.usResident === true,
         phone: str("phone"),
         smsConsent: body.smsConsent === true,
         utm:
@@ -261,6 +262,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         shopifyCustomerId: customerId,
         signedInCustomer: true,
         marketingConsent: body.consent === true || c.emailSubscribed,
+        usResident: body.usResident === true,
         phone: str("phone"),
         smsConsent: body.smsConsent === true,
         utm:

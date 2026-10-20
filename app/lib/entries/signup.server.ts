@@ -1,3 +1,4 @@
+import { US_ONLY_MESSAGE } from "../us-only";
 import { randomBytes } from "node:crypto";
 import type { Campaign, Entrant } from "@prisma/client";
 import db from "../../db.server";
@@ -65,6 +66,11 @@ export interface SignupInput {
    */
   signedInCustomer?: boolean;
   marketingConsent?: boolean;
+  /**
+   * The "I live in the US" box on the storefront forms. Only storefront sign-ups pass it; when
+   * it's passed as false on a US-only giveaway the sign-up is refused.
+   */
+  usResident?: boolean;
   /** Optional mobile number from the sign-up form; only kept when smsConsent is true. */
   phone?: string;
   smsConsent?: boolean;
@@ -156,6 +162,8 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
       error: "Enter your first and last name.",
       status: 400,
     };
+  if (parseSettings(campaign.settings).usOnly && input.usResident === false)
+    return { ok: false, error: US_ONLY_MESSAGE, status: 400 };
   if (
     parseSettings(campaign.settings).requireEmailConsent &&
     !input.marketingConsent
