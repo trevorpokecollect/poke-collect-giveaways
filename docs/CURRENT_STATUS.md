@@ -249,8 +249,8 @@ The prize keeps `DailyPrize.items` (PrizeItem[], `app/lib/bundles.ts`); single f
 (idempotency keys `daily-<op>-<prize>-<n>`; single prizes keep the old keys), and a failed bundle reserve puts back
 what it took. The $0 claim order has one line per product with its quantity. Storefront `daily.prize.items` /
 `upcoming[].items` (pictures + counts, no values); the widget shows the products side by side with a yellow "3x"
-above repeated ones. Migration `20261020170000_prize_bundles`. Bundle pictures (Trevor 10-20, branch `claude/bundle-pictures`, NOT
-deployed): the widget trims each product photo's empty margin (`trimImage` reads it on a 120px canvas, then uses
+above repeated ones. Migration `20261020170000_prize_bundles`. Bundle pictures (Trevor 10-20, live 2026-10-20: Railway `2e60a8a`,
+Shopify **poke-collect-giveaways-40**): the widget trims each product photo's empty margin (`trimImage` reads it on a 120px canvas, then uses
 Shopify's `crop=region` URL; non-Shopify images stay as they are), Upcoming Prizes shows every bundle picture, the claim
 page shows all of them with "3x", and the admin list shows a thumbnail per product. Needs Shopify + Railway deploy. Tests:
 `bundles.test.ts`, `bundles.integration.test.ts` (261 total).
