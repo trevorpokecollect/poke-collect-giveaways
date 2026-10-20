@@ -229,7 +229,7 @@ embedded admin. `SearchBox` (`app/components/SearchBox.tsx`, full width) drives 
 (400ms) or on Enter; `entrantSearchWhere()` (`app/lib/entries/search.ts`) needs every word in the email or name.
 Not tried in the live admin (Claude's browser pane was signed out of Shopify).
 
-## US-only giveaways (branch `claude/us-only`, NOT deployed)
+## US-only giveaways (live 2026-10-20: Railway `66e2ab5`, Shopify **poke-collect-giveaways-38**; Staff Guide updated)
 Trevor 10-20: giveaways only for people in the US with a US shipping address. Setting `usOnly` (default **true**,
 editor "US residents only"). (1) Both storefront sign-up forms have a required box "I live in the US and have a US
 shipping address." (`usResident`, refused on the server when false). (2) Winner claims must be a US address: country US,
