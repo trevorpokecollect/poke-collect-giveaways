@@ -1,3 +1,4 @@
+import { prizeItems } from "./bundles";
 import { usAddressProblem } from "./us-only";
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
@@ -181,6 +182,9 @@ export type ClaimView =
       title: string;
       prize: string;
       imageUrl: string | null;
+      /** Bundle prizes: every product's picture and count. */
+      items?:
+        { imageUrl: string | null; quantity: number; title: string }[] | null;
       deadline: Date;
       defaults: { name: string };
     };
@@ -217,6 +221,7 @@ export async function loadClaim(
     title: campaign.title,
     prize,
     imageUrl: daily ? daily.imageUrl : campaign.imageUrl,
+    items: daily ? prizeItems(daily.items) : null,
     deadline: parsed.expiresAt,
     defaults: { name: winner.entrant.name ?? "" },
   };

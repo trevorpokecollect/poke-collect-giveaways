@@ -263,19 +263,73 @@
 
   // Today's prize on a red "digital rain" backdrop (the Mystery Packs opener's effect), floating
   // with a soft glow. Only once a prize is picked; the rain pauses while off-screen or hidden.
+  // Product photos are often square with wide empty margins, so side by side they look tiny and
+  // uneven. trimImage finds the picture's visible area (not transparent, not plain white) on a
+  // small canvas and, for Shopify CDN images, swaps in Shopify's own crop of just that area.
+  var trimCache = {};
+  function trimImage(img, url) {
+    if (!url || !/^https:\/\/cdn\.shopify\.com\//.test(url)) return;
+    var done = function (crop) { if (crop) img.src = crop; };
+    if (url in trimCache) { done(trimCache[url]); return; }
+    var probe = new Image();
+    probe.crossOrigin = "anonymous";
+    probe.onload = function () {
+      var crop = null;
+      try {
+        var w = probe.naturalWidth, h = probe.naturalHeight, n = 120;
+        var c = document.createElement("canvas");
+        c.width = n; c.height = n;
+        var ctx = c.getContext("2d");
+        ctx.drawImage(probe, 0, 0, n, n);
+        var px = ctx.getImageData(0, 0, n, n).data;
+        var x0 = n, y0 = n, x1 = -1, y1 = -1;
+        for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) {
+          var i = (y * n + x) * 4;
+          var empty = px[i + 3] < 40 || (px[i] > 244 && px[i + 1] > 244 && px[i + 2] > 244);
+          if (empty) continue;
+          if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+        if (x1 > x0 && y1 > y0) {
+          var pad = 2;
+          x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(n - 1, x1 + pad); y1 = Math.min(n - 1, y1 + pad);
+          var area = ((x1 - x0 + 1) * (y1 - y0 + 1)) / (n * n);
+          if (area < 0.9) {
+            var u = new URL(url);
+            u.searchParams.set("crop", "region");
+            u.searchParams.set("crop_left", String(Math.floor((x0 / n) * w)));
+            u.searchParams.set("crop_top", String(Math.floor((y0 / n) * h)));
+            u.searchParams.set("crop_width", String(Math.ceil(((x1 - x0 + 1) / n) * w)));
+            u.searchParams.set("crop_height", String(Math.ceil(((y1 - y0 + 1) / n) * h)));
+            crop = u.toString();
+          }
+        }
+      } catch (e) { /* canvas blocked: keep the original picture */ }
+      trimCache[url] = crop;
+      done(crop);
+    };
+    probe.src = url;
+  }
+
+  // Bundle pictures: every product, trimmed, with "3x" above repeated ones.
+  function bundleArt(items, cls) {
+    return items.map(function (i) {
+      var img = i.imageUrl ? el("img", { src: i.imageUrl, alt: "", loading: "lazy" }) : null;
+      if (img) trimImage(img, i.imageUrl);
+      return el("div", { class: cls }, [
+        // Every product keeps the badge's space, so pictures line up.
+        el("span", { class: "pcg__qty" + (i.quantity > 1 ? "" : " pcg__qty--none"), "aria-hidden": "true", text: i.quantity > 1 ? i.quantity + "x" : "1x" }),
+        img || el("span", { class: "pcg__stage-ph", "aria-hidden": "true", text: "🎁" }),
+      ]);
+    });
+  }
+
   function prizeStage(p) {
     var canvas = el("canvas", { class: "pcg__matrix", "aria-hidden": "true" });
     // Bundles: every product side by side, with "3x" above any that come more than once.
     var items = p.items && p.items.length ? p.items : null;
     var bundle = items && (items.length > 1 || items[0].quantity > 1);
     var art = bundle
-      ? el("div", { class: "pcg__stage-items pcg__stage-items--" + Math.min(items.length, 4), role: "img", "aria-label": p.title }, items.map(function (i) {
-          return el("div", { class: "pcg__stage-item" }, [
-            // Every product keeps the badge's space, so pictures line up.
-            el("span", { class: "pcg__qty" + (i.quantity > 1 ? "" : " pcg__qty--none"), "aria-hidden": "true", text: i.quantity > 1 ? i.quantity + "x" : "1x" }),
-            i.imageUrl ? el("img", { src: i.imageUrl, alt: "", loading: "lazy" }) : el("span", { class: "pcg__stage-ph", "aria-hidden": "true", text: "🎁" }),
-          ]);
-        }))
+      ? el("div", { class: "pcg__stage-items pcg__stage-items--" + Math.min(items.length, 4), role: "img", "aria-label": p.title }, bundleArt(items, "pcg__stage-item"))
       : el("img", { class: "pcg__stage-img", src: p.imageUrl, alt: p.title, loading: "lazy" });
     var stage = el("div", { class: "pcg__image pcg__stage" }, [
       canvas,
@@ -437,8 +491,11 @@
     return el("div", { class: "pcg__upcoming" }, [
       el("h3", { class: "pcg__subheading", text: "Upcoming Prizes" }),
       el("ul", { class: "pcg__upcoming-list", role: "list" }, list.map(function (u) {
+        var parts = u.items && u.items.length ? u.items : null;
         return el("li", { class: "pcg__upcoming-item" }, [
-          u.imageUrl ? el("img", { src: u.imageUrl, alt: "", loading: "lazy" }) : el("span", { class: "pcg__upcoming-ph", "aria-hidden": "true", text: "🎁" }),
+          parts
+            ? el("span", { class: "pcg__upcoming-bundle", role: "img", "aria-label": u.title }, bundleArt(parts, "pcg__upcoming-part"))
+            : u.imageUrl ? el("img", { src: u.imageUrl, alt: "", loading: "lazy" }) : el("span", { class: "pcg__upcoming-ph", "aria-hidden": "true", text: "🎁" }),
           el("span", { class: "pcg__upcoming-day", text: label(u.date) }),
           el("span", { class: "pcg__upcoming-title", text: u.title }),
         ]);

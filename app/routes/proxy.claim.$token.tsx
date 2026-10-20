@@ -54,6 +54,10 @@ const STYLE = `<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@
 .pcc__title{margin:8px 0 4px;font-family:Oswald,"Arial Narrow",Impact,sans-serif;font-weight:700;font-size:2em;line-height:1.1;text-transform:uppercase;color:#fff}
 .pcc__prize{margin:0;color:#ff6b6b;font-weight:700}
 .pcc__image{display:block;width:100%;max-height:320px;object-fit:contain;background:var(--cream)}
+.pcc__bundle{display:flex;align-items:flex-end;justify-content:center;gap:12px;height:320px;padding:16px;box-sizing:border-box;background:var(--cream)}
+.pcc__part{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px}
+.pcc__part img{max-width:100%;max-height:85%;object-fit:contain}
+.pcc__qty{padding:3px 12px;border-radius:999px;background:var(--yellow);color:var(--ink);font-family:Oswald,"Arial Narrow",Impact,sans-serif;font-weight:700}
 .pcc__body{padding:24px}
 .pcc__body p{margin:0 0 14px;line-height:1.55}
 .pcc__form{display:grid;gap:12px;grid-template-columns:1fr 1fr}
@@ -74,10 +78,23 @@ function shell(
   title: string,
   body: string,
   image?: string | null,
+  items?: { imageUrl: string | null; quantity: number }[] | null,
 ) {
+  // Bundle prizes show every product, with "3x" above repeated ones.
+  const pictures =
+    items && (items.length > 1 || items[0].quantity > 1)
+      ? `<div class="pcc__bundle">${items
+          .map(
+            (i) =>
+              `<div class="pcc__part">${i.quantity > 1 ? `<span class="pcc__qty">${i.quantity}x</span>` : ""}${i.imageUrl ? `<img src="${esc(i.imageUrl)}" alt="">` : ""}</div>`,
+          )
+          .join("")}</div>`
+      : image
+        ? `<img class="pcc__image" src="${esc(image)}" alt="">`
+        : "";
   return `${STYLE}
 <div class="pcc"><div class="pcc__card">
-${image ? `<img class="pcc__image" src="${esc(image)}" alt="">` : ""}
+${pictures}
 <div class="pcc__hero"><div class="pcc__kicker">${esc(kicker)}</div><h1 class="pcc__title">${esc(title)}</h1></div>
 <div class="pcc__body">${body}</div>
 </div></div>`;
@@ -149,6 +166,7 @@ ${input("phone", "Phone", v("phone"), { wide: true, type: "tel", autocomplete: "
 </form>
 <p class="pcc__note" style="margin-top:14px">Prizes ship only to US addresses (the 50 states and DC). We only use these details to ship your prize.</p>`,
         view.imageUrl,
+        view.items,
       );
     }
   }

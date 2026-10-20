@@ -28,6 +28,8 @@ export interface QueueRow {
   plannedFor: string | null;
   /** Several products, or several of one, as one prize. */
   bundle: boolean;
+  /** A bundle's product pictures. */
+  images: string[];
 }
 
 interface BundleDraftPart {
@@ -442,13 +444,19 @@ function UpcomingPrizes(props: {
                       gap="small-200"
                       alignItems="center"
                     >
-                      {q.imageUrl && (
+                      {(q.images.length
+                        ? q.images
+                        : q.imageUrl
+                          ? [q.imageUrl]
+                          : []
+                      ).map((src, n) => (
                         <s-thumbnail
-                          src={q.imageUrl}
+                          key={n}
+                          src={src}
                           alt={q.title}
                           size="small"
                         />
-                      )}
+                      ))}
                       <s-stack gap="none">
                         <s-text>{q.title}</s-text>
                         {q.bundle && <s-badge tone="info">Bundle</s-badge>}

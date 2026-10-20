@@ -196,6 +196,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         note: q.note,
         plannedFor: plannedFor.get(q.id) ?? null,
         bundle: Array.isArray(q.bundle),
+        images: Array.isArray(q.bundle)
+          ? (q.bundle as { imageUrl: string | null }[])
+              .map((b) => b.imageUrl)
+              .filter((u): u is string => !!u)
+          : [],
       })),
       drawTime: dailyCfg.drawTime,
       timezone: campaign.timezone,
