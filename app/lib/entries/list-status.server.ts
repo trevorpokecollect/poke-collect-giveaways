@@ -65,12 +65,23 @@ export async function checkListStatus(campaign: Campaign, limit = 200) {
   }
 }
 
-/** New vs already-on-the-list counts, optionally only sign-ups since `since`. */
-export async function listGrowth(campaignId: string, since?: Date) {
+/** New vs already-on-the-list counts, optionally only sign-ups in [since, until). */
+export async function listGrowth(
+  campaignId: string,
+  since?: Date,
+  until?: Date,
+) {
   const where = {
     campaignId,
     ipHash: { not: null },
-    ...(since ? { createdAt: { gte: since } } : {}),
+    ...(since || until
+      ? {
+          createdAt: {
+            ...(since ? { gte: since } : {}),
+            ...(until ? { lt: until } : {}),
+          },
+        }
+      : {}),
   };
   const checked = { ...where, listsCheckedAt: { not: null } };
   const [
