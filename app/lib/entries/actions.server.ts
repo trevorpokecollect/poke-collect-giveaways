@@ -428,7 +428,7 @@ export async function completeAction(
         );
       if (!found)
         return fail(
-          `We don't see a buylist from ${entrant.email} yet today. Submit one with this email, then tap again.`,
+          `We don't see an approved buylist from ${entrant.email} yet today. Buylists count once we approve them (usually within 24 hours). Tap again after you get the approval email.`,
         );
     }
     // "List A Card On Vault Marketplace": only a real Vault Market listing since the task day began.

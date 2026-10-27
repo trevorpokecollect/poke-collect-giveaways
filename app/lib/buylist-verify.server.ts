@@ -1,6 +1,6 @@
 // Checks the Poke-Collect buylist app (poke-collect-singles) for a real submission, for the
 // "Submit A Buylist" daily task (action config `verifyBuylist`). The buylist app answers
-// GET <BUYLIST_VERIFY_URL>?email=<email>&since=<ISO time> with { submitted: boolean } when the
+// GET <BUYLIST_VERIFY_URL>?email=<email>&since=<ISO time>&approved=1 with { submitted: boolean } when the
 // request carries the shared BUYLIST_VERIFY_SECRET in the x-verify-secret header. Both values are
 // Railway variables; the secret is never committed.
 
@@ -14,6 +14,9 @@ export async function buylistSubmittedSince(email: string, since: Date) {
   const url = new URL(base);
   url.searchParams.set("email", email);
   url.searchParams.set("since", since.toISOString());
+  // Only buylists staff approved count (Trevor 2026-10-27: people sent throwaway buylists for the
+  // entries). The buylist app matches approvedAt >= since and skips declined/cancelled ones.
+  url.searchParams.set("approved", "1");
   try {
     const res = await fetch(url, {
       headers: { "x-verify-secret": secret, Accept: "application/json" },

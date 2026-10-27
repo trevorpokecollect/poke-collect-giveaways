@@ -215,7 +215,9 @@ settings). Trevor chose to verify real submissions: editor checkbox "Only count 
 submissions only, not DRAFT/CANCELLED; `GIVEAWAY_COUNT_STAFF=true` there would count walk-ins). Railway vars set:
 `BUYLIST_VERIFY_URL` (giveaway app) and `BUYLIST_VERIFY_SECRET` (both apps, same value; copied by Trevor). Failures log
 `[buylist-verify] check failed`. `TaskDay.startsAt` added. Test:
-`buylist-verify.integration.test.ts`.
+`buylist-verify.integration.test.ts`. **Approved only** (Trevor 10-27, branch `claude/approved-buylists`, NOT deployed): the giveaway now
+sends `approved=1`, and the buylist app must then match `approvedAt >= since` and skip DRAFT/CANCELLED/DECLINED (patch handed
+to the buylist thread via Trevor). Until the buylist app supports it, the parameter is ignored and submissions still count.
 
 ## Add Entries (live 2026-10-19 ~16:30Z: Railway `56725aa`, PR #29)
 Admin "Add Entries" on the entrant page and (by email) behind a button on the giveaway's Entrants tab, for purchases or

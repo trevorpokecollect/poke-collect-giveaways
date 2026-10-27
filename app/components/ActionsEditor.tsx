@@ -359,8 +359,8 @@ function DailyTaskFields({
             onChange={(latestInstagram) => setConfig({ latestInstagram })}
           />
           <Check
-            label="Only count real buylist submissions"
-            details="Entries are given only when the buylist app has a submission from the entrant's email since the task last reset. Needs BUYLIST_VERIFY_URL and BUYLIST_VERIFY_SECRET in Railway; until then claims are refused."
+            label="Only count approved buylists"
+            details="Entries are given only when the buylist app has a buylist from the entrant's email that staff approved since the task last reset. Needs BUYLIST_VERIFY_URL and BUYLIST_VERIFY_SECRET in Railway; until then claims are refused."
             checked={!!c.verifyBuylist}
             onChange={(verifyBuylist) => setConfig({ verifyBuylist })}
           />

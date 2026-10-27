@@ -113,6 +113,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       });
       expect(r.ok).toBe(false);
       expect(asked.at(-1)?.searchParams.get("email")).toBe("Ash@Example.com");
+      expect(asked.at(-1)?.searchParams.get("approved")).toBe("1");
       // Asked from the start of today's draw day.
       expect(
         new Date(asked.at(-1)!.searchParams.get("since")!).getTime(),
