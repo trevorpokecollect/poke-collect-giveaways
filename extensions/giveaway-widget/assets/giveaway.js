@@ -112,6 +112,26 @@
     for (var i = 0; i < PLATFORMS.length; i++) if (PLATFORMS[i][1].test(host)) return PLATFORMS[i][0];
     return a.type === "SOCIAL_FOLLOW" ? "other" : null;
   }
+  // Cardbit (sister site) tasks: any follow/visit action whose label or link names Cardbit shows the
+  // Cardbit emblem, with a small badge for the network. One pointing at cardbit.com itself (the
+  // Founder waitlist) gets the full Cardbit look; as the last odd tile it already spans the row.
+  var CARDBIT_EMBLEM = "data:image/webp;base64,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";
+  function isCardbit(a) {
+    var url = (a.config && a.config.url) || a.url || "";
+    var host = "";
+    try { host = new URL(url).hostname.toLowerCase(); } catch (e) { /* no link */ }
+    return /cardbit/i.test(a.label || "") || /(^|\.)cardbit\.com$/.test(host);
+  }
+  function cardbitIcon(platform) {
+    var span = el("span", { class: "pcg__ic pcg__ic--cb", "aria-hidden": "true" });
+    span.appendChild(el("img", { src: CARDBIT_EMBLEM, alt: "", width: "109", height: "128", decoding: "async" }));
+    if (platform && platform !== "other") {
+      var badge = el("span", { class: "pcg__ic-badge" });
+      badge.innerHTML = ICONS[platform] || "";
+      span.appendChild(badge);
+    }
+    return span;
+  }
   // iPhone/iPad: a new tab for Instagram, Whatnot or Discord is left blank (about:blank) when the
   // phone hands the link to the app, and getting back to the giveaway is awkward. There we open
   // the link in this tab instead: the app opens and the giveaway stays put, or Back returns to it.
@@ -601,12 +621,13 @@
     actions = actions.filter(function (a) { return a.mandatory; }).concat(actions.filter(function (a) { return !a.mandatory; }));
     return el("ul", { class: "pcg__socials", role: "list" }, actions.map(function (a) {
       var platform = platformOf(a);
+      var cardbit = isCardbit(a);
       var finished = !!done[a.id];
       var isLocked = locked && !a.mandatory;
       var error = el("p", { class: "pcg__error", role: "alert" });
       var pts = el("span", { class: "pcg__soc-pts" }, finished ? [icon("check"), document.createTextNode(" +" + a.entries)] : [document.createTextNode("+" + a.entries)]);
       var btn = el("button", {
-        class: "pcg__soc pcg__soc--" + platform + (finished ? " pcg__soc--done" : "") + (a.mandatory ? " pcg__soc--req" : ""),
+        class: "pcg__soc pcg__soc--" + platform + (cardbit ? " pcg__soc--cb" + (platform === "other" ? " pcg__soc--cardbit" : "") : "") + (finished ? " pcg__soc--done" : "") + (a.mandatory ? " pcg__soc--req" : ""),
         type: "button",
         "aria-label": a.label + ", " + (finished ? "done, " : "") + entriesText(a.entries),
         onclick: function () {
@@ -617,7 +638,7 @@
           if (isLocked) { error.textContent = "Complete the required step first to unlock this one."; return; }
           self.submitAction(a, {}, { error: error, button: btn }).catch(function () {});
         },
-      }, [icon(platform), el("span", { class: "pcg__soc-name" }, [
+      }, [cardbit ? cardbitIcon(platform) : icon(platform), el("span", { class: "pcg__soc-name" }, [
         tc(a.label),
         a.mandatory && !finished ? el("small", { class: "pcg__soc-req", text: "Required To Enter" }) : null,
       ]), pts]);
@@ -762,7 +783,7 @@
       name ? el("label", { class: "pcg__label", for: nameId, text: "First And Last Name" }) : null,
       name,
       consent ? el("label", { class: "pcg__check" }, [consent, el("span", {}, [
-        "Email me deals, drops and stream alerts.",
+        "Email me deals, drops and giveaway alerts.",
         el("span", { class: "pcg__req", text: " Required To Enter" }),
       ])]) : null,
       us.box,
@@ -860,7 +881,7 @@
       name,
       el("div", { class: "pcg__hp", "aria-hidden": "true" }, [honeypot]),
       el("label", { class: "pcg__check" }, [consent, el("span", {}, [
-        "Email me deals, drops and stream alerts.",
+        "Email me deals, drops and giveaway alerts.",
         emailRequired ? el("span", { class: "pcg__req", text: " Required To Enter" }) : null,
       ])]),
       us.box,

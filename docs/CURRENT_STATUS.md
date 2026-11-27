@@ -17,6 +17,16 @@ deployed `8af9e1e` (SUCCESS)._
 - **Monthly**: still on GiveawayNinja (/pages/monthly-giveaway, "30th Celebration UPC Case", draw Nov 1). The app has a
   one-click preset `New monthly (GiveawayNinja setup)` (`/app/campaigns/new?type=monthly`), not yet created/migrated.
 
+## Cardbit tasks look (pushed 2026-11-27, NOT deployed: needs Trevor's "deploy", Railway + Shopify)
+- Widget: any follow/visit task whose label or link names Cardbit shows the Cardbit emblem (inlined webp, from
+  cardbit.com brand-emblem) with a small network badge; one pointing at cardbit.com (Become A Cardbit Founder) gets a
+  dark navy/cyan Cardbit bar. It is the last odd social tile, so the existing CSS already makes it full width.
+- Sign-up consent line now "Email me deals, drops and giveaway alerts." (no more "stream", Poke-Collect stopped streaming).
+- Daily Giveaway task data (admin, live 2026-11-27): socials ordered Poke-Collect left / Cardbit right (Discord, Facebook,
+  Instagram pairs), Founder last; removed Bookmark Our Next Show, List A Card On Vault Marketplace, Join Our Live
+  Whatnot Show; added Cardbit Discord/Facebook/Instagram follows (+50), Founder (+100), daily Like & Comment on
+  Cardbit Instagram/Facebook (+5).
+
 ## Recently completed (10-12 → 10-13)
 Prize queue + Upcoming Prizes; safety stock prizes; per-draw analytics + date ranges (**Analytics page only** — the
 giveaway page tabs have just a "Current draw / All time" toggle for Entries By Method and New Sign-Ups); daily rules wording;
