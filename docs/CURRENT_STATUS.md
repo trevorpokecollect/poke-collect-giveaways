@@ -17,7 +17,7 @@ deployed `8af9e1e` (SUCCESS)._
 - **Monthly**: still on GiveawayNinja (/pages/monthly-giveaway, "30th Celebration UPC Case", draw Nov 1). The app has a
   one-click preset `New monthly (GiveawayNinja setup)` (`/app/campaigns/new?type=monthly`), not yet created/migrated.
 
-## Cardbit tasks look (pushed 2026-11-27, NOT deployed: needs Trevor's "deploy", Railway + Shopify)
+## Cardbit tasks look (LIVE 2026-11-27 ~2:15 PM CT: Railway 110d32d + Shopify app version poke-collect-giveaways-41)
 - Widget: any follow/visit task whose label or link names Cardbit shows the Cardbit emblem (inlined webp, from
   cardbit.com brand-emblem) with a small network badge; one pointing at cardbit.com (Become A Cardbit Founder) gets a
   dark navy/cyan Cardbit bar. It is the last odd social tile, so the existing CSS already makes it full width.
